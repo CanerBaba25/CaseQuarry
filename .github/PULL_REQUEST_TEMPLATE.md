@@ -31,7 +31,7 @@ Commands run and actual results:
 - [ ] This PR is intended for the **original CaseQuarry repository** only. I am not using it to distribute an independent modified product.
 - [ ] I have legal authority to submit my own contribution and have documented any third-party code used.
 - [ ] I have read the contributor terms **draft** and understand maintainers will require an approved rights grant before accepting external code. This checkbox is **not** an automatic copyright transfer or acceptance of unfinalized terms.
-- [ ] AI-assisted changes (if any) have been identified, reviewed and validated.
+- [ ] All changes have been reviewed and validated.
 
 ## Screenshots/notes (optional)
 

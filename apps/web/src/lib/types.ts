@@ -1,0 +1,203 @@
+export type User = {
+  id: string;
+  email: string;
+  name: string;
+  tenant_id: string;
+  role: string;
+  csrf_token: string;
+};
+export type Matter = {
+  id: string;
+  matter_number: string;
+  title: string;
+  description: string;
+  client: string;
+  jurisdiction: string;
+  case_type: string;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+  role: string;
+};
+export type AuditEvent = {
+  id: string;
+  event_type: string;
+  timestamp: string;
+  created_at?: string;
+  actor_id?: string;
+  actor_name?: string;
+  target_id?: string;
+  target_type?: string;
+  safe_metadata?: Record<string, unknown>;
+};
+export type Bucket = { key: string; count: number };
+export type Stats = {
+  evidence_items: number;
+  source_occurrences: number;
+  unique_objects: number;
+  indexed: number;
+  reviewed: number;
+  duplicates: number;
+  total_bytes: number;
+  processing: Record<string, number>;
+  types: Bucket[];
+  review_status: Bucket[];
+  recent_activity: AuditEvent[];
+};
+export type Evidence = {
+  evidence_id: string;
+  id: string;
+  type: string;
+  title: string;
+  date_utc: string | null;
+  sender: string;
+  recipients: string[];
+  source_id: string;
+  custodian_id: string;
+  snippet: string;
+  sha256: string;
+  byte_size: number;
+  has_attachments: boolean;
+  review_status: string;
+  privilege_status: string;
+  tags: string[];
+  bookmarked: boolean;
+  parser_state: string;
+  review_version: number;
+  thread_id: string | null;
+  date_raw?: string | null;
+  parent_id?: string | null;
+  parser_error?: string | null;
+};
+export type Span = {
+  id: string;
+  span_id: string;
+  page?: number;
+  line_start?: number;
+  char_start: number;
+  char_end: number;
+  text: string;
+  artifact_id: string;
+  artifact_version: number;
+  text_hash?: string;
+};
+export type EvidenceDetail = Evidence & {
+  text: string;
+  html: null;
+  email: null | {
+    from: unknown;
+    to: unknown;
+    cc: unknown;
+    bcc: unknown;
+    reply_to: unknown;
+    raw_headers: Record<string, unknown> | string;
+    message_id: string;
+    in_reply_to: string;
+    references: string[];
+    sent_at_raw: string;
+  };
+  spans: Span[];
+  attachments: Evidence[];
+  source: {
+    id: string;
+    label: string;
+    custodian: string | { display_name: string };
+    custodian_id?: string | null;
+  };
+  original_name: string;
+  integrity_status: string;
+  annotations: {
+    id: string;
+    text: string;
+    created_at: string;
+    author_id: string;
+  }[];
+  review_history: {
+    id: string;
+    decided_at?: string;
+    created_at?: string;
+    changes?: { review_status?: string };
+    review_status?: string;
+    note?: string;
+  }[];
+  timezone_source?: string;
+  parent_item_id?: string;
+  duplicate_count?: number;
+  derived_artifacts?: {
+    id: string;
+    artifact_type: string;
+    sha256: string;
+    parser_or_model_version: string;
+  }[];
+};
+export type SearchSpec = {
+  query: string;
+  mode: string;
+  filters: Record<string, unknown>;
+  sort: { field: string; order: string }[];
+  group_by: string | null;
+  page_size: number;
+  cursor: string | null;
+};
+export type SearchResult = {
+  case_id: string;
+  index_version: string;
+  total_hits: number;
+  total_hits_relation: string;
+  next_cursor: string | null;
+  items: Evidence[];
+  facets: { field: string; values: Bucket[] }[];
+  groups: Bucket[];
+  coverage: {
+    total_items: number;
+    states: Record<string, number>;
+    scale_validated: boolean;
+  };
+  warnings?: string[];
+};
+export type ImportBatch = {
+  id: string;
+  batch_id?: string;
+  state: string;
+  counts: Record<string, number>;
+  errors: { filename: string; code: string; message: string }[];
+  created_at?: string;
+  source_label?: string;
+  source_id?: string;
+  filename?: string;
+};
+export type Source = {
+  id: string;
+  label: string;
+  kind: string;
+  custodian_id?: string;
+  created_at?: string;
+  item_count?: number;
+};
+export type Person = {
+  id: string;
+  email: string;
+  name: string;
+  sent_count: number;
+  received_count: number;
+  total_count: number;
+  unique_messages?: number;
+  state?: string;
+};
+export type TimelineItem = {
+  id: string;
+  date_utc: string;
+  title: string;
+  evidence_id: string;
+  type: string;
+  source: string;
+};
+export type SavedSearch = { id: string; name: string; query_spec: SearchSpec };
+export type ExportRecord = {
+  id: string;
+  state: string;
+  format: string;
+  download_url?: string;
+  created_at?: string;
+  counts?: Record<string, number>;
+};

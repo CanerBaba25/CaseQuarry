@@ -1,0 +1,90 @@
+name: casequarry
+
+x-api-environment: &api-environment
+  CASEQUARRY_ENVIRONMENT: development
+  CASEQUARRY_DATABASE_URL: postgresql+psycopg://casequarry:${POSTGRES_PASSWORD:?Run uv run python scripts/tasks.py init}@db:5432/casequarry
+  CASEQUARRY_STORAGE_ROOT: /app/private-data
+  CASEQUARRY_SETUP_TOKEN: ${CASEQUARRY_SETUP_TOKEN:?Run uv run python scripts/tasks.py init}
+  CASEQUARRY_WORKER_MODE: external
+  CASEQUARRY_AI_ENABLED: "false"
+  CASEQUARRY_ALLOW_REMOTE_AI: "false"
+  CASEQUARRY_ALLOW_INSECURE_LOCAL_COOKIES: "true"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: casequarry
+      POSTGRES_USER: casequarry
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run uv run python scripts/tasks.py init}
+    volumes:
+      - database:/var/lib/postgresql/data
+    networks: [private]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U casequarry -d casequarry"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    environment: *api-environment
+    volumes:
+      - evidence:/app/private-data
+    networks: [private]
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    command: [python, -m, casequarry.worker]
+    environment: *api-environment
+    volumes:
+      - evidence:/app/private-data
+    networks: [private]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        CASEQUARRY_API_INTERNAL_URL: http://api:8000
+    environment:
+      CASEQUARRY_API_INTERNAL_URL: http://api:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    networks: [private]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/login').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+networks:
+  private:
+    internal: true
+
+volumes:
+  database:
+  evidence:

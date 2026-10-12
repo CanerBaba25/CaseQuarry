@@ -1,8 +1,59 @@
-/BRAND_NAME_RESEARCH.md
-/CaseQuarry_CODEX_MASTER_SPEC.md
-/CODEX_START_HERE.md
-/CONTRIBUTING.md
-/CONTRIBUTOR_TERMS_DRAFT.md
-/graphify-out
-/LICENSE_DRAFT.md
-/README.md
+# Local Graphify outputs and configuration
+graphify-out/
+.graphify*
+
+# Local RTK configuration, instructions and backups
+.rtk*
+[Rr][Tt][Kk].toml
+[Rr][Tt][Kk].md*
+
+# Local agent instructions, skills and hooks
+[Aa][Gg][Ee][Nn][Tt].md*
+[Aa][Gg][Ee][Nn][Tt][Ss].md*
+[Aa][Gg][Ee][Nn][Tt][Ss].override.md
+.agents/
+.codex/
+
+# Other assistant integration artifacts
+.claude/
+.gemini/
+.cursor/
+CLAUDE.md*
+GEMINI.md*
+rtk-rewrite.sh
+rtk-suggest.sh
+rtk-rewrite.json
+
+# Private implementation prompts and working notes
+CODEX_START_HERE.md
+*_CODEX_MASTER_SPEC.md
+BRAND_NAME_RESEARCH.md
+
+# Local release packages; publish them as release assets
+.release-artifacts/
+
+# Private runtime data and development output
+.env
+.env.*
+!.env.example
+.data/
+.venv/
+node_modules/
+.next/
+out/
+dist/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
+test-results/
+playwright-report/
+*.log
+
+# Local build coordination and status
+IMPLEMENTATION_STATUS.md
+API_CONTRACT.md
+BUILD_LOG.md

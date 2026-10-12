@@ -1,0 +1,111 @@
+"""Build a source-only ZIP from a clean, reviewed Git checkout."""
+
+from __future__ import annotations
+
+import fnmatch
+import hashlib
+import subprocess
+import tomllib
+import zipfile
+from pathlib import Path
+
+EXCLUDED_DIRS = {
+    ".git",
+    ".venv",
+    "node_modules",
+    ".next",
+    ".data",
+    ".release-artifacts",
+    "graphify-out",
+    ".codex",
+    ".agents",
+    ".claude",
+    ".gemini",
+    ".cursor",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    "test-results",
+    "playwright-report",
+    "coverage",
+    "dist",
+    "build",
+}
+EXCLUDED_NAMES = {
+    "IMPLEMENTATION_STATUS.md",
+    "CODEX_START_HERE.md",
+    "BRAND_NAME_RESEARCH.md",
+    "API_CONTRACT.md",
+    "hooks.json",
+    "GRAPH_REPORT.md",
+    "RTK.toml",
+}
+EXCLUDED_PATTERNS = [
+    "*CODEX_MASTER_SPEC*",
+    "AGENT*.md*",
+    "agent*.md*",
+    "RTK.md*",
+    "rtk.md*",
+    ".graphify*",
+    ".rtk*",
+    "CLAUDE.md*",
+    "GEMINI.md*",
+    "*.pyc",
+    "*.tsbuildinfo",
+    "*.log",
+    "*.db",
+    "*.sqlite*",
+    "*.pem",
+    "*.key",
+    ".env",
+    ".env.*",
+]
+
+
+def allowed(name: str) -> bool:
+    path = Path(name)
+    if any(part in EXCLUDED_DIRS or part.casefold().startswith((".graphify", ".rtk")) for part in path.parts):
+        return False
+    if path.name == ".env.example":
+        return True
+    return path.name.casefold() not in {item.casefold() for item in EXCLUDED_NAMES} and not any(
+        fnmatch.fnmatch(path.name.casefold(), pattern.casefold()) for pattern in EXCLUDED_PATTERNS
+    )
+
+
+def git(root: Path, *args: str) -> bytes:
+    return subprocess.check_output(["git", *args], cwd=root)
+
+
+def release(root: Path) -> Path:
+    if git(root, "status", "--porcelain", "--untracked-files=no").strip():
+        raise RuntimeError("Commit/review tracked changes before creating a source release")
+    commit = git(root, "rev-parse", "--short=12", "HEAD").decode().strip()
+    version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    directory = root / ".release-artifacts"
+    directory.mkdir(exist_ok=True)
+    destination = directory / f"casequarry-{version}-{commit}-source.zip"
+    paths = [item.decode("utf-8") for item in git(root, "ls-files", "-z").split(b"\0") if item]
+    rejected = [name for name in paths if not allowed(name)]
+    if rejected:
+        raise RuntimeError(
+            "Excluded tooling/private files remain tracked; remove these exact paths from the index: "
+            + ", ".join(rejected)
+        )
+    with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name in sorted(paths):
+            path = root / name
+            if path.is_symlink():
+                raise RuntimeError("Source release refuses symlinks: " + name)
+            # Read the committed blob, so unrelated work cannot alter the release.
+            content = git(root, "show", f"HEAD:{name}")
+            info = zipfile.ZipInfo(f"casequarry-{version}/{name}", (2026, 10, 12, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, content)
+    digest = hashlib.sha256(destination.read_bytes()).hexdigest()
+    destination.with_suffix(".zip.sha256").write_text(f"{digest}  {destination.name}\n", encoding="utf-8")
+    return destination
+
+
+if __name__ == "__main__":
+    print(release(Path(__file__).resolve().parents[1]))

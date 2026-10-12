@@ -1,0 +1,10 @@
+node_modules/
+.venv/
+.next/
+.data/
+graphify-out/
+dist/
+out/
+__pycache__/
+test-results/
+playwright-report/
