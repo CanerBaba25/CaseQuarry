@@ -29,6 +29,8 @@ type Citation = {
   char_end: number;
   original_sha256: string;
   artifact_sha256: string;
+  superseded?: boolean;
+  current_artifact_version?: number;
 };
 type Finding = {
   id: string;
@@ -37,6 +39,8 @@ type Finding = {
   source_citations: Citation[];
   human_review_status: string;
   confidence_label: string;
+  superseded_sources?: boolean;
+  source_acceptance_allowed?: boolean;
 };
 type Job = {
   id: string;
@@ -490,22 +494,35 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
                             MODEL-SELECTED SOURCE QUOTATION
                           </span>
                           <Badge
-                            value={finding.human_review_status}
+                            value={`${finding.human_review_status}${finding.superseded_sources ? " · prior source version" : ""}`}
                             tone={
-                              finding.human_review_status === "accepted"
-                                ? "green"
-                                : finding.human_review_status === "rejected"
-                                  ? "red"
-                                  : "amber"
+                              finding.superseded_sources
+                                ? "amber"
+                                : finding.human_review_status === "accepted"
+                                  ? "green"
+                                  : finding.human_review_status === "rejected"
+                                    ? "red"
+                                    : "amber"
                             }
                           />
                         </div>
                         <blockquote>{finding.claim}</blockquote>
+                        {finding.superseded_sources && (
+                          <div className="notice amber">
+                            <Icon name="alert" size={16} />
+                            <span>
+                              This quotation uses a superseded extraction. Its
+                              previous human review record is preserved. Rerun
+                              against the current source before recording a new
+                              acceptance.
+                            </span>
+                          </div>
+                        )}
                         <div className="quotation-citations">
                           {finding.source_citations.map((citation, i) => (
                             <Link
                               key={`${citation.span_id}-${i}`}
-                              href={`/app/matters/${matter.id}/evidence/${citation.evidence_id}#span-${citation.span_id}`}
+                              href={`/app/matters/${matter.id}/evidence/${citation.evidence_id}?version=${citation.artifact_version}#span-${citation.span_id}`}
                             >
                               <Icon name="file" size={14} />
                               <span>
@@ -528,7 +545,11 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
                             disabled={!can(matter.role, "review")}
                             onClick={() => {
                               setReview(finding);
-                              setDecision("accept");
+                              setDecision(
+                                finding.source_acceptance_allowed === false
+                                  ? "reject"
+                                  : "accept",
+                              );
                             }}
                           >
                             Review quotation
@@ -620,7 +641,10 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
                 value={decision}
                 onChange={(event) => setDecision(event.target.value)}
               >
-                <option value="accept">
+                <option
+                  value="accept"
+                  disabled={review.source_acceptance_allowed === false}
+                >
                   Accept quotation after source review
                 </option>
                 <option value="reject">Reject quotation</option>
@@ -637,7 +661,14 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
               />
             </label>
             <div className="form-actions">
-              <button className="button primary" disabled={busy}>
+              <button
+                className="button primary"
+                disabled={
+                  busy ||
+                  (decision === "accept" &&
+                    review.source_acceptance_allowed === false)
+                }
+              >
                 {busy ? "Saving review…" : "Record quotation review"}
               </button>
             </div>

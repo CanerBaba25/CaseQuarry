@@ -21,7 +21,9 @@ from rich.table import Table
 
 from . import __version__
 from .client import API, Options, fail, logout, profiles, save_login
+from .connector_commands import app as connectors
 from .native import native_available
+from .workflow_commands import register as register_workflows
 
 app = typer.Typer(no_args_is_help=True, help="CaseQuarry: preserve, search and review evidence privately.")
 auth = typer.Typer(help="Sign in using the API; store sessions only in the OS keyring.")
@@ -49,8 +51,11 @@ for name, group in [
     ("email", email),
     ("ai", ai),
     ("benchmark", benchmark),
+    ("connector", connectors),
 ]:
     app.add_typer(group, name=name)
+
+register_workflows(app, ingest, auth, email, evidence)
 
 
 def version_callback(value: bool) -> None:

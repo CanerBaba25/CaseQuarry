@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { post } from "@/lib/api";
+import { date, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import type { User } from "@/lib/types";
 import { Badge, ErrorBox, Icon, Loading, Modal } from "./ui";
@@ -12,6 +12,20 @@ export default function AccountSecurity({ user }: { user: User }) {
     "/auth/mfa/status",
   );
   const [modal, setModal] = useState<"enroll" | "disable" | null>(null);
+  const [passwordModal, setPasswordModal] = useState(false);
+  const sessions = useResource<{
+    items: {
+      id: string;
+      current: boolean;
+      created_at: string;
+      expires_at: string;
+    }[];
+    limit: number;
+  }>("/auth/sessions");
+  const [revoke, setRevoke] = useState<{ id: string; current: boolean } | null>(
+      null,
+    ),
+    [message, setMessage] = useState("");
   return (
     <>
       <PageHeading
@@ -88,6 +102,119 @@ export default function AccountSecurity({ user }: { user: User }) {
           )}
         </section>
       </div>
+      <section className="panel security-password">
+        <div className="section-heading">
+          <div>
+            <h2>Password</h2>
+            <p className="muted">
+              Changing your password revokes your other sessions and preserves
+              this one.
+            </p>
+          </div>
+          <button
+            className="button secondary"
+            onClick={() => setPasswordModal(true)}
+            disabled={!status.data || status.loading}
+          >
+            Change password
+          </button>
+        </div>
+      </section>
+      {message && (
+        <div className="notice green" role="status">
+          <Icon name="check" size={17} />
+          {message}
+        </div>
+      )}
+      <section className="panel sessions-panel">
+        <div className="section-heading">
+          <div>
+            <h2>Active sign-ins</h2>
+            <p className="muted">
+              Up to 100 active sessions for your account. Dates are shown in
+              UTC.
+            </p>
+          </div>
+          <button
+            className="button secondary compact"
+            onClick={sessions.refresh}
+          >
+            Refresh sessions
+          </button>
+        </div>
+        <ErrorBox error={sessions.error} retry={sessions.refresh} />
+        {sessions.loading ? (
+          <Loading />
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Session</th>
+                  <th>Signed in · UTC</th>
+                  <th>Expires · UTC</th>
+                  <th>
+                    <span className="sr-only">Session action</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.data?.items.map((session) => (
+                  <tr key={session.id}>
+                    <td>
+                      <Badge
+                        value={
+                          session.current ? "This session" : "Other session"
+                        }
+                        tone={session.current ? "green" : "neutral"}
+                      />
+                      <small className="block mono">{session.id}</small>
+                    </td>
+                    <td>{date(session.created_at, true)}</td>
+                    <td>{date(session.expires_at, true)}</td>
+                    <td>
+                      <button
+                        className="button ghost compact danger-link"
+                        onClick={() => setRevoke(session)}
+                      >
+                        {session.current ? "Sign out here" : "Revoke session"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      {passwordModal && (
+        <PasswordModal
+          mfaEnabled={status.data?.enabled || false}
+          close={() => setPasswordModal(false)}
+          done={(count) => {
+            setPasswordModal(false);
+            setMessage(
+              `Password changed. ${number(count)} other sessions revoked.`,
+            );
+            sessions.refresh();
+          }}
+        />
+      )}
+      {revoke && (
+        <RevokeSession
+          id={revoke.id}
+          current={revoke.current}
+          close={() => setRevoke(null)}
+          done={(current) => {
+            setRevoke(null);
+            if (current) window.dispatchEvent(new Event("cq:unauthorized"));
+            else {
+              sessions.refresh();
+              setMessage("The selected session was revoked.");
+            }
+          }}
+        />
+      )}
       {modal && (
         <AuthenticatorModal
           kind={modal}
@@ -95,10 +222,180 @@ export default function AccountSecurity({ user }: { user: User }) {
           done={() => {
             setModal(null);
             status.refresh();
+            sessions.refresh();
           }}
         />
       )}
     </>
+  );
+}
+
+function PasswordModal({
+  mfaEnabled,
+  close,
+  done,
+}: {
+  mfaEnabled: boolean;
+  close: () => void;
+  done: (count: number) => void;
+}) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState<unknown>(null);
+  return (
+    <Modal title="Change your password" close={close}>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          setError(null);
+          if (data.get("new_password") !== data.get("confirmation")) {
+            setError(
+              new Error("The new password and confirmation must match."),
+            );
+            return;
+          }
+          setBusy(true);
+          try {
+            const result = await post<{ other_sessions_revoked: number }>(
+              "/auth/password/change",
+              {
+                current_password: data.get("current_password"),
+                new_password: data.get("new_password"),
+                ...(data.get("totp_code")
+                  ? { totp_code: data.get("totp_code") }
+                  : {}),
+              },
+            );
+            done(result.other_sessions_revoked);
+          } catch (error) {
+            setError(error);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <ErrorBox error={error} />
+        <label>
+          Current password
+          <input
+            name="current_password"
+            type="password"
+            required
+            autoComplete="current-password"
+            maxLength={1024}
+          />
+        </label>
+        <label>
+          New password
+          <input
+            name="new_password"
+            type="password"
+            required
+            minLength={12}
+            maxLength={1024}
+            autoComplete="new-password"
+          />
+        </label>
+        <label>
+          Confirm new password
+          <input
+            name="confirmation"
+            type="password"
+            required
+            minLength={12}
+            maxLength={1024}
+            autoComplete="new-password"
+          />
+        </label>
+        {mfaEnabled && (
+          <label>
+            Current authenticator code
+            <input
+              name="totp_code"
+              required
+              pattern="[0-9]{6}"
+              maxLength={6}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+            />
+          </label>
+        )}
+        <div className="notice amber">
+          <Icon name="lock" size={17} />
+          <span>
+            Your other active sessions will be signed out after this change.
+          </span>
+        </div>
+        <div className="form-actions">
+          <button type="button" className="button secondary" onClick={close}>
+            Cancel
+          </button>
+          <button className="button primary" disabled={busy}>
+            {busy ? "Changing…" : "Change password"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function RevokeSession({
+  id,
+  current,
+  close,
+  done,
+}: {
+  id: string;
+  current: boolean;
+  close: () => void;
+  done: (current: boolean) => void;
+}) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState<unknown>(null);
+  return (
+    <Modal
+      title={current ? "Sign out this session" : "Revoke the selected session"}
+      close={close}
+    >
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          setBusy(true);
+          setError(null);
+          try {
+            const result = await post<{ current: boolean }>(
+              `/auth/sessions/${id}/revoke`,
+              { reason: data.get("reason") },
+            );
+            done(result.current);
+          } catch (error) {
+            setError(error);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <p className="muted">
+          {current
+            ? "This browser will return to the sign-in page."
+            : "The selected session will no longer have access. The account can sign in again with its credentials."}
+        </p>
+        <ErrorBox error={error} />
+        <label>
+          Reason
+          <input name="reason" required minLength={3} maxLength={2000} />
+        </label>
+        <div className="form-actions">
+          <button type="button" className="button secondary" onClick={close}>
+            Cancel
+          </button>
+          <button className="button primary" disabled={busy}>
+            {busy ? "Revoking…" : current ? "Sign out" : "Revoke session"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

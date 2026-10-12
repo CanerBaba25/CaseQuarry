@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     max_archive_depth: int = 3
     max_extracted_chars: int = 4_000_000
     max_case_bytes: int = 20 * 1024 * 1024 * 1024
+    ocr_enabled: bool = True
+    ocr_language: str = "eng"
+    ocr_timeout_seconds: int = Field(default=60, ge=5, le=300)
+    ocr_max_pages: int = Field(default=200, ge=1, le=2000)
+    ocr_max_pixels: int = Field(default=25_000_000, ge=1_000_000, le=100_000_000)
+    ocr_dpi: int = Field(default=200, ge=72, le=400)
+    extraction_timeout_seconds: int = Field(default=180, ge=15, le=900)
+    worker_import_records_per_tick: int = Field(default=25, ge=1, le=200)
+    tesseract_command: str | None = None
     ai_enabled: bool = False
     ai_local_base_url: str = "http://127.0.0.1:11434"
     ai_model: str = ""

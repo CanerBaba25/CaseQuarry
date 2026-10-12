@@ -145,13 +145,20 @@ def search_conditions(tenant_id, case_id, spec: SearchInput):
         )
     conditions = [Evidence.tenant_id == tenant_id, Evidence.case_id == case_id, compile_query(spec.query)]
     filters = spec.filters
-    if filters.person_id:
-        participant_evidence = select(Participant.evidence_id).where(
-            Participant.tenant_id == tenant_id,
-            Participant.case_id == case_id,
-            Participant.person_id == filters.person_id,
-        )
-        conditions.append(Evidence.id.in_(participant_evidence))
+    for person_id, roles in (
+        (filters.person_id, None),
+        (filters.sender_person_id, ("from",)),
+        (filters.recipient_person_id, ("to", "cc", "bcc")),
+    ):
+        if person_id:
+            participant_evidence = select(Participant.evidence_id).where(
+                Participant.tenant_id == tenant_id,
+                Participant.case_id == case_id,
+                Participant.person_id == person_id,
+            )
+            if roles:
+                participant_evidence = participant_evidence.where(Participant.role.in_(roles))
+            conditions.append(Evidence.id.in_(participant_evidence))
     for values, column in (
         (filters.item_types, Evidence.item_type),
         (filters.review_status, Evidence.review_status),
@@ -172,10 +179,16 @@ def search_conditions(tenant_id, case_id, spec: SearchInput):
     date_column = Evidence.created_at if filters.date_field == "imported_at" else Evidence.date_utc
     if filters.date_field not in {"sent_at", "date_utc", "imported_at"}:
         fail(422, "INVALID_DATE_FIELD", "Choose sent_at, date_utc or imported_at.")
-    if filters.date_from:
-        conditions.append(date_column >= parse_date(filters.date_from))
-    if filters.date_to:
-        conditions.append(date_column < parse_date(filters.date_to, inclusive_end=True))
+    date_from = parse_date(filters.date_from) if filters.date_from else None
+    date_to = parse_date(filters.date_to, inclusive_end=True) if filters.date_to else None
+    if date_from and date_to and date_to <= date_from:
+        fail(422, "INVALID_DATE_RANGE", "The end of the date range must follow its start.")
+    if date_from:
+        conditions.append(date_column >= date_from)
+    if date_to:
+        conditions.append(date_column < date_to)
+    if filters.missing_date is not None:
+        conditions.append(date_column.is_(None) if filters.missing_date else date_column.is_not(None))
     for value, column in (
         (filters.has_attachment, Evidence.has_attachments),
         (filters.bookmarked, Evidence.bookmarked),

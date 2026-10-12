@@ -25,7 +25,7 @@ uv run casequarry audit verify --case CASE_ID
 
 Passwords are prompted with hidden input. `auth login --password-stdin` reads one line without echoing it. Bearer sessions are stored in the OS keyring; profile JSON contains server/email only. Tokens are never printed. A secure OS keyring is required for persistent login; there is no plaintext fallback.
 
-Imports are sent in bounded groups of 25 files. Folder uploads preserve paths relative to the selected folder; local absolute paths are not sent. `--wait` polls at one-second intervals for up to ten minutes per batch; timeout does not cancel a running server job. MBOX is submitted as one file and parsed as a stream by the worker. Unsupported PST/MSG and other adapters are preserved/reported by the backend and cannot be represented as successful searchable imports.
+Imports are sent in bounded groups of 25 files. Folder uploads preserve paths relative to the selected folder; local absolute paths are not sent. `--wait` polls at one-second intervals for up to ten minutes per batch; timeout does not cancel a running server job. MBOX is submitted as one file and parsed as a stream by the worker. Bounded Outlook MSG extraction is supported; unsupported PST/OST and other adapters are preserved/reported by the backend and cannot be represented as successful searchable imports.
 
 Local integrity helpers work without an API session. Build the optional Rust helper with `cargo build --release --locked`; `--engine auto` uses that fixed binary when present and otherwise uses bounded Python streaming. `--engine rust` requires the binary. These commands preserve input bytes:
 
@@ -41,5 +41,19 @@ The MBOX inventory counts message boundaries and checks configured line/message 
 CSV/JSON exports save a separate `<path>.manifest.json` sidecar and verify the downloaded export hash before writing. Native ZIP requires completed human review for every included item; a blanket confirmation never substitutes for those decisions. Privilege/confidentiality and integrity policies also apply to metadata exports.
 
 Exit codes: 0 success; 2 usage/validation; 3 authentication/authorization; 4 missing or inaccessible item; 5 conflict/blocked transition; 6 partial or continuing operation; 7 subsystem unavailable; 8 integrity failure. Use JSON for automation and inspect both the exit code and reported processing state.
+
+Additional authenticated workflow groups cover sources/custodians/members, tasks, holds, issues, saved searches, review sets, assignments and resumable upload sessions. Mutation commands accept a bounded `--body request.json` matching the server's published schema; version/reason/approval requirements are enforced by the server. Account commands include `auth sessions`, `auth revoke-session`, `auth mfa-status`, `auth change-password` and administrator `user` actions. `email network|timeline|traffic` retrieves live source-backed views. See [local adapters and read-only acquisition](ADAPTERS.md) for connector scopes and limits.
+
+`evidence entities`, `evidence near-duplicates` and `evidence compare` return deterministic, source-referenced candidate findings and bounded comparison coverage. They do not confirm identity, merge originals or make human review decisions. Inspect their returned truncation/coverage limits before using a finding.
+
+```sh
+uv run cq task create --case CASE_ID --body private-task.json
+uv run cq assignment claim ASSIGNMENT_ID --case CASE_ID --body private-transition.json
+uv run cq --dry-run hold release HOLD_ID --case CASE_ID --body private-reason.json
+uv run cq api request GET /auth/sessions
+uv run cq api request PUT /cases/CASE_ID/upload-sessions/UPLOAD_ID/parts/0 --data-file private-part.bin
+```
+
+`api request` provides authenticated JSON access to implemented public API routes, including routes without a dedicated shortcut. It accepts a bounded JSON document or binary request part, preserves normal dry-run behavior, disables redirects and redacts sensitive response keys. Use dedicated original/export download commands for binary responses. Store credential-bearing JSON files only in private locations, exclude them from version control, and remove them after use.
 
 Do not put real evidence or credentials in shell arguments when avoidable, transcripts or public tickets. CLI output is intended for authorized local users and may contain explicitly requested evidence metadata/text.

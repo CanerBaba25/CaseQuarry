@@ -14,6 +14,8 @@ The local mode uses SQLite and an embedded durable worker. Data persists under `
 
 With Docker/Compose installed, `uv run python scripts/tasks.py init` followed by `docker compose up -d --build` runs private PostgreSQL/API/worker services and web on loopback port 3000. Compose has not yet been verified on the initial Windows machine. See [Windows installation](INSTALL_WINDOWS.md) for the exact deployment limits and required production safeguards.
 
+For optional local OCR on Debian/Ubuntu, install the distribution's `tesseract-ocr` and `tesseract-ocr-eng` packages, or configure a trusted executable with `CASEQUARRY_TESSERACT_COMMAND`. The locked Python dependencies provide the PDF renderer. [Adapter documentation](ADAPTERS.md) explains limits, quality flags and read-only IMAPS/Maildir acquisition; absence of an engine remains an explicit partial state.
+
 For an offline installation, first obtain the pinned Python/npm distributions and container images through an approved connected environment. `uv sync --offline --locked` works only when every required distribution is cached. `npm ci --offline` similarly requires its cache. The application has no mandatory model or telemetry connection, but dependency installation is not automatically offline.
 
 Portable quality/diagnostic tasks are `lint`, `typecheck` and `smoke`. `test` and fixture/browser/benchmark tasks require local QA assets excluded from the public source distribution; missing assets produce a precise unavailable response. GNU Make aliases are optional; supported tasks have Python equivalents.

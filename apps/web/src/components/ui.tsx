@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { ApiError, label } from "@/lib/api";
 
 const paths: Record<string, React.ReactNode> = {
@@ -221,9 +221,19 @@ export function ErrorBox({
         {error instanceof ApiError && error.requestId && (
           <small>Request: {error.requestId}</small>
         )}
+        {error instanceof ApiError && error.retryAfterSeconds !== undefined && (
+          <small>
+            The server requested a {error.retryAfterSeconds}-second pause before
+            retrying this request.
+          </small>
+        )}
       </div>
       {retry && (
-        <button className="button secondary compact" onClick={retry}>
+        <button
+          type="button"
+          className="button secondary compact"
+          onClick={retry}
+        >
           Try again
         </button>
       )}
@@ -263,6 +273,9 @@ export function Empty({
   );
 }
 
+let modalCount = 0;
+let modalBodyOverflow = "";
+
 export function Modal({
   title,
   children,
@@ -275,11 +288,13 @@ export function Modal({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const closeRef = useRef(close);
   closeRef.current = close;
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    const bodyOverflow = document.body.style.overflow;
+    if (modalCount === 0) modalBodyOverflow = document.body.style.overflow;
+    modalCount += 1;
     document.body.style.overflow = "hidden";
     const focusables = () =>
       Array.from(
@@ -289,7 +304,12 @@ export function Modal({
       );
     focusables()[0]?.focus();
     function key(event: KeyboardEvent) {
-      if (event.key === "Escape") closeRef.current();
+      const dialogs = document.querySelectorAll("[data-cq-modal]");
+      if (dialogs[dialogs.length - 1] !== ref.current) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeRef.current();
+      }
       if (event.key === "Tab") {
         const items = focusables();
         const first = items[0],
@@ -305,7 +325,8 @@ export function Modal({
     }
     document.addEventListener("keydown", key);
     return () => {
-      document.body.style.overflow = bodyOverflow;
+      modalCount -= 1;
+      if (modalCount === 0) document.body.style.overflow = modalBodyOverflow;
       document.removeEventListener("keydown", key);
       previous?.focus();
     };
@@ -322,10 +343,11 @@ export function Modal({
         className={`modal ${wide ? "wide" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        aria-labelledby={titleId}
+        data-cq-modal="true"
       >
         <div className="modal-heading">
-          <h2 id="modal-title">{title}</h2>
+          <h2 id={titleId}>{title}</h2>
           <button
             className="icon-button"
             aria-label="Close dialog"

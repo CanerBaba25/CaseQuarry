@@ -17,14 +17,15 @@ from sqlalchemy.orm import Session
 
 from . import audit
 from .ai_models import AIJob, AIResult
-from .evidence_routes import checked_text, get_item, spans_json
-from .models import Evidence, Member, Setting, Span, User, new_id, now
+from .evidence_routes import checked_text, get_item
+from .models import Artifact, Evidence, Member, Setting, Span, User, new_id, now
 from .schemas import Input, SearchInput
 from .search import search_conditions
 from .security import Actor, authorize_case, current_actor, fail, get_db, utc
 
 router = APIRouter(prefix="/api/v1")
 MAX_ITEMS, MAX_SPANS, MAX_SPAN_CHARS = 50, 40, 1600
+MAX_HISTORICAL_BYTES = 16_000_000
 INSUFFICIENT = "Insufficient evidence from the reviewed scope."
 PROMPT_VERSION = "extractive-quotes-v1"
 SYSTEM_INSTRUCTIONS = (
@@ -190,20 +191,23 @@ def _scope(db, user, case_id, body):
 
 
 def result_json(result):
-    return {"id": result.id, "claim": result.claim, "source_citations": result.citations, "kind": "source_quotation", "confidence_label": "requires_review", "human_review_status": result.review_state, "reviewed_by": result.reviewed_by, "reviewed_at": utc(result.reviewed_at).isoformat() if result.reviewed_at else None}
+    superseded = getattr(result, "_source_superseded", False)
+    return {"id": result.id, "claim": result.claim, "source_citations": getattr(result, "_read_citations", result.citations), "kind": "source_quotation", "confidence_label": "requires_review", "human_review_status": result.review_state, "reviewed_by": result.reviewed_by, "reviewed_at": utc(result.reviewed_at).isoformat() if result.reviewed_at else None, "superseded_sources": superseded, "source_acceptance_allowed": not superseded}
 
 
 def job_json(job, results=()):
+    findings = [result_json(result) for result in results]
+    superseded = any(finding["superseded_sources"] for finding in findings)
     return {
         "id": job.id, "job_id": job.id, "case_id": job.case_id, "task": job.task, "state": job.state,
         "provider": job.provider, "model": job.model, "model_tag": job.model, "model_version": None,
         "model_version_status": "Configured tag; exact weights fingerprint not recorded.",
         "prompt_version": job.prompt_version, "template_version": job.prompt_version,
         "question": job.question, "mode": "extractive_quotes", "scope": job.scope, "coverage": job.coverage,
-        "answer": job.answer, "findings": [result_json(result) for result in results], "usage": job.usage,
+        "answer": job.answer, "findings": findings, "usage": job.usage, "superseded_sources": superseded,
         "error_code": job.error_code, "created_at": utc(job.created_at).isoformat(),
         "generated_at": utc(job.completed_at).isoformat() if job.completed_at and job.state == "completed" else None,
-        "completed_at": utc(job.completed_at).isoformat() if job.completed_at else None, "warnings": WARNINGS,
+        "completed_at": utc(job.completed_at).isoformat() if job.completed_at else None, "warnings": WARNINGS + (["One or more citations use a superseded extraction. Inspect their immutable version links and rerun current analysis before accepting a finding."] if superseded else []),
     }
 
 
@@ -237,41 +241,65 @@ def _get_job(db, user, case_id, job_id):
     return job
 
 
-def _source_ref(db, user, case_id, evidence_id, span_id, storage):
+def _source_ref(db, user, case_id, evidence_id, span_id, storage, *, artifact_version=None):
     item, original = get_item(db, user, case_id, evidence_id)
     if item.privilege_status in {"suspected", "confirmed"} or item.parser_state == "quarantined":
         fail(409, "AI_SOURCE_RESTRICTED", "A source became restricted. Review the scope before requesting another job.")
     if not storage.verify(original)["valid"]:
         fail(409, "INTEGRITY_FAILED", "Original evidence failed verification; model processing is blocked.")
-    artifact = checked_text(db, item, storage)
-    span = next((value for value in spans_json(db, item) if value["span_id"] == span_id), None)
-    if artifact is None or span is None or span["artifact_id"] != artifact.id or artifact.sha256 != item.text_hash:
+    superseded = artifact_version is not None and artifact_version != item.text_version
+    source_text = item.text
+    if superseded:
+        artifact = db.scalar(select(Artifact).where(Artifact.evidence_id == item.id, Artifact.tenant_id == user.tenant_id, Artifact.case_id == case_id, Artifact.version == artifact_version, Artifact.kind == "extracted-text"))
+        if artifact is None:
+            fail(409, "AI_CITATION_INVALID", "The immutable cited extraction version is unavailable.")
+        try:
+            with storage.path(artifact.storage_key).open("rb") as stream:
+                encoded = stream.read(MAX_HISTORICAL_BYTES + 1)
+            if len(encoded) > MAX_HISTORICAL_BYTES:
+                fail(413, "AI_HISTORICAL_SIZE_LIMIT", "Historical quotation inspection is bounded to 16 megabytes per immutable extracted artifact.")
+            if hashlib.sha256(encoded).hexdigest() != artifact.sha256:
+                fail(409, "DERIVED_INTEGRITY_FAILED", "The historical cited artifact failed bounded hash verification.")
+            source_text = encoded.decode("utf-8")
+        except (OSError, UnicodeDecodeError):
+            fail(409, "DERIVED_INTEGRITY_FAILED", "The historical cited artifact is missing or invalid.")
+    else:
+        artifact = checked_text(db, item, storage)
+    span = db.scalar(select(Span).where(Span.id == span_id, Span.evidence_id == item.id, Span.tenant_id == user.tenant_id, Span.case_id == case_id, Span.artifact_id == artifact.id)) if artifact else None
+    if artifact is None or artifact.kind != "extracted-text" or span is None or not superseded and artifact.sha256 != item.text_hash:
         fail(409, "AI_CITATION_INVALID", "A citation does not resolve to an immutable artifact in the authorized matter.")
-    text = span["text"][:MAX_SPAN_CHARS]
+    if not 0 <= span.char_start < span.char_end <= len(source_text) or hashlib.sha256(source_text[span.char_start:span.char_end].encode()).hexdigest() != span.text_hash:
+        fail(409, "CITATION_INTEGRITY_FAILED", "The requested citation span failed immutable text verification.")
+    text = source_text[span.char_start:span.char_end][:MAX_SPAN_CHARS]
     return {
         "span_id": span_id, "evidence_id": item.id, "artifact_id": artifact.id, "artifact_version": artifact.version,
-        "artifact_sha256": artifact.sha256, "original_sha256": original.sha256, "page": span["page"],
+        "artifact_sha256": artifact.sha256, "original_sha256": original.sha256, "page": span.page,
         "parser_state": item.parser_state,
-        "char_start": span["char_start"], "char_end": span["char_start"] + len(text), "span_char_end": span["char_end"], "span_text_hash": span["text_hash"],
+        "superseded": superseded, "current_artifact_version": item.text_version,
+        "char_start": span.char_start, "char_end": span.char_start + len(text), "span_char_end": span.char_end, "span_text_hash": span.text_hash,
         "retrieved_text_sha256": hashlib.sha256(text.encode()).hexdigest(), "text": text,
     }
 
 
+def _current_spans(job):
+    return select(Span).join(Artifact, Span.artifact_id == Artifact.id).join(Evidence, Span.evidence_id == Evidence.id).where(Span.tenant_id == job.tenant_id, Span.case_id == job.case_id, Span.evidence_id.in_(job.evidence_ids), Artifact.tenant_id == job.tenant_id, Artifact.case_id == job.case_id, Artifact.evidence_id == Evidence.id, Artifact.kind == "extracted-text", Artifact.version == Evidence.text_version, Evidence.tenant_id == job.tenant_id, Evidence.case_id == job.case_id)
+
+
 def _gather_sources(db, user, job, storage):
     summaries = list(db.execute(select(Evidence.id, Evidence.privilege_status, Evidence.parser_state, func.length(Evidence.text)).where(Evidence.tenant_id == job.tenant_id, Evidence.case_id == job.case_id, Evidence.id.in_(job.evidence_ids))))
-    span_items = set(db.scalars(select(Span.evidence_id).where(Span.tenant_id == job.tenant_id, Span.case_id == job.case_id, Span.evidence_id.in_(job.evidence_ids)).distinct()))
+    span_items = set(db.scalars(_current_spans(job).with_only_columns(Span.evidence_id).distinct()))
     restricted = {identifier for identifier, privilege, state, _length in summaries if privilege in {"suspected", "confirmed"} or state == "quarantined"}
     unsearchable = {identifier for identifier, _privilege, _state, length in summaries if not length or identifier not in span_items} - restricted
     sources, processed = [], set()
     omitted = {"restricted_items": len(restricted), "unsearchable_items": len(unsearchable), "partial_items": sum(state == "partial" for _identifier, _privilege, state, _length in summaries)}
-    available_spans = db.scalar(select(func.count()).select_from(Span).where(Span.tenant_id == job.tenant_id, Span.case_id == job.case_id, Span.evidence_id.in_(job.evidence_ids))) or 0
+    available_spans = db.scalar(select(func.count()).select_from(_current_spans(job).subquery())) or 0
     for evidence_id in job.evidence_ids:
         if len(sources) >= MAX_SPANS:
             break
         item, _original = get_item(db, user, job.case_id, evidence_id)
         if evidence_id in restricted:
             continue
-        span_id = db.scalar(select(Span.id).where(Span.tenant_id == job.tenant_id, Span.case_id == job.case_id, Span.evidence_id == evidence_id).order_by(Span.char_start).limit(1))
+        span_id = db.scalar(_current_spans(job).with_only_columns(Span.id).where(Span.evidence_id == evidence_id).order_by(Span.char_start, Span.id).limit(1))
         if span_id is None or not item.text:
             continue
         sources.append(_source_ref(db, user, job.case_id, evidence_id, span_id, storage))
@@ -400,8 +428,9 @@ def process_pending_ai(database, settings, storage):
 def _results(db, user, job, storage):
     results = list(db.scalars(select(AIResult).where(AIResult.job_id == job.id, AIResult.tenant_id == user.tenant_id, AIResult.case_id == job.case_id).order_by(AIResult.finding_index)))
     for result in results:
+        read_citations, superseded = [], False
         for citation in result.citations:
-            source = _source_ref(db, user, job.case_id, citation["evidence_id"], citation["span_id"], storage)
+            source = _source_ref(db, user, job.case_id, citation["evidence_id"], citation["span_id"], storage, artifact_version=citation["artifact_version"])
             for key in ("artifact_id", "artifact_version", "artifact_sha256", "original_sha256", "span_text_hash"):
                 if source[key] != citation[key]:
                     fail(409, "AI_SOURCE_CHANGED", "A cited source changed. Review its integrity before accessing the finding.")
@@ -409,6 +438,10 @@ def _results(db, user, job, storage):
             end = citation["char_end"] - source["char_start"]
             if start < 0 or end > len(source["text"]) or source["text"][start:end] != result.claim or hashlib.sha256(result.claim.encode()).hexdigest() != citation["quote_sha256"]:
                 fail(409, "AI_CITATION_INVALID", "The stored quotation no longer resolves to its source.")
+            superseded |= source["superseded"]
+            read_citations.append({**citation, "superseded": source["superseded"], "current_artifact_version": source["current_artifact_version"], "content_url": f"/api/v1/cases/{job.case_id}/evidence/{citation['evidence_id']}/content?version={citation['artifact_version']}"})
+        # Read-time flags never rewrite stored citation or review history.
+        result._read_citations, result._source_superseded = read_citations, superseded
     return results
 
 
@@ -436,6 +469,8 @@ def review_finding(case_id: str, finding_id: str, body: FindingReview, request: 
     if len(body.reason.strip()) < 3:
         fail(422, "REASON_REQUIRED", "Provide a reason for the finding review.")
     _results(db, actor.user, db.get(AIJob, result.job_id), request.app.state.storage)
+    if body.decision == "accept" and getattr(result, "_source_superseded", False):
+        fail(409, "AI_SOURCE_SUPERSEDED", "Rerun analysis on the current extraction before accepting this finding. Its historical quotation remains available for inspection.")
     result.review_state, result.reviewed_by, result.review_reason, result.reviewed_at = ("accepted" if body.decision == "accept" else "rejected"), actor.user.id, body.reason.strip(), now()
     audit.record(db, actor.user, case_id, "ai.finding_reviewed", "ai_finding", result.id, {"decision": body.decision}, getattr(request.state, "request_id", ""))
     db.commit()

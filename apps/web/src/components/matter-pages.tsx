@@ -18,6 +18,7 @@ import type {
 } from "@/lib/types";
 import { can } from "@/lib/permissions";
 import { MatterTeam } from "./team";
+import ImportCapabilities from "./import-capabilities";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 
 export function PageHeading({
@@ -654,6 +655,7 @@ export function SourcesPage({
           )}
         </Modal>
       )}
+      <ImportCapabilities caseId={matter.id} />
     </>
   );
 }

@@ -74,6 +74,7 @@ def dev() -> None:
                     "8000",
                     "--reload",
                     "--no-access-log",
+                    "--no-proxy-headers",
                 ],
                 cwd=ROOT,
                 env=env,

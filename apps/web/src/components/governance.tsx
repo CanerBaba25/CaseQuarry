@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, date, label, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
-import type { Matter } from "@/lib/types";
+import type { Matter, Member } from "@/lib/types";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { PageHeading, Pagination } from "./matter-pages";
 
@@ -19,6 +19,13 @@ type Hold = {
   created_at: string;
 };
 type Issue = {
+  review?: {
+    state: string;
+    version: number;
+    reviewed_by?: string;
+    reason?: string;
+    stale: boolean;
+  };
   id: string;
   title: string;
   description: string;
@@ -65,6 +72,17 @@ export function GovernancePage({
     [busy, setBusy] = useState(false);
   const canManage = can(matter.role, "hold"),
     canReview = can(matter.role, "review");
+  const members = useResource<{ items: Member[] }>(
+    kind === "tasks" ? `/cases/${matter.id}/members` : null,
+  );
+  useEffect(() => {
+    setCursor(null);
+    setHistory([]);
+    setCreate(false);
+    setRelease(null);
+    setIssue(null);
+    setError(null);
+  }, [matter.id, kind]);
   const copy = {
     holds: {
       eyebrow: "PRESERVATION RECORDS",
@@ -112,6 +130,21 @@ export function GovernancePage({
       setBusy(false);
     }
   }
+  async function taskAssignee(id: string, assigned_to: string | null) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/cases/${matter.id}/tasks/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ assigned_to }),
+      });
+      resource.refresh();
+    } catch (error) {
+      setError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <>
       <PageHeading eyebrow={copy.eyebrow} title={copy.title} text={copy.text}>
@@ -151,6 +184,12 @@ export function GovernancePage({
               onClick={() => setIssue(item)}
             >
               <span className="eyebrow">HUMAN-DEFINED ISSUE</span>
+              {item.review && (
+                <Badge
+                  value={item.review.stale ? "Review stale" : item.review.state}
+                  tone={item.review.stale ? "amber" : undefined}
+                />
+              )}
               <h2>{item.title}</h2>
               <p>
                 {item.description ||
@@ -174,6 +213,7 @@ export function GovernancePage({
                 <th>{kind === "holds" ? "Preservation hold" : "Task"}</th>
                 <th>Status</th>
                 <th>Created</th>
+                {kind === "tasks" && <th>Assigned to</th>}
                 <th />
               </tr>
             </thead>
@@ -199,6 +239,25 @@ export function GovernancePage({
                     />
                   </td>
                   <td className="nowrap">{date(item.created_at)}</td>
+                  {kind === "tasks" && (
+                    <td>
+                      <select
+                        aria-label={`Assigned to for ${item.title}`}
+                        value={item.assigned_to || ""}
+                        disabled={busy || !canReview}
+                        onChange={(event) =>
+                          void taskAssignee(item.id, event.target.value || null)
+                        }
+                      >
+                        <option value="">Unassigned</option>
+                        {members.data?.items.map((member) => (
+                          <option key={member.user_id} value={member.user_id}>
+                            {member.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  )}
                   <td>
                     {kind === "holds" ? (
                       item.state === "active" && (
@@ -284,7 +343,10 @@ export function GovernancePage({
           matter={matter}
           issue={issue}
           canReview={canReview}
-          close={() => setIssue(null)}
+          close={() => {
+            setIssue(null);
+            resource.refresh();
+          }}
         />
       )}
     </>
@@ -304,6 +366,9 @@ function CreateGovernance({
 }) {
   const [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false);
+  const members = useResource<{ items: Member[] }>(
+    kind === "tasks" ? `/cases/${matter.id}/members` : null,
+  );
   return (
     <Modal
       title={
@@ -321,10 +386,16 @@ function CreateGovernance({
           setBusy(true);
           setError(null);
           try {
-            await post(
-              `/cases/${matter.id}/${kind}`,
-              Object.fromEntries(new FormData(event.currentTarget)),
-            );
+            await post(`/cases/${matter.id}/${kind}`, {
+              ...Object.fromEntries(new FormData(event.currentTarget)),
+              ...(kind === "tasks"
+                ? {
+                    assigned_to:
+                      new FormData(event.currentTarget).get("assigned_to") ||
+                      null,
+                  }
+                : {}),
+            });
             done();
           } catch (error) {
             setError(error);
@@ -373,10 +444,24 @@ function CreateGovernance({
             />
           </label>
         ) : (
-          <p className="muted">
-            New tasks start open and unassigned. Evidence review decisions are
-            recorded separately.
-          </p>
+          <>
+            <label>
+              Assign task to
+              <select name="assigned_to" defaultValue="">
+                <option value="">Unassigned</option>
+                {members.data?.items.map((member) => (
+                  <option key={member.user_id} value={member.user_id}>
+                    {member.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <ErrorBox error={members.error} />
+            <p className="muted">
+              New tasks start open. Task completion remains separate from
+              evidence review decisions.
+            </p>
+          </>
         )}
         <div className="form-actions">
           <button
@@ -505,6 +590,82 @@ function IssueMatrix({
       </p>
       <ErrorBox error={detail.error} retry={detail.refresh} />
       <ErrorBox error={error} />
+      {detail.data?.review && (
+        <section className="panel issue-review-control">
+          <div className="section-heading">
+            <div>
+              <h3>Human issue review</h3>
+              <Badge
+                value={
+                  detail.data.review.stale
+                    ? "Review stale"
+                    : detail.data.review.state
+                }
+                tone={detail.data.review.stale ? "amber" : undefined}
+              />
+            </div>
+            <span className="muted">v{detail.data.review.version}</span>
+          </div>
+          {detail.data.review.stale && (
+            <div className="notice amber">
+              Linked evidence or review changed after the last issue decision.
+              Review the current scope again.
+            </div>
+          )}
+          {detail.data.review.reason && (
+            <p className="muted">{detail.data.review.reason}</p>
+          )}
+          {canReview && (
+            <form
+              onSubmit={async (event) => {
+                event.preventDefault();
+                const form = new FormData(event.currentTarget);
+                setBusy(true);
+                setError(null);
+                try {
+                  await post(`/cases/${matter.id}/issues/${issue.id}/review`, {
+                    state: form.get("state"),
+                    reason: form.get("reason"),
+                    expected_version: detail.data!.review!.version,
+                  });
+                  detail.refresh();
+                } catch (error) {
+                  setError(error);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <label>
+                Issue decision
+                <select name="state" defaultValue="needs_review">
+                  <option value="needs_review">Needs review</option>
+                  <option value="disputed">Disputed</option>
+                  <option
+                    value="reviewed"
+                    disabled={!can(matter.role, "privilege")}
+                  >
+                    Reviewed by attorney or matter lead
+                  </option>
+                </select>
+              </label>
+              <label>
+                Issue review reason
+                <textarea
+                  name="reason"
+                  required
+                  minLength={3}
+                  maxLength={2000}
+                  rows={2}
+                />
+              </label>
+              <button className="button secondary compact" disabled={busy}>
+                Record issue decision
+              </button>
+            </form>
+          )}
+        </section>
+      )}
       {detail.loading && !detail.data ? (
         <Loading />
       ) : (

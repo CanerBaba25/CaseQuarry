@@ -1,0 +1,1299 @@
+"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { bytes, label, number, post } from "@/lib/api";
+import { useResource } from "@/lib/hooks";
+import { can } from "@/lib/permissions";
+import type { EvidenceDetail, Matter, User } from "@/lib/types";
+import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
+import { PageHeading, Pagination } from "./matter-pages";
+import PdfRegionSelector from "./pdf-region-selector";
+
+type Range = { start: number; end: number };
+type Region = {
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+type Redaction = {
+  id: string;
+  evidence_id: string;
+  kind: "pdf" | "text";
+  state: string;
+  requested_by: string;
+  approved_by: string | null;
+  reason: string;
+  sha256: string | null;
+  byte_size: number;
+  verification: Record<string, unknown>;
+  error: string | null;
+  error_code: string | null;
+  selection: { ranges?: Range[]; regions?: Region[] };
+};
+type Production = {
+  id: string;
+  state: string;
+  requested_by: string;
+  approved_by: string | null;
+  reason: string;
+  bates_prefix: string;
+  evidence_ids: string[];
+  redactions: Record<string, string>;
+  counts: Record<string, unknown>;
+  sha256: string | null;
+  byte_size: number;
+  error?: string;
+  items?: {
+    evidence_id: string;
+    begin_bates: string;
+    end_bates: string;
+    page_count: number;
+    produced_sha256: string;
+  }[];
+};
+
+export default function ProductionsPage({
+  matter,
+  user,
+}: {
+  matter: Matter;
+  user: User;
+}) {
+  const params = useSearchParams();
+  const [redactionCursor, setRedactionCursor] = useState<string | null>(null),
+    [redactionHistory, setRedactionHistory] = useState<(string | null)[]>([]),
+    [productionCursor, setProductionCursor] = useState<string | null>(null),
+    [productionHistory, setProductionHistory] = useState<(string | null)[]>([]);
+  const redactions = useResource<{
+    items: Redaction[];
+    next_cursor: string | null;
+  }>(
+    can(matter.role, "review")
+      ? `/cases/${matter.id}/redactions${redactionCursor ? `?cursor=${encodeURIComponent(redactionCursor)}` : ""}`
+      : null,
+  );
+  const productions = useResource<{
+    items: Production[];
+    next_cursor: string | null;
+  }>(
+    can(matter.role, "export")
+      ? `/cases/${matter.id}/productions${productionCursor ? `?cursor=${encodeURIComponent(productionCursor)}` : ""}`
+      : null,
+  );
+  const [createRedaction, setCreateRedaction] = useState(false),
+    [createProduction, setCreateProduction] = useState(false),
+    [redactionId, setRedactionId] = useState<string | null>(null),
+    [productionId, setProductionId] = useState<string | null>(null);
+  useEffect(() => {
+    if (params.get("evidence_id") && can(matter.role, "review"))
+      setCreateRedaction(true);
+  }, [params, matter.role]);
+  const pending =
+    redactions.data?.items.some((item) =>
+      ["pending", "running"].includes(item.state),
+    ) ||
+    productions.data?.items.some((item) =>
+      ["pending", "running"].includes(item.state),
+    );
+  useEffect(() => {
+    if (!pending) return;
+    const timer = setInterval(() => {
+      redactions.refresh();
+      productions.refresh();
+    }, 2500);
+    return () => clearInterval(timer);
+  }, [pending, redactions.refresh, productions.refresh]);
+  return (
+    <>
+      <PageHeading
+        eyebrow="REVIEWED DISCLOSURE"
+        title="Produce with a second look."
+        text="Verified derivative copies, fixed review snapshots and a stable Bates registry. Originals stay preserved and are never included in these production packs."
+      >
+        <button
+          className="button secondary"
+          disabled={!can(matter.role, "review")}
+          onClick={() => setCreateRedaction(true)}
+        >
+          Request redaction
+        </button>
+        <button
+          className="button primary"
+          disabled={!can(matter.role, "export")}
+          onClick={() => setCreateProduction(true)}
+        >
+          <Icon name="export" size={17} />
+          Propose production
+        </button>
+      </PageHeading>
+      <div className="notice amber">
+        <Icon name="shield" size={19} />
+        <span>
+          A different current matter lead or attorney must approve each
+          redaction and production. Privilege, review and integrity checks are
+          repeated before delivery. Preservation holds remain disclosed; they do
+          not authorize disclosure.
+        </span>
+      </div>
+      {can(matter.role, "review") ? (
+        <section className="section">
+          <div className="section-heading">
+            <div>
+              <h2>Redaction review</h2>
+              <p className="muted">
+                Inspect the generated sanitized derivative before a separate
+                approval.
+              </p>
+            </div>
+            <button
+              className="button secondary compact"
+              onClick={redactions.refresh}
+            >
+              Refresh redactions
+            </button>
+          </div>
+          <ErrorBox error={redactions.error} retry={redactions.refresh} />
+          {redactions.loading ? (
+            <Loading />
+          ) : (
+            <div className="panel table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Evidence</th>
+                    <th>Derivative</th>
+                    <th>State</th>
+                    <th>Preserved hash</th>
+                    <th>
+                      <span className="sr-only">Redaction action</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {redactions.data?.items.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <Link
+                          className="mono"
+                          href={`/app/matters/${matter.id}/evidence/${item.evidence_id}`}
+                        >
+                          {item.evidence_id}
+                        </Link>
+                        <small className="block">{item.reason}</small>
+                      </td>
+                      <td>{label(item.kind)}</td>
+                      <td>
+                        <Badge value={item.state} />
+                      </td>
+                      <td className="mono">
+                        {item.sha256
+                          ? `${item.sha256.slice(0, 18)}…`
+                          : "Awaiting derivative"}
+                      </td>
+                      <td>
+                        <button
+                          className="button secondary compact"
+                          onClick={() => setRedactionId(item.id)}
+                        >
+                          Inspect redaction
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!redactions.data?.items.length && (
+                <Empty
+                  icon="review"
+                  title="No redaction requests"
+                  text="Select exact text offsets or PDF page regions. Sanitized derivatives are generated and checked separately from immutable originals."
+                />
+              )}
+            </div>
+          )}
+          <Pagination
+            previous={
+              redactionHistory.length
+                ? () => {
+                    const pages = [...redactionHistory];
+                    setRedactionCursor(pages.pop() || null);
+                    setRedactionHistory(pages);
+                  }
+                : undefined
+            }
+            next={
+              redactions.data?.next_cursor
+                ? () => {
+                    setRedactionHistory([...redactionHistory, redactionCursor]);
+                    setRedactionCursor(redactions.data!.next_cursor);
+                  }
+                : undefined
+            }
+          />
+        </section>
+      ) : (
+        <div className="notice subtle">
+          <Icon name="lock" size={17} />
+          Your matter role does not allow redaction review.
+        </div>
+      )}
+      {can(matter.role, "export") && (
+        <section className="section">
+          <div className="section-heading">
+            <div>
+              <h2>Production packs</h2>
+              <p className="muted">
+                At most 200 reviewed items per pack. Flattened PDF copies or
+                verified UTF-8 text, manifest and CSV/DAT/OPT load files.
+              </p>
+            </div>
+            <button
+              className="button secondary compact"
+              onClick={productions.refresh}
+            >
+              Refresh productions
+            </button>
+          </div>
+          <ErrorBox error={productions.error} retry={productions.refresh} />
+          {productions.loading ? (
+            <Loading />
+          ) : (
+            <div className="panel table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Pack</th>
+                    <th>Scope</th>
+                    <th>State</th>
+                    <th>Bates prefix</th>
+                    <th>
+                      <span className="sr-only">Production action</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productions.data?.items.map((item) => (
+                    <tr key={item.id}>
+                      <td>
+                        <strong>{item.reason}</strong>
+                        <small className="block mono">{item.id}</small>
+                      </td>
+                      <td>{number(item.evidence_ids.length)} items</td>
+                      <td>
+                        <Badge value={item.state} />
+                      </td>
+                      <td className="mono">{item.bates_prefix}</td>
+                      <td>
+                        <button
+                          className="button secondary compact"
+                          onClick={() => setProductionId(item.id)}
+                        >
+                          Inspect pack
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!productions.data?.items.length && (
+                <Empty
+                  icon="export"
+                  title="No proposed productions"
+                  text="Propose a reviewed evidence snapshot and approved redactions. The pack is generated only after separate attorney or matter-lead approval."
+                />
+              )}
+            </div>
+          )}
+          <Pagination
+            previous={
+              productionHistory.length
+                ? () => {
+                    const pages = [...productionHistory];
+                    setProductionCursor(pages.pop() || null);
+                    setProductionHistory(pages);
+                  }
+                : undefined
+            }
+            next={
+              productions.data?.next_cursor
+                ? () => {
+                    setProductionHistory([
+                      ...productionHistory,
+                      productionCursor,
+                    ]);
+                    setProductionCursor(productions.data!.next_cursor);
+                  }
+                : undefined
+            }
+          />
+        </section>
+      )}
+      {createRedaction && (
+        <RedactionRequest
+          caseId={matter.id}
+          initialId={params.get("evidence_id") || ""}
+          close={() => setCreateRedaction(false)}
+          done={(id) => {
+            setCreateRedaction(false);
+            redactions.refresh();
+            setRedactionId(id);
+          }}
+        />
+      )}
+      {createProduction && (
+        <ProductionRequest
+          caseId={matter.id}
+          close={() => setCreateProduction(false)}
+          done={(id) => {
+            setCreateProduction(false);
+            productions.refresh();
+            setProductionId(id);
+          }}
+        />
+      )}
+      {redactionId && (
+        <RedactionReview
+          caseId={matter.id}
+          id={redactionId}
+          user={user}
+          canApprove={can(matter.role, "privilege")}
+          close={() => setRedactionId(null)}
+          changed={redactions.refresh}
+        />
+      )}
+      {productionId && (
+        <ProductionReview
+          caseId={matter.id}
+          id={productionId}
+          user={user}
+          canApprove={can(matter.role, "privilege")}
+          close={() => setProductionId(null)}
+          changed={productions.refresh}
+        />
+      )}
+    </>
+  );
+}
+
+function RedactionRequest({
+  caseId,
+  initialId,
+  close,
+  done,
+}: {
+  caseId: string;
+  initialId: string;
+  close: () => void;
+  done: (id: string) => void;
+}) {
+  const [draftId, setDraftId] = useState(initialId),
+    [id, setId] = useState(initialId),
+    [kind, setKind] = useState<"text" | "pdf">("text"),
+    [ranges, setRanges] = useState<Range[]>([]),
+    [regions, setRegions] = useState<Region[]>([]),
+    [error, setError] = useState<unknown>(null),
+    [busy, setBusy] = useState(false);
+  const item = useResource<EvidenceDetail>(
+    id ? `/cases/${caseId}/evidence/${id}` : null,
+  );
+  const content = useResource<{ text: string; artifact_version: number }>(
+    id && kind === "text" ? `/cases/${caseId}/evidence/${id}/content` : null,
+  );
+  const textRef = useRef<HTMLTextAreaElement>(null),
+    text = content.data?.text || "",
+    characters = Array.from(text);
+  return (
+    <Modal title="Request a sanitized redaction" close={close} wide>
+      <div className="evidence-lookup">
+        <label>
+          Evidence ID
+          <input
+            value={draftId}
+            onChange={(event) => setDraftId(event.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          className="button secondary"
+          disabled={!draftId.trim()}
+          onClick={() => {
+            setId(draftId.trim());
+            setRanges([]);
+            setRegions([]);
+            setError(null);
+          }}
+        >
+          Load evidence
+        </button>
+      </div>
+      <ErrorBox error={item.error || content.error || error} />
+      {(item.loading || content.loading) && <Loading />}
+      {item.data && (
+        <form
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            setBusy(true);
+            setError(null);
+            try {
+              const result = await post<{ id: string }>(
+                `/cases/${caseId}/redactions`,
+                {
+                  evidence_id: id,
+                  kind,
+                  reason: form.get("reason"),
+                  ...(kind === "text"
+                    ? {
+                        ranges,
+                        expected_text_version: content.data?.artifact_version,
+                      }
+                    : { regions }),
+                },
+              );
+              done(result.id);
+            } catch (error) {
+              setError(error);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <h3>{item.data.title}</h3>
+          <p className="field-help">
+            Original SHA-256: <code>{item.data.sha256}</code>
+          </p>
+          <label>
+            Derivative type
+            <select
+              value={kind}
+              onChange={(event) => {
+                setKind(event.target.value as "text" | "pdf");
+                setRanges([]);
+                setRegions([]);
+              }}
+            >
+              <option value="text">UTF-8 extracted text</option>
+              <option value="pdf" disabled={item.data.type !== "pdf"}>
+                Flattened PDF pages
+              </option>
+            </select>
+          </label>
+          {kind === "text" ? (
+            <>
+              <label>
+                Immutable extracted text · version{" "}
+                {content.data?.artifact_version || "—"}
+                <textarea
+                  className="redaction-source-text"
+                  ref={textRef}
+                  readOnly
+                  value={text}
+                  rows={10}
+                />
+              </label>
+              <button
+                type="button"
+                className="button secondary compact"
+                disabled={!text || ranges.length >= 200}
+                onClick={() => {
+                  const field = textRef.current;
+                  if (!field || field.selectionEnd <= field.selectionStart) {
+                    setError(
+                      new Error(
+                        "Select the exact source text you want to redact first.",
+                      ),
+                    );
+                    return;
+                  }
+                  const range = {
+                    start: Array.from(text.slice(0, field.selectionStart))
+                      .length,
+                    end: Array.from(text.slice(0, field.selectionEnd)).length,
+                  };
+                  setRanges([...ranges, range]);
+                  setError(null);
+                }}
+              >
+                Add selected text range
+              </button>
+              <div className="redaction-selections">
+                {ranges.map((range, index) => (
+                  <div key={index}>
+                    <span>
+                      <strong>
+                        Characters {range.start}–{range.end}
+                      </strong>
+                      <small className="block">
+                        {characters
+                          .slice(range.start, range.end)
+                          .join("")
+                          .slice(0, 180)}
+                      </small>
+                    </span>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label={`Remove text range ${index + 1}`}
+                      onClick={() =>
+                        setRanges(ranges.filter((_, i) => i !== index))
+                      }
+                    >
+                      <Icon name="close" size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p className="field-help">
+                Ranges use zero-based Unicode character offsets; the end is
+                exclusive. The server binds them to the verified extracted-text
+                version.
+              </p>
+            </>
+          ) : (
+            <>
+              <PdfRegionSelector
+                caseId={caseId}
+                evidenceId={id}
+                originalHash={item.data.sha256}
+                regions={regions}
+                change={setRegions}
+              />
+              <div className="notice subtle">
+                <Icon name="file" size={17} />
+                <span>
+                  Use normalized page coordinates with the top-left as origin.
+                  For example x=0.1, y=0.2, width=0.3 and height=0.1. Inspect
+                  the sanitized draft and the original before approval. PDF
+                  processing is limited to 50 pages and 50 MB.
+                </span>
+              </div>
+              <a
+                className="text-link"
+                href={`/api/v1/cases/${caseId}/evidence/${id}/original`}
+              >
+                Download original for coordinate review
+              </a>
+              <div className="redaction-regions">
+                {regions.map((region, index) => (
+                  <div className="region-row" key={index}>
+                    {(["page", "x", "y", "width", "height"] as const).map(
+                      (field) => (
+                        <label key={field}>
+                          {label(field)}
+                          <input
+                            type="number"
+                            aria-label={`Region ${index + 1} ${field}`}
+                            value={region[field]}
+                            min={
+                              field === "page"
+                                ? 1
+                                : field === "width" || field === "height"
+                                  ? 0.001
+                                  : 0
+                            }
+                            max={field === "page" ? 50 : 1}
+                            step={field === "page" ? 1 : 0.001}
+                            required
+                            onChange={(event) =>
+                              setRegions(
+                                regions.map((value, i) =>
+                                  i === index
+                                    ? {
+                                        ...value,
+                                        [field]: Number(event.target.value),
+                                      }
+                                    : value,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                      ),
+                    )}
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label={`Remove PDF region ${index + 1}`}
+                      onClick={() =>
+                        setRegions(regions.filter((_, i) => i !== index))
+                      }
+                    >
+                      <Icon name="close" size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="button secondary compact"
+                disabled={regions.length >= 200}
+                onClick={() =>
+                  setRegions([
+                    ...regions,
+                    { page: 1, x: 0.1, y: 0.1, width: 0.3, height: 0.1 },
+                  ])
+                }
+              >
+                Add PDF region
+              </button>
+            </>
+          )}
+          <label>
+            Redaction reason
+            <textarea
+              name="reason"
+              required
+              minLength={3}
+              maxLength={2000}
+              rows={3}
+            />
+          </label>
+          <div className="form-actions">
+            <button type="button" className="button secondary" onClick={close}>
+              Cancel
+            </button>
+            <button
+              className="button primary"
+              disabled={
+                busy ||
+                (kind === "text"
+                  ? !ranges.length || !content.data
+                  : !regions.length)
+              }
+            >
+              {busy ? "Requesting…" : "Generate redacted draft"}
+            </button>
+          </div>
+        </form>
+      )}
+    </Modal>
+  );
+}
+
+function ProductionRequest({
+  caseId,
+  close,
+  done,
+}: {
+  caseId: string;
+  close: () => void;
+  done: (id: string) => void;
+}) {
+  const [redactionCursor, setRedactionCursor] = useState<string | null>(null),
+    [availableRedactions, setAvailableRedactions] = useState<Redaction[]>([]);
+  const sets = useResource<{
+      items: { id: string; name: string; count: number }[];
+    }>(`/cases/${caseId}/review-sets`),
+    redactions = useResource<{
+      items: Redaction[];
+      next_cursor: string | null;
+    }>(
+      `/cases/${caseId}/redactions?limit=100${redactionCursor ? `&cursor=${encodeURIComponent(redactionCursor)}` : ""}`,
+    );
+  useEffect(() => {
+    if (redactions.data)
+      setAvailableRedactions((current) => [
+        ...new Map(
+          [...current, ...redactions.data!.items].map((item) => [
+            item.id,
+            item,
+          ]),
+        ).values(),
+      ]);
+  }, [redactions.data]);
+  const [scope, setScope] = useState("ids"),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState<unknown>(null);
+  return (
+    <Modal title="Propose a derived production pack" close={close}>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const form = new FormData(event.currentTarget);
+          const approved =
+            availableRedactions.filter((item) =>
+              form.getAll("redaction").includes(item.id),
+            ) || [];
+          const mapping: Record<string, string> = {};
+          for (const item of approved) {
+            if (mapping[item.evidence_id]) {
+              setError(
+                new Error(
+                  "Select only one approved redaction for each evidence item.",
+                ),
+              );
+              return;
+            }
+            mapping[item.evidence_id] = item.id;
+          }
+          setBusy(true);
+          setError(null);
+          try {
+            const result = await post<{ id: string }>(
+              `/cases/${caseId}/productions`,
+              {
+                ...(scope === "set"
+                  ? { review_set_id: form.get("review_set_id") }
+                  : {
+                      evidence_ids: String(form.get("evidence_ids") || "")
+                        .split(/[\s,]+/)
+                        .filter(Boolean),
+                    }),
+                redactions: mapping,
+                bates_prefix: form.get("bates_prefix"),
+                reason: form.get("reason"),
+                confirmed: form.get("confirmed") === "on",
+              },
+            );
+            done(result.id);
+          } catch (error) {
+            setError(error);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <ErrorBox error={error || sets.error || redactions.error} />
+        <label>
+          Production scope
+          <select
+            value={scope}
+            onChange={(event) => setScope(event.target.value)}
+          >
+            <option value="ids">Explicit evidence IDs</option>
+            <option value="set">Fixed review-set snapshot</option>
+          </select>
+        </label>
+        {scope === "set" ? (
+          <label>
+            Review set
+            <select name="review_set_id" required defaultValue="">
+              <option value="" disabled>
+                Choose a review set
+              </option>
+              {sets.data?.items.map((set) => (
+                <option
+                  key={set.id}
+                  value={set.id}
+                  disabled={!set.count || set.count > 200}
+                >
+                  {set.name} · {number(set.count)} items
+                  {set.count > 200 ? " · exceeds limit" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <label>
+            Evidence IDs
+            <textarea
+              name="evidence_ids"
+              required
+              rows={4}
+              placeholder="One ID per line, or comma separated"
+            />
+          </label>
+        )}
+        <fieldset className="production-redactions">
+          <legend>Approved redactions to apply</legend>
+          {availableRedactions
+            .filter((item) => item.state === "approved")
+            .map((item) => (
+              <label className="checkbox-label" key={item.id}>
+                <input name="redaction" value={item.id} type="checkbox" />
+                <span>
+                  <code>{item.evidence_id}</code>
+                  <small className="block">
+                    {label(item.kind)} · {item.reason}
+                  </small>
+                </span>
+              </label>
+            ))}
+          {!availableRedactions.some((item) => item.state === "approved") && (
+            <p className="muted">
+              No approved redactions loaded. Unredacted derivatives may contain
+              sensitive information.
+            </p>
+          )}
+          {redactions.loading && (
+            <Loading text="Loading approved redaction choices…" />
+          )}
+          {redactions.data?.next_cursor && (
+            <button
+              type="button"
+              className="button secondary compact"
+              disabled={redactions.loading}
+              onClick={() => setRedactionCursor(redactions.data!.next_cursor)}
+            >
+              Load older redaction records
+            </button>
+          )}
+        </fieldset>
+        <label>
+          Bates prefix
+          <input
+            name="bates_prefix"
+            defaultValue="CQ"
+            required
+            pattern="[A-Z][A-Z0-9_-]{0,15}"
+            maxLength={16}
+          />
+        </label>
+        <label>
+          Disclosure reason
+          <textarea
+            name="reason"
+            required
+            minLength={3}
+            maxLength={2000}
+            rows={3}
+          />
+        </label>
+        <label className="checkbox-label">
+          <input type="checkbox" name="confirmed" required />
+          <span>
+            I confirm the selected evidence scope, applied redactions and
+            requested disclosure. A different matter lead or attorney must
+            approve.
+          </span>
+        </label>
+        <div className="notice amber">
+          <Icon name="lock" size={17} />
+          <span>
+            Completed human review and privilege none or cleared are required.
+            Packs contain verified text or flattened PDF derivatives,
+            CSV/DAT/OPT load files and a hash manifest; they exclude original
+            native bytes.
+          </span>
+        </div>
+        <div className="form-actions">
+          <button type="button" className="button secondary" onClick={close}>
+            Cancel
+          </button>
+          <button className="button primary" disabled={busy}>
+            {busy ? "Proposing…" : "Propose for separate approval"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function Confirmation({
+  title,
+  path,
+  approve,
+  close,
+  done,
+}: {
+  title: string;
+  path: string;
+  approve: boolean;
+  close: () => void;
+  done: () => void;
+}) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState<unknown>(null);
+  return (
+    <Modal title={title} close={close}>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const form = new FormData(event.currentTarget);
+          setBusy(true);
+          setError(null);
+          try {
+            await post(path, {
+              reason: form.get("reason"),
+              ...(approve ? { confirmed: form.get("confirmed") === "on" } : {}),
+            });
+            done();
+          } catch (error) {
+            setError(error);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <ErrorBox error={error} />
+        <label>
+          Review reason
+          <textarea
+            name="reason"
+            required
+            minLength={3}
+            maxLength={2000}
+            rows={3}
+          />
+        </label>
+        {approve && (
+          <label className="checkbox-label">
+            <input type="checkbox" name="confirmed" required />
+            <span>
+              I separately reviewed this disclosure and confirm approval. The
+              server will recheck evidence, human review and permissions.
+            </span>
+          </label>
+        )}
+        <div className="form-actions">
+          <button type="button" className="button secondary" onClick={close}>
+            Back
+          </button>
+          <button className="button primary" disabled={busy}>
+            {busy ? "Saving…" : title}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function RedactionReview({
+  caseId,
+  id,
+  user,
+  canApprove,
+  close,
+  changed,
+}: {
+  caseId: string;
+  id: string;
+  user: User;
+  canApprove: boolean;
+  close: () => void;
+  changed: () => void;
+}) {
+  const detail = useResource<Redaction>(`/cases/${caseId}/redactions/${id}`),
+    [action, setAction] = useState<"approve" | "reject" | null>(null);
+  const row = detail.data;
+  useEffect(() => {
+    if (!row || !["pending", "running"].includes(row.state)) return;
+    const timer = setInterval(detail.refresh, 2000);
+    return () => clearInterval(timer);
+  }, [row, detail.refresh]);
+  const refresh = () => {
+    detail.refresh();
+    changed();
+  };
+  return (
+    <Modal title="Inspect redacted derivative" close={close} wide>
+      <ErrorBox error={detail.error} retry={detail.refresh} />
+      {detail.loading && !row ? (
+        <Loading />
+      ) : (
+        row && (
+          <>
+            <div className="section-heading">
+              <div>
+                <Badge value={row.state} />
+                <h3 className="mono">{row.evidence_id}</h3>
+                <p className="muted">{row.reason}</p>
+              </div>
+              <Link
+                className="text-link"
+                href={`/app/matters/${caseId}/evidence/${row.evidence_id}`}
+              >
+                Inspect source <Icon name="arrow" size={14} />
+              </Link>
+            </div>
+            {row.error && (
+              <div className="notice red" role="alert">
+                {row.error_code}: {row.error}
+              </div>
+            )}
+            {["ready_for_review", "approved"].includes(row.state) && (
+              <SanitizedPreview caseId={caseId} row={row} />
+            )}
+            {row.sha256 && (
+              <>
+                <h3>Sanitized derivative SHA-256</h3>
+                <code className="hash-block">{row.sha256}</code>
+                <p className="field-help">
+                  {bytes(row.byte_size)} · verified derivative, original
+                  preserved separately.
+                </p>
+              </>
+            )}
+            <details className="audit-metadata">
+              <summary>Selection and verification results</summary>
+              <pre>
+                {JSON.stringify(
+                  { selection: row.selection, verification: row.verification },
+                  null,
+                  2,
+                )}
+              </pre>
+            </details>
+            {row.state === "ready_for_review" && (
+              <>
+                <p className="field-help">
+                  Review both the sanitized derivative and original. A different
+                  matter lead or attorney must approve; the requester cannot
+                  approve their own redaction.
+                </p>
+                <div className="form-actions">
+                  <button
+                    className="button secondary"
+                    onClick={() => setAction("reject")}
+                  >
+                    Reject draft
+                  </button>
+                  <button
+                    className="button primary"
+                    disabled={!canApprove || row.requested_by === user.id}
+                    onClick={() => setAction("approve")}
+                  >
+                    Approve redaction
+                  </button>
+                </div>
+              </>
+            )}
+            {action && (
+              <Confirmation
+                title={
+                  action === "approve"
+                    ? "Approve redaction"
+                    : "Reject redaction"
+                }
+                path={`/cases/${caseId}/redactions/${id}/${action}`}
+                approve={action === "approve"}
+                close={() => setAction(null)}
+                done={() => {
+                  setAction(null);
+                  refresh();
+                }}
+              />
+            )}
+          </>
+        )
+      )}
+    </Modal>
+  );
+}
+
+function SanitizedPreview({ caseId, row }: { caseId: string; row: Redaction }) {
+  const [source, setSource] = useState<string | null>(null),
+    [error, setError] = useState<unknown>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    let url: string | null = null;
+    setSource(null);
+    setError(null);
+    fetch(`/api/v1/cases/${caseId}/redactions/${row.id}/preview`, {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          if (response.status === 401)
+            window.dispatchEvent(new Event("cq:unauthorized"));
+          const data = await response.json().catch(() => ({}));
+          throw new Error(
+            data.message ||
+              "The sanitized preview is unavailable. Refresh and inspect the reported source or permission change.",
+          );
+        }
+        if (row.kind === "text") return response.text();
+        url = URL.createObjectURL(await response.blob());
+        return url;
+      })
+      .then((value) => {
+        if (!controller.signal.aborted) setSource(value);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setError(error);
+      });
+    return () => {
+      controller.abort();
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [caseId, row.id, row.kind]);
+  return (
+    <section className="sanitized-preview">
+      <h3>Sanitized derivative preview</h3>
+      <ErrorBox error={error} />
+      {source === null && !error ? (
+        <Loading text="Verifying and opening sanitized preview…" />
+      ) : (
+        source !== null &&
+        (row.kind === "text" ? (
+          <pre className="redaction-text-preview">{source}</pre>
+        ) : (
+          <iframe
+            title="Sanitized flattened PDF derivative"
+            src={source}
+            sandbox="allow-same-origin"
+            className="redaction-pdf-preview"
+          />
+        ))
+      )}
+      <a
+        className="text-link"
+        href={`/api/v1/cases/${caseId}/redactions/${row.id}/preview`}
+      >
+        Download verified sanitized derivative
+      </a>
+    </section>
+  );
+}
+
+function ProductionReview({
+  caseId,
+  id,
+  user,
+  canApprove,
+  close,
+  changed,
+}: {
+  caseId: string;
+  id: string;
+  user: User;
+  canApprove: boolean;
+  close: () => void;
+  changed: () => void;
+}) {
+  const detail = useResource<Production>(`/cases/${caseId}/productions/${id}`),
+    [approve, setApprove] = useState(false);
+  const row = detail.data;
+  useEffect(() => {
+    if (!row || !["pending", "running"].includes(row.state)) return;
+    const timer = setInterval(detail.refresh, 2000);
+    return () => clearInterval(timer);
+  }, [row, detail.refresh]);
+  return (
+    <Modal title="Inspect derived production pack" close={close} wide>
+      <ErrorBox error={detail.error} retry={detail.refresh} />
+      {detail.loading && !row ? (
+        <Loading />
+      ) : (
+        row && (
+          <>
+            <div className="section-heading">
+              <div>
+                <Badge value={row.state} />
+                <h3>{row.reason}</h3>
+                <p className="field-help">
+                  Bates prefix <code>{row.bates_prefix}</code> ·{" "}
+                  {number(row.evidence_ids.length)} explicit snapshot items ·{" "}
+                  {Object.keys(row.redactions).length} approved redactions
+                </p>
+              </div>
+              {row.state === "completed" && (
+                <a
+                  className="button primary"
+                  href={`/api/v1/cases/${caseId}/productions/${id}/download`}
+                >
+                  <Icon name="export" size={17} />
+                  Download verified pack
+                </a>
+              )}
+            </div>
+            <div className="notice subtle">
+              <Icon name="file" size={17} />
+              <span>
+                Delivery contains derivatives only. CSV/DAT metadata and the
+                tested OPT profile accompany the manifest. Original native files
+                remain excluded; active preservation holds are disclosed in the
+                scope.
+              </span>
+            </div>
+            <details className="audit-metadata" open>
+              <summary>Scope, processing and hold disclosure</summary>
+              <pre>{JSON.stringify(row.counts, null, 2)}</pre>
+            </details>
+            <h3>Evidence snapshot</h3>
+            <div className="production-evidence-scope">
+              {row.evidence_ids.map((evidence) => (
+                <Link
+                  key={evidence}
+                  href={`/app/matters/${caseId}/evidence/${evidence}`}
+                  className="mono"
+                >
+                  {evidence}
+                  {row.redactions[evidence] && (
+                    <small>
+                      {" "}
+                      · approved redaction {row.redactions[evidence]}
+                    </small>
+                  )}
+                </Link>
+              ))}
+            </div>
+            {row.items?.length ? (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Evidence</th>
+                      <th>Bates beginning</th>
+                      <th>Bates ending</th>
+                      <th>Pages</th>
+                      <th>Produced SHA-256</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {row.items.map((item) => (
+                      <tr key={item.evidence_id}>
+                        <td className="mono">{item.evidence_id}</td>
+                        <td>{item.begin_bates}</td>
+                        <td>{item.end_bates}</td>
+                        <td>{number(item.page_count)}</td>
+                        <td className="mono hash-cell">
+                          {item.produced_sha256}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            {row.sha256 && (
+              <>
+                <h3>Production package SHA-256</h3>
+                <code className="hash-block">{row.sha256}</code>
+                <p className="field-help">
+                  {bytes(row.byte_size)} · hashes and current approval
+                  permissions are revalidated at download.
+                </p>
+              </>
+            )}
+            {row.state === "proposed" && (
+              <div className="form-actions">
+                <p className="field-help">
+                  A different current matter lead or attorney must confirm this
+                  snapshot. Inspect its evidence and approved redactions before
+                  acting.
+                </p>
+                <button
+                  className="button primary"
+                  disabled={!canApprove || row.requested_by === user.id}
+                  onClick={() => setApprove(true)}
+                >
+                  Approve production
+                </button>
+              </div>
+            )}
+            {approve && (
+              <Confirmation
+                title="Approve production"
+                path={`/cases/${caseId}/productions/${id}/approve`}
+                approve
+                close={() => setApprove(false)}
+                done={() => {
+                  setApprove(false);
+                  detail.refresh();
+                  changed();
+                }}
+              />
+            )}
+          </>
+        )
+      )}
+    </Modal>
+  );
+}

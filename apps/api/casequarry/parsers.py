@@ -3,8 +3,6 @@ import io
 import json
 import mimetypes
 import re
-import shutil
-import subprocess
 import zipfile
 from dataclasses import dataclass, field
 from datetime import UTC
@@ -96,31 +94,14 @@ def parse_document(path: Path, filename: str, settings) -> Parsed:
                 safe_zip_entries(archive, settings)
         if extension == ".eml":
             return parse_email(path.read_bytes(), filename, settings.max_extracted_chars)
+        if extension == ".msg":
+            from .outlook import parse_msg
+            return parse_msg(path, filename, settings)
         if extension in {".mbox", ".zip"}:
             return Parsed("container", filename, state="stored", metadata={"format": extension[1:]})
         if extension == ".pdf":
-            from pypdf import PdfReader
-            with path.open("rb") as header:
-                is_pdf = header.read(5) == b"%PDF-"
-            if not is_pdf:
-                return Parsed("pdf", filename, state="failed", error="MIME_MISMATCH")
-            reader = PdfReader(path)
-            if reader.is_encrypted and not reader.decrypt(""):
-                return Parsed("pdf", filename, state="locked", error="PASSWORD_REQUIRED")
-            result = Parsed("pdf", filename, metadata={"page_count": len(reader.pages)})
-            parts, offset = [], 0
-            for number, page in enumerate(reader.pages, 1):
-                text = page.extract_text() or ""
-                if offset + len(text) > settings.max_extracted_chars:
-                    result.state, result.error = "partial", "TEXT_LIMIT"
-                    break
-                result.pages.append((number, offset, offset + len(text)))
-                parts.append(text)
-                offset += len(text) + 2
-            result.text = "\n\n".join(parts)
-            if not result.text.strip():
-                result.state, result.error = "partial", "OCR_REQUIRED"
-            return result
+            from .pdf_document import parse_pdf
+            return parse_pdf(path, filename, settings)
         if extension == ".docx":
             from docx import Document
             document = Document(path)
@@ -136,14 +117,10 @@ def parse_document(path: Path, filename: str, settings) -> Parsed:
             from PIL import Image
             with Image.open(path) as image:
                 image.verify()
-            if shutil.which("tesseract"):
-                command = subprocess.run(["tesseract", str(path), "stdout"], capture_output=True, timeout=60, check=False)
-                if command.returncode == 0:
-                    result = Parsed("image", filename, text=command.stdout.decode("utf-8", errors="replace"), metadata={"ocr_engine": "tesseract", "ocr_quality": "unverified"})
-                else:
-                    result = Parsed("image", filename, state="partial", error="OCR_FAILED")
-            else:
-                result = Parsed("image", filename, state="partial", error="OCR_DEPENDENCY_MISSING")
+            from .ocr import recognize
+            recognized = recognize(path, settings)
+            text, error = recognized.pop("text", ""), recognized.pop("error", None)
+            result = Parsed("image", filename, text=text, state="partial" if error else "indexed", error=error, metadata={"extraction_method": "local-ocr", "ocr_engine": "tesseract", "ocr_quality": "needs-human-verification", "ocr_language": settings.ocr_language, "ocr_pages": [{"page": 1, "method": "ocr", **recognized}]})
         elif extension in {".txt", ".md", ".html", ".htm", ".csv", ".json", ".log"}:
             with path.open("rb") as stream:
                 data = stream.read(settings.max_extracted_chars * 4 + 1)

@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api, bytes, date, label, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
+import { bucketRange, filtersFromParams } from "@/lib/search-scope";
 import type {
   Evidence,
   EvidenceDetail,
   Matter,
+  Member,
   SavedSearch,
   SearchResult,
   SearchSpec,
@@ -19,6 +21,7 @@ import type {
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { Pagination } from "./matter-pages";
 import ThreadView from "./thread-view";
+import SourceInvestigations from "./source-investigations";
 
 const statuses = ["unreviewed", "needs_review", "responsive", "non_responsive"];
 const types = [
@@ -52,7 +55,9 @@ export default function Explorer({
   emailOnly?: boolean;
   evidenceId?: string;
 }) {
-  const router = useRouter();
+  const router = useRouter(),
+    params = useSearchParams(),
+    routeQuery = params.toString();
   const [spec, setSpec] = useState<SearchSpec>(() => ({
     ...defaultSpec,
     filters: {
@@ -61,7 +66,10 @@ export default function Explorer({
     },
   }));
   const [draft, setDraft] = useState(""),
-    [result, setResult] = useState<SearchResult | null>(null),
+    [loadedResult, setLoadedResult] = useState<{
+      key: string;
+      value: SearchResult;
+    } | null>(null),
     [error, setError] = useState<unknown>(null),
     [loading, setLoading] = useState(true),
     [version, setVersion] = useState(0);
@@ -72,7 +80,7 @@ export default function Explorer({
     [history, setHistory] = useState<(string | null)[]>([]),
     [filtersOpen, setFiltersOpen] = useState(false);
   const [dialog, setDialog] = useState<
-    "saved" | "set" | "bulk" | "export" | null
+    "saved" | "set" | "bulk" | "export" | "assign" | null
   >(null);
   const sources = useResource<{ items: Source[] }>(
       `/cases/${matter.id}/sources`,
@@ -80,6 +88,14 @@ export default function Explorer({
     saved = useResource<{ items: SavedSearch[] }>(
       `/cases/${matter.id}/saved-searches`,
     );
+  const custodians = useResource<{
+    items: { id: string; display_name: string }[];
+  }>(`/cases/${matter.id}/custodians`);
+  const members = useResource<{ items: Member[] }>(
+    `/cases/${matter.id}/members`,
+  );
+  const requestKey = JSON.stringify([matter.id, spec]);
+  const result = loadedResult?.key === requestKey ? loadedResult.value : null;
   const person = useResource<{ email: string; name: string }>(
     spec.filters.person_id
       ? `/cases/${matter.id}/people/${spec.filters.person_id}`
@@ -89,10 +105,8 @@ export default function Explorer({
   const canPrivilege = can(matter.role, "privilege");
   const canExport = can(matter.role, "export");
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const query = params.get("q") || "",
-      type = params.get("type"),
-      participant = params.get("person_id");
+    const params = new URLSearchParams(routeQuery);
+    const query = params.get("q") || "";
     setDraft(query);
     setHistory([]);
     setSelected([]);
@@ -101,24 +115,23 @@ export default function Explorer({
       ...defaultSpec,
       query,
       filters: {
-        ...(participant ? { person_id: participant } : {}),
         ...(reviewOnly
           ? { review_status: ["unreviewed", "needs_review"] }
           : {}),
-        ...(type
-          ? { item_types: [type] }
-          : emailOnly
-            ? { item_types: ["email"] }
-            : {}),
+        ...filtersFromParams(params),
+        ...(emailOnly ? { item_types: ["email"] } : {}),
       },
     });
-  }, [matter.id, reviewOnly, emailOnly, evidenceId]);
+  }, [matter.id, reviewOnly, emailOnly, evidenceId, routeQuery]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
     post<SearchResult>(`/cases/${matter.id}/search`, spec, controller.signal)
-      .then(setResult)
+      .then((value) => {
+        if (!controller.signal.aborted)
+          setLoadedResult({ key: requestKey, value });
+      })
       .catch((error) => {
         if (!controller.signal.aborted) setError(error);
       })
@@ -126,9 +139,16 @@ export default function Explorer({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [matter.id, spec, version]);
+  }, [matter.id, spec, version, requestKey]);
   function update(changes: Partial<SearchSpec>) {
-    setSpec((current) => ({ ...current, ...changes, cursor: null }));
+    setSpec((current) => ({
+      ...current,
+      ...changes,
+      ...(changes.filters && emailOnly
+        ? { filters: { ...changes.filters, item_types: ["email"] } }
+        : {}),
+      cursor: null,
+    }));
     setHistory([]);
     setSelected([]);
   }
@@ -137,8 +157,7 @@ export default function Explorer({
     if (
       value === null ||
       value === "" ||
-      (Array.isArray(value) && value.length === 0) ||
-      value === false
+      (Array.isArray(value) && value.length === 0)
     )
       delete filters[key];
     else filters[key] = value;
@@ -153,12 +172,14 @@ export default function Explorer({
         : [...current, value],
     );
   }
-  const activeFilters = Object.entries(spec.filters).flatMap(([key, value]) =>
-    (Array.isArray(value) ? value : [value]).map((item) => ({
-      key,
-      value: item,
-    })),
-  );
+  const activeFilters = Object.entries(spec.filters)
+    .filter(([key]) => !emailOnly || key !== "item_types")
+    .flatMap(([key, value]) =>
+      (Array.isArray(value) ? value : [value]).map((item) => ({
+        key,
+        value: item,
+      })),
+    );
   const allVisibleSelected = Boolean(
     result?.items.length &&
     result.items.every((item) => selected.includes(item.evidence_id)),
@@ -171,6 +192,10 @@ export default function Explorer({
       review_status: "review_status",
       month: "month",
       thread: "thread_id",
+      custodian: "custodian_ids",
+      privilege_status: "privilege_status",
+      reviewer: "assigned_to",
+      tag: "tags",
     } as Record<string, string>
   )[spec.group_by || ""];
   return (
@@ -181,7 +206,13 @@ export default function Explorer({
             {matter.matter_number} ·{" "}
             {reviewOnly ? "HUMAN REVIEW" : "THE EVIDENCE RECORD"}
           </span>
-          <h1>{reviewOnly ? "Review queue" : "Evidence explorer"}</h1>
+          <h1>
+            {reviewOnly
+              ? "Review queue"
+              : emailOnly
+                ? "Email explorer"
+                : "Evidence explorer"}
+          </h1>
         </div>
         <div className="explorer-heading-actions">
           <button
@@ -217,11 +248,6 @@ export default function Explorer({
         <button
           type="submit"
           className="button primary compact"
-          aria-disabled={!can(matter.role, "import")}
-          tabIndex={can(matter.role, "import") ? undefined : -1}
-          onClick={(event) => {
-            if (!can(matter.role, "import")) event.preventDefault();
-          }}
           disabled={loading}
         >
           Search
@@ -257,6 +283,10 @@ export default function Explorer({
               <option value="sent_at:asc">Oldest first</option>
               <option value="title:asc">Title A–Z</option>
               <option value="size:desc">Largest first</option>
+              <option value="size:asc">Smallest first</option>
+              <option value="sender:asc">Sender A–Z</option>
+              <option value="imported_at:desc">Recently imported</option>
+              <option value="imported_at:asc">First imported</option>
               <option value="evidence_id:asc">Evidence ID</option>
             </select>
           </label>
@@ -272,10 +302,16 @@ export default function Explorer({
               <option value="">No grouping</option>
               <option value="sender">Sender</option>
               <option value="month">Month</option>
+              <option value="day">Day</option>
+              <option value="year">Year</option>
               <option value="type">File type</option>
               <option value="source">Source</option>
               <option value="review_status">Review status</option>
               <option value="thread">Thread</option>
+              <option value="custodian">Custodian</option>
+              <option value="privilege_status">Privilege status</option>
+              <option value="reviewer">Assigned reviewer</option>
+              <option value="tag">Tag</option>
             </select>
           </label>
           <button
@@ -306,7 +342,9 @@ export default function Explorer({
               <span>
                 {item.key === "person_id" ? "Participant" : label(item.key)}:{" "}
                 {typeof item.value === "boolean"
-                  ? "Yes"
+                  ? item.value
+                    ? "Yes"
+                    : "No"
                   : item.key === "person_id"
                     ? person.data?.name ||
                       person.data?.email ||
@@ -337,7 +375,7 @@ export default function Explorer({
             <Icon name="filter" size={16} />
           </div>
           <FilterSection title="Evidence type">
-            {types.map((type) => {
+            {(emailOnly ? ["email"] : types).map((type) => {
               const bucket = result?.facets
                 .find((item) =>
                   ["type", "item_type", "item_types"].includes(item.field),
@@ -351,6 +389,7 @@ export default function Explorer({
                       (spec.filters.item_types || []) as string[]
                     ).includes(type)}
                     onChange={() => toggle("item_types", type)}
+                    disabled={emailOnly}
                   />
                   <Icon name={type === "email" ? "email" : "file"} size={15} />
                   <span>
@@ -411,6 +450,27 @@ export default function Explorer({
               </select>
             </label>
             <label className="filter-field">
+              Custodian
+              <select
+                value={
+                  ((spec.filters.custodian_ids || []) as string[])[0] || ""
+                }
+                onChange={(event) =>
+                  filter(
+                    "custodian_ids",
+                    event.target.value ? [event.target.value] : [],
+                  )
+                }
+              >
+                <option value="">All custodians</option>
+                {custodians.data?.items.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.display_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
               Sender
               <input
                 value={String(spec.filters.sender || "")}
@@ -418,18 +478,49 @@ export default function Explorer({
                 placeholder="Email address"
               />
             </label>
-            <label className="facet-option">
+            <label className="filter-field">
+              Recipient
               <input
-                type="checkbox"
-                checked={Boolean(spec.filters.has_attachment)}
-                onChange={(event) =>
-                  filter("has_attachment", event.target.checked)
-                }
+                value={String(spec.filters.recipient || "")}
+                onChange={(event) => filter("recipient", event.target.value)}
+                placeholder="Address contains…"
               />
-              <span>With attachments</span>
             </label>
+            <label className="filter-field">
+              Attachments
+              <select
+                value={
+                  typeof spec.filters.has_attachment === "boolean"
+                    ? String(spec.filters.has_attachment)
+                    : ""
+                }
+                onChange={(event) =>
+                  filter(
+                    "has_attachment",
+                    event.target.value === ""
+                      ? null
+                      : event.target.value === "true",
+                  )
+                }
+              >
+                <option value="">With or without</option>
+                <option value="true">With attachments</option>
+                <option value="false">Without attachments</option>
+              </select>
+            </label>
+            <ErrorBox error={sources.error || custodians.error} />
           </FilterSection>
           <FilterSection title="Date · UTC">
+            <label className="filter-field">
+              Date field
+              <select
+                value={String(spec.filters.date_field || "sent_at")}
+                onChange={(event) => filter("date_field", event.target.value)}
+              >
+                <option value="sent_at">Source timestamp</option>
+                <option value="imported_at">Imported timestamp</option>
+              </select>
+            </label>
             <label className="filter-field">
               From
               <input
@@ -446,6 +537,120 @@ export default function Explorer({
                 onChange={(event) => filter("date_to", event.target.value)}
               />
             </label>
+            <label className="filter-field">
+              Timestamp availability
+              <select
+                value={
+                  typeof spec.filters.missing_date === "boolean"
+                    ? String(spec.filters.missing_date)
+                    : ""
+                }
+                onChange={(event) =>
+                  filter(
+                    "missing_date",
+                    event.target.value === ""
+                      ? null
+                      : event.target.value === "true",
+                  )
+                }
+              >
+                <option value="">Dated and undated</option>
+                <option value="true">Missing timestamp</option>
+                <option value="false">Has timestamp</option>
+              </select>
+            </label>
+          </FilterSection>
+          <FilterSection title="Review & processing">
+            <label className="filter-field">
+              Privilege status
+              <select
+                value={
+                  ((spec.filters.privilege_status || []) as string[])[0] || ""
+                }
+                onChange={(event) =>
+                  filter(
+                    "privilege_status",
+                    event.target.value ? [event.target.value] : [],
+                  )
+                }
+              >
+                <option value="">All determinations</option>
+                {["none", "suspected", "confirmed", "cleared"].map((value) => (
+                  <option key={value} value={value}>
+                    {label(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
+              Processing state
+              <select
+                value={((spec.filters.parser_state || []) as string[])[0] || ""}
+                onChange={(event) =>
+                  filter(
+                    "parser_state",
+                    event.target.value ? [event.target.value] : [],
+                  )
+                }
+              >
+                <option value="">All processing states</option>
+                {[
+                  "indexed",
+                  "stored",
+                  "pending",
+                  "partial",
+                  "failed",
+                  "unsupported",
+                  "locked",
+                  "quarantined",
+                ].map((value) => (
+                  <option key={value} value={value}>
+                    {label(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
+              Assigned reviewer
+              <select
+                value={String(spec.filters.assigned_to || "")}
+                onChange={(event) => filter("assigned_to", event.target.value)}
+              >
+                <option value="">All reviewers</option>
+                {members.data?.items.map((item) => (
+                  <option key={item.user_id} value={item.user_id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="filter-field">
+              Tag
+              <input
+                value={((spec.filters.tags || []) as string[]).join(", ")}
+                onChange={(event) =>
+                  filter(
+                    "tags",
+                    event.target.value
+                      .split(",")
+                      .map((value) => value.trim())
+                      .filter(Boolean),
+                  )
+                }
+                placeholder="Exact tags, comma separated"
+              />
+            </label>
+            <label className="facet-option">
+              <input
+                type="checkbox"
+                checked={spec.filters.bookmarked === true}
+                onChange={(event) =>
+                  filter("bookmarked", event.target.checked ? true : null)
+                }
+              />
+              <span>Bookmarked only</span>
+            </label>
+            <ErrorBox error={members.error} />
           </FilterSection>
           <FilterSection title="Saved searches">
             {saved.data?.items.length ? (
@@ -486,43 +691,59 @@ export default function Explorer({
             <div className="group-summary">
               <div>
                 <strong>{label(spec.group_by)} groups</strong>
-                <small>Counts across the full matching scope</small>
+                <small>Full-scope counts · up to 200 returned groups</small>
               </div>
               <div className="group-chips">
                 {result.groups.map((item) => (
                   <button
                     key={item.key}
-                    disabled={!item.key || item.key === "Unknown"}
+                    disabled={
+                      !item.key ||
+                      item.key === "Unknown" ||
+                      item.key === "Untagged"
+                    }
                     title={
                       !item.key || item.key === "Unknown"
                         ? "Missing metadata cannot be drilled down in this preview. These items remain in the evidence results."
                         : undefined
                     }
                     onClick={() => {
-                      if (spec.group_by === "month") {
-                        const first = `${item.key}-01`;
-                        const lastDate = new Date(`${first}T00:00:00Z`);
-                        if (!Number.isNaN(lastDate.getTime())) {
-                          lastDate.setUTCMonth(lastDate.getUTCMonth() + 1);
-                          lastDate.setUTCDate(0);
-                          update({
-                            filters: {
-                              ...spec.filters,
-                              date_from: first,
-                              date_to: lastDate.toISOString().slice(0, 10),
-                            },
-                          });
-                        }
+                      if (
+                        ["month", "year", "day"].includes(spec.group_by || "")
+                      ) {
+                        update({
+                          filters: {
+                            ...spec.filters,
+                            ...bucketRange(item.key, spec.group_by!),
+                            date_field: "sent_at",
+                          },
+                        });
                       } else
                         filter(
                           groupField,
-                          ["sender", "thread_id"].includes(groupField)
+                          ["sender", "thread_id", "assigned_to"].includes(
+                            groupField,
+                          )
                             ? item.key
                             : [item.key],
                         );
                     }}
                   >
-                    <span>{item.key === "" ? "Not recorded" : item.key}</span>
+                    <span>
+                      {spec.group_by === "source"
+                        ? sources.data?.items.find(
+                            (source) => source.id === item.key,
+                          )?.label || item.key
+                        : spec.group_by === "custodian"
+                          ? custodians.data?.items.find(
+                              (custodian) => custodian.id === item.key,
+                            )?.display_name || item.key
+                          : spec.group_by === "reviewer"
+                            ? members.data?.items.find(
+                                (member) => member.user_id === item.key,
+                              )?.name || item.key
+                            : item.key || "Not recorded"}
+                    </span>
                     <strong>{number(item.count)}</strong>
                   </button>
                 ))}
@@ -549,6 +770,14 @@ export default function Explorer({
                 >
                   Save review set
                 </button>
+                {can(matter.role, "manage") && (
+                  <button
+                    className="button secondary compact"
+                    onClick={() => setDialog("assign")}
+                  >
+                    Assign selected
+                  </button>
+                )}
                 <button
                   className="icon-button"
                   aria-label="Clear selection"
@@ -560,7 +789,7 @@ export default function Explorer({
             </div>
           )}
           <div className={`evidence-table-wrap ${loading ? "is-loading" : ""}`}>
-            {loading && !result ? (
+            {loading || (!result && !error) ? (
               <Loading text="Searching the evidence record…" />
             ) : !result?.items.length ? (
               <Empty
@@ -648,6 +877,9 @@ export default function Explorer({
                             <strong>{item.title || item.evidence_id}</strong>
                             <span className="evidence-subtitle">
                               {item.sender || label(item.type)}
+                              {emailOnly && item.recipients.length > 0 && (
+                                <span> → {item.recipients.join(", ")}</span>
+                              )}
                               {item.has_attachments && (
                                 <span className="attachment-indicator">
                                   <Icon name="file" size={12} />
@@ -746,6 +978,7 @@ export default function Explorer({
             id={selectedId}
             canReview={canReview}
             canPrivilege={canPrivilege}
+            canManage={can(matter.role, "manage")}
             close={() => {
               setSelectedId(null);
               if (evidenceId) router.push(`/app/matters/${matter.id}/explorer`);
@@ -809,8 +1042,9 @@ function FilterSection({
 export function EvidenceInspector({
   caseId,
   id,
-  canReview,
+  canReview: allowReview,
   canPrivilege,
+  canManage: allowManage = false,
   close,
   changed,
   open,
@@ -819,14 +1053,44 @@ export function EvidenceInspector({
   id: string;
   canReview: boolean;
   canPrivilege: boolean;
+  canManage?: boolean;
   close: () => void;
   changed: () => void;
   open: (id: string) => void;
 }) {
+  const path = usePathname(),
+    params = useSearchParams(),
+    versionRouter = useRouter(),
+    version = path.endsWith(`/evidence/${id}`) ? params.get("version") : null;
+  const canReview = allowReview && !version,
+    canManage = allowManage && !version;
   const detail = useResource<EvidenceDetail>(`/cases/${caseId}/evidence/${id}`);
+  const historical = useResource<{
+    text: string;
+    spans: Span[];
+    artifact_version: number;
+    current_version: number;
+    superseded: boolean;
+    warnings?: string[];
+  }>(
+    version
+      ? `/cases/${caseId}/evidence/${id}/content?version=${encodeURIComponent(version)}`
+      : null,
+  );
+  const versions = useResource<{
+    items: {
+      version: number;
+      current: boolean;
+      sha256: string;
+      created_at: string;
+    }[];
+    current_version: number;
+    before_version: number | null;
+  }>(`/cases/${caseId}/evidence/${id}/versions`);
   const custodians = useResource<{
     items: { id: string; display_name: string }[];
   }>(`/cases/${caseId}/custodians`);
+  const members = useResource<{ items: Member[] }>(`/cases/${caseId}/members`);
   const [tab, setTab] = useState("content"),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null),
@@ -838,8 +1102,24 @@ export function EvidenceInspector({
     } | null>(null),
     [raw, setRaw] = useState(false);
   const [tags, setTags] = useState(""),
-    [note, setNote] = useState("");
-  const data = detail.data;
+    [note, setNote] = useState(""),
+    [noteSpan, setNoteSpan] = useState<string | null>(null);
+  const data = useMemo(
+    () =>
+      !detail.data
+        ? null
+        : version
+          ? historical.data
+            ? {
+                ...detail.data,
+                text: historical.data.text,
+                spans: historical.data.spans,
+                artifact_version: historical.data.artifact_version,
+              }
+            : null
+          : detail.data,
+    [detail.data, historical.data, version],
+  );
   useEffect(() => {
     setTab("content");
     setError(null);
@@ -847,7 +1127,8 @@ export function EvidenceInspector({
     setVerified(null);
     setRaw(false);
     setNote("");
-  }, [id]);
+    setNoteSpan(null);
+  }, [id, version]);
   useEffect(() => {
     if (data) setTags(data.tags.join(", "));
   }, [data]);
@@ -904,12 +1185,72 @@ export function EvidenceInspector({
           <Icon name="close" size={18} />
         </button>
       </div>
-      <ErrorBox error={detail.error} retry={detail.refresh} />
-      {detail.loading && !data ? (
+      <ErrorBox
+        error={detail.error || historical.error}
+        retry={() => {
+          detail.refresh();
+          historical.refresh();
+        }}
+      />
+      {(detail.loading || historical.loading) && !data ? (
         <Loading text="Opening evidence…" />
       ) : (
         data && (
           <>
+            {version && (
+              <div className="notice amber" role="status">
+                <Icon name="lock" size={17} />
+                <span>
+                  {historical.data?.superseded
+                    ? `Superseded extraction v${version}; the current version is v${historical.data.current_version}.`
+                    : `Version-specific extraction v${version}.`}{" "}
+                  This view is read-only. Current review and production use the
+                  latest extraction.{" "}
+                  <Link
+                    className="text-link"
+                    href={`/app/matters/${caseId}/evidence/${id}`}
+                  >
+                    Open current evidence
+                  </Link>
+                </span>
+              </div>
+            )}
+            <label className="inspector-version-select">
+              Extracted text version
+              <select
+                value={version || "current"}
+                aria-label="Extracted text version"
+                onChange={(event) =>
+                  versionRouter.push(
+                    `/app/matters/${caseId}/evidence/${id}${event.target.value === "current" ? "" : `?version=${event.target.value}`}`,
+                  )
+                }
+              >
+                <option value="current">
+                  Current extraction
+                  {versions.data?.current_version
+                    ? ` · v${versions.data.current_version}`
+                    : ""}
+                </option>
+                {version &&
+                  !versions.data?.items.some(
+                    (item) => String(item.version) === version,
+                  ) && (
+                    <option value={version}>Cited extraction v{version}</option>
+                  )}
+                {versions.data?.items.map((item) => (
+                  <option key={item.version} value={String(item.version)}>
+                    v{item.version} · {item.current ? "current" : "superseded"}
+                  </option>
+                ))}
+              </select>
+              {versions.data?.before_version && (
+                <small>
+                  Showing the latest 50 versions. Older versions remain
+                  addressable by their exact version link.
+                </small>
+              )}
+            </label>
             <div className="inspector-heading">
               <div className="inspector-badges">
                 <Badge value={data.type} />
@@ -926,6 +1267,14 @@ export function EvidenceInspector({
                   <Icon name="export" size={15} />
                   Original
                 </a>
+                {canReview && (
+                  <Link
+                    className="button secondary compact"
+                    href={`/app/matters/${caseId}/productions?evidence_id=${id}`}
+                  >
+                    Redact
+                  </Link>
+                )}
                 <button
                   className={`icon-button ${data.bookmarked ? "starred" : ""}`}
                   disabled={busy || !canReview}
@@ -998,6 +1347,7 @@ export function EvidenceInspector({
                 ["content", "Content"],
                 ["metadata", "Source"],
                 ["review", "Review"],
+                ...(!version ? [["investigate", "Investigate"]] : []),
                 ...(data.type === "email" ? [["thread", "Thread"]] : []),
               ].map(([key, title]) => (
                 <button
@@ -1078,6 +1428,18 @@ export function EvidenceInspector({
                         <dt>Sent</dt>
                         <dd>{date(data.date_utc, true)}</dd>
                       </div>
+                      {!["", "—"].includes(people(data.email.bcc)) && (
+                        <div>
+                          <dt>BCC</dt>
+                          <dd>{people(data.email.bcc)}</dd>
+                        </div>
+                      )}
+                      {!["", "—"].includes(people(data.email.reply_to)) && (
+                        <div>
+                          <dt>Reply-To</dt>
+                          <dd>{people(data.email.reply_to)}</dd>
+                        </div>
+                      )}
                     </dl>
                   )}
                   <div className="text-viewer-heading">
@@ -1121,6 +1483,18 @@ export function EvidenceInspector({
                             <Icon name="copy" size={12} />
                             Copy source reference
                           </button>
+                          {canReview && (
+                            <button
+                              className="citation-copy"
+                              onClick={() => {
+                                setNoteSpan(span.span_id || span.id);
+                                setTab("review");
+                              }}
+                            >
+                              <Icon name="review" size={12} />
+                              Note this location
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1236,6 +1610,43 @@ export function EvidenceInspector({
                       value={data.timezone_source || "See original metadata"}
                     />
                   </dl>
+                  {data.metadata && Object.keys(data.metadata).length > 0 && (
+                    <>
+                      <h3>Extraction metadata</h3>
+                      {Boolean(data.metadata.ocr_quality) && (
+                        <div className="notice amber">
+                          <Icon name="alert" size={16} />
+                          <span>
+                            OCR text and confidence scores require human
+                            verification against the source. They do not
+                            establish evidentiary accuracy.
+                          </span>
+                        </div>
+                      )}
+                      <dl className="metadata-list">
+                        {[
+                          "extraction_method",
+                          "ocr_engine",
+                          "ocr_language",
+                          "ocr_quality",
+                          "format",
+                          "encoding",
+                        ]
+                          .filter((key) => data.metadata?.[key])
+                          .map((key) => (
+                            <Meta
+                              key={key}
+                              title={label(key)}
+                              value={String(data.metadata![key])}
+                            />
+                          ))}
+                      </dl>
+                      <details className="audit-metadata">
+                        <summary>All parser metadata</summary>
+                        <pre>{JSON.stringify(data.metadata, null, 2)}</pre>
+                      </details>
+                    </>
+                  )}
                   <h3>Original SHA-256</h3>
                   <code className="hash-block">{data.sha256}</code>
                   <p className="field-help">
@@ -1279,6 +1690,13 @@ export function EvidenceInspector({
                 </>
               ) : tab === "thread" ? (
                 <ThreadView caseId={caseId} id={id} open={open} />
+              ) : tab === "investigate" ? (
+                <SourceInvestigations
+                  key={id}
+                  caseId={caseId}
+                  id={id}
+                  open={open}
+                />
               ) : (
                 <>
                   <div className="review-current">
@@ -1314,7 +1732,10 @@ export function EvidenceInspector({
                     disabled={
                       busy ||
                       !canReview ||
-                      (data.privilege_status === "confirmed" && !canPrivilege)
+                      (["confirmed", "cleared"].includes(
+                        data.privilege_status,
+                      ) &&
+                        !canPrivilege)
                     }
                     onChange={(event) =>
                       void review({ privilege_status: event.target.value })
@@ -1327,7 +1748,35 @@ export function EvidenceInspector({
                     <option value="confirmed" disabled={!canPrivilege}>
                       Confirmed by attorney
                     </option>
+                    <option value="cleared" disabled={!canPrivilege}>
+                      Cleared by attorney
+                    </option>
                   </select>
+                  <h3>Assigned reviewer</h3>
+                  <label>
+                    <span className="sr-only">Evidence assigned reviewer</span>
+                    <select
+                      value={data.assigned_to || ""}
+                      disabled={!canManage || busy}
+                      onChange={(event) =>
+                        void review({ assigned_to: event.target.value || null })
+                      }
+                    >
+                      <option value="">Unassigned</option>
+                      {members.data?.items
+                        .filter((member) => can(member.role, "review"))
+                        .map((member) => (
+                          <option key={member.user_id} value={member.user_id}>
+                            {member.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <p className="field-help">
+                    Matter leads and review managers can change direct
+                    allocation. Reviewers claim fixed snapshots from the review
+                    queue.
+                  </p>
                   <h3>Human tags</h3>
                   <form
                     onSubmit={(event) => {
@@ -1362,6 +1811,26 @@ export function EvidenceInspector({
                     </button>
                   </form>
                   <h3>Review note</h3>
+                  <label>
+                    Source location
+                    <select
+                      value={noteSpan || ""}
+                      onChange={(event) =>
+                        setNoteSpan(event.target.value || null)
+                      }
+                      disabled={!canReview}
+                    >
+                      <option value="">General evidence note</option>
+                      {data.spans.map((span) => (
+                        <option key={span.id} value={span.span_id || span.id}>
+                          {span.page
+                            ? `Page ${span.page}`
+                            : `Chars ${span.char_start}–${span.char_end}`}{" "}
+                          · {span.span_id || span.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <form
                     onSubmit={async (event) => {
                       event.preventDefault();
@@ -1371,9 +1840,13 @@ export function EvidenceInspector({
                       try {
                         await post(
                           `/cases/${caseId}/evidence/${id}/annotations`,
-                          { text: note.trim() },
+                          {
+                            text: note.trim(),
+                            ...(noteSpan ? { span_id: noteSpan } : {}),
+                          },
                         );
                         setNote("");
+                        setNoteSpan(null);
                         detail.refresh();
                         setMessage("Note saved.");
                       } catch (error) {
@@ -1407,6 +1880,23 @@ export function EvidenceInspector({
                         <div key={note.id}>
                           <p>{note.text}</p>
                           <small>{date(note.created_at, true)}</small>
+                          {note.span_id && (
+                            <button
+                              className="text-link"
+                              onClick={() => {
+                                setTab("content");
+                                setTimeout(
+                                  () =>
+                                    document
+                                      .getElementById(`span-${note.span_id}`)
+                                      ?.scrollIntoView({ block: "center" }),
+                                  0,
+                                );
+                              }}
+                            >
+                              Open anchored location
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1474,7 +1964,7 @@ function ExplorerActionModal({
   close,
   done,
 }: {
-  kind: "saved" | "set" | "bulk" | "export";
+  kind: "saved" | "set" | "bulk" | "export" | "assign";
   caseId: string;
   selected: string[];
   spec: SearchSpec;
@@ -1486,6 +1976,9 @@ function ExplorerActionModal({
     [download, setDownload] = useState<{ id: string; state: string } | null>(
       null,
     );
+  const members = useResource<{ items: Member[] }>(
+    kind === "assign" ? `/cases/${caseId}/members` : null,
+  );
   const exportStatus = useResource<{ id: string; state: string }>(
     download &&
       !["completed", "ready", "failed"].includes(download.state.toLowerCase())
@@ -1509,6 +2002,7 @@ function ExplorerActionModal({
     set: "Create a review set",
     bulk: "Review selected evidence",
     export: "Export this evidence scope",
+    assign: "Assign selected evidence",
   };
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1540,6 +2034,13 @@ function ExplorerActionModal({
                 }
               : {}),
           },
+        });
+      if (kind === "assign")
+        await post(`/cases/${caseId}/assignments`, {
+          title: form.get("name"),
+          evidence_ids: selected,
+          assignee_id: form.get("assignee_id") || null,
+          reason: form.get("reason"),
         });
       if (kind === "export") {
         setDownload(
@@ -1599,7 +2100,7 @@ function ExplorerActionModal({
                 ? `${number(selected.length)} explicitly selected evidence items.`
                 : "All evidence matching the current query and filters, across every page."}
           </p>
-          {["saved", "set"].includes(kind) && (
+          {["saved", "set", "assign"].includes(kind) && (
             <label>
               Name
               <input
@@ -1613,6 +2114,38 @@ function ExplorerActionModal({
                 }
               />
             </label>
+          )}
+          {kind === "assign" && (
+            <>
+              <ErrorBox error={members.error} />
+              <label>
+                Assigned reviewer
+                <select name="assignee_id" defaultValue="">
+                  <option value="">Unassigned · available to claim</option>
+                  {members.data?.items
+                    .filter((member) => can(member.role, "review"))
+                    .map((member) => (
+                      <option key={member.user_id} value={member.user_id}>
+                        {member.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                Assignment reason
+                <textarea
+                  name="reason"
+                  required
+                  minLength={3}
+                  maxLength={2000}
+                  rows={3}
+                />
+              </label>
+              <p className="field-help">
+                The selected items form a fixed snapshot. Items already reserved
+                by another open assignment are rejected.
+              </p>
+            </>
           )}
           {kind === "bulk" && (
             <>

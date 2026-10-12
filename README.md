@@ -21,9 +21,9 @@ and record human review decisions in one private workspace. CaseQuarry combines
 TypeScript/React for the interface, Python for its API and document processing, and
 Rust for streaming integrity checks.
 
-> **Development preview.** Version 0.1.0 is a functioning import, search and review
-> release for synthetic data and evaluation. Production use and the two-million-email
-> scale target are not validated. It is not cleared for confidential client matters.
+> **Development preview · 0.2.0.** Import, investigate, assign review work and create
+> approved redacted productions using synthetic data. Production deployment and the
+> two-million-email scale target remain unvalidated.
 
 ![CaseQuarry workspace showing a real synthetic matter, evidence counts and review progress](docs/assets/workspace.png)
 
@@ -31,28 +31,39 @@ Rust for streaming integrity checks.
 
 ## What you can do
 
-| Workflow | Available in 0.1.0 |
+| Workflow | Available in 0.2.0 |
 |---|---|
 | Preserve | SHA-256 originals, source paths, MBOX offsets, duplicates and attachment families |
-| Import | Resumable uploads and durable jobs with pause, retry, checkpoints and visible errors |
-| Search | Boolean/phrase/field/date search, facets, grouping, sorting and server pagination |
-| Investigate | People, communication maps, explicit email threads and metadata timelines |
-| Review | Versioned decisions, privilege roles, tags, notes, saved searches and review sets |
+| Import | Resumable uploads, bounded OCR, durable jobs and retries that preserve extraction history |
+| Search | Boolean/phrase/field/date search, exact sender/recipient filters, facets, grouping and pagination |
+| Investigate | Email readers, scoped traffic charts, communication maps, threads, timelines and candidate comparisons |
+| Review | Versioned decisions, exclusive work assignments, review queues, tags, notes and saved scope snapshots |
 | Organize | Matters, members, custodians, sources, issues, tasks and legal holds |
-| Export | CSV/JSON metadata and reviewed native ZIP packages with verified manifests |
-| Secure | Tenant/matter roles, expiring sessions, CSRF, authenticator MFA and audit chains |
+| Disclose | Irreversible text/PDF redactions, independent approval, sequential Bates numbers and CSV/DAT/OPT loadfiles |
+| Export | Metadata and reviewed native ZIP packages, with fresh scope and hash verification |
+| Secure | Tenant/matter roles, password/session controls, administrator controls, MFA and audit chains |
 | Assist | Optional local source quotations with exact verified citations and human review |
 | Operate | Authenticated CLI, Rust integrity tools, migrations and encrypted development backups |
 
 ### Supported inputs
 
-**Email:** EML, MBOX. **Documents:** PDF, TXT, Markdown, HTML, CSV, JSON, DOCX,
+**Email:** EML, MBOX and bounded Outlook MSG. **Documents:** PDF, TXT, Markdown, HTML, CSV, JSON, DOCX,
 XLSX and PPTX. **Images:** PNG, JPEG and TIFF. **Archives:** bounded ZIP imports.
 
-Missing OCR, unsupported types and extraction failures remain visible; preserved
-originals remain separate from derived text. PST/OST, external connectors, media
-transcription, advanced productions/redaction and large-scale ranked search are
-still under development.
+Local Tesseract enables OCR for scanned PDFs and images; missing OCR and extraction
+limits remain visible. Install it using the platform guide, then explicitly retry
+partial imports to create a new immutable extraction version. Earlier citation links
+continue to open their original version.
+
+The CLI inventories and imports local folders and Maildir, and supports explicit,
+read-only TLS IMAP acquisition. See [adapter support and limits](docs/ADAPTERS.md).
+PST/OST, OAuth mail connectors, media transcription and large-scale ranked search
+remain unfinished; live external mail accounts have not been validated.
+
+Redacted productions contain approved derivatives and page images. They require a
+different authorized approver and block unsafe privilege, review and integrity states.
+Native exports are a separate workflow and can contain original content; see the
+[reviewer guide](docs/REVIEWER_GUIDE.md) before choosing an output.
 
 ## Quick start
 
@@ -75,6 +86,10 @@ For a tagged source download, use the ZIP and SHA-256 sidecar on the
 [Releases page](https://github.com/CanerBaba25/CaseQuarry/releases). Extract the ZIP,
 open its directory, and run the same commands starting with `uv sync --locked`.
 
+**Upgrading an existing installation:** stop the application, preserve a verified
+backup, run `uv sync --locked`, then `uv run python scripts/tasks.py migrate` before restarting.
+Version 0.2.0 adds migration `0003_disclosure_workflow`; startup refuses stale schemas.
+
 ### Optional Rust tools
 
 With Rust installed:
@@ -95,6 +110,8 @@ Python fallback. It never downloads a processor while handling evidence.
   explicit matter-lead consent. It cannot change human evidence decisions.
 - Originals are immutable through the application; derived text, citations and export
   manifests are independently hash-checked before use.
+- Retried extraction appends a version while preserving the source occurrence and
+  review history; historical text is marked as superseded in the reader.
 - Search, retrieval, jobs and exports enforce tenant and matter permissions.
 - Privilege, review and integrity safeguards restrict native exports, including
   content embedded in parent email or archive families.
@@ -106,7 +123,7 @@ for evaluation and public bug reports.
 
 ## Measured results
 
-The recorded local SQLite run imported **10,000 synthetic emails and 100 mixed documents**:
+The recorded **0.1.0** local SQLite run imported **10,000 synthetic emails and 100 mixed documents**:
 
 | Measurement | Recorded result |
 |---|---:|
@@ -117,12 +134,18 @@ The recorded local SQLite run imported **10,000 synthetic emails and 100 mixed d
 | Grouped phrase search p95 | 244.94 ms |
 | Peak API + embedded worker memory | 157.20 MiB |
 
-Ten image documents remained partial because OCR was unavailable in that run.
+Ten image documents remained partial because OCR was unavailable in that earlier run.
+Version 0.2.0 separately verifies real scanned PDF/image OCR and immutable retries;
+the larger benchmark has not yet been repeated with the new extraction pipeline.
 Percentiles use 15 queries; these results are not a production SLA or a multi-million
 capacity claim. See [benchmark scope and method](docs/BENCHMARKS.md).
 
-The release passed local Python, Rust and real browser workflow checks, including a
-375px mobile view. GitHub verifies source linting, migration setup and Python/web/Rust
+The complete local Python suite passed **258 tests** and the Rust component passed
+**five tests**, formatting and strict Clippy checks. The web app passes TypeScript
+checks and a production build. The isolated Python wheel contains matching source
+and migrates a fresh database using packaged resources. **23 recorded browser checks**
+across a workflow run and focused continuation cover desktop, 375px mobile views and
+account-switch isolation. GitHub verifies source linting, migration setup and Python/web/Rust
 builds. Verification suites and synthetic QA harnesses are maintained locally and
 excluded from the public source distribution.
 
@@ -132,6 +155,7 @@ excluded from the public source distribution.
 |---|---|
 | Install | [Windows](docs/INSTALL_WINDOWS.md), [Linux](docs/INSTALL_LINUX.md) |
 | Review evidence | [Reviewer guide](docs/REVIEWER_GUIDE.md), [CLI reference](docs/CLI_REFERENCE.md) |
+| Acquire files and mail | [Supported adapters and limits](docs/ADAPTERS.md) |
 | Administer | [Administrator guide](docs/ADMIN_GUIDE.md), [Backup and recovery](docs/BACKUP_RECOVERY.md) |
 | Assess controls | [Threat model](docs/THREAT_MODEL.md), [Data handling](docs/DATA_HANDLING.md), [Evidence integrity](docs/EVIDENCE_INTEGRITY.md) |
 | Assess optional models | [Analysis safety and runtime policy](docs/AI_SAFETY.md) |

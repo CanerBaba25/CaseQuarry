@@ -43,7 +43,8 @@ def generate_notices(root: Path) -> None:
             license_text = meta.get("License", "")
             if not expression:
                 expression = (
-                    ", ".join(classifiers)
+                    (license_text if 0 < len(license_text) < 120 else "")
+                    or ", ".join(classifiers)
                     or (
                         license_text
                         if len(license_text) < 120
@@ -63,9 +64,8 @@ def generate_notices(root: Path) -> None:
         checked_files = []
         if dist:
             for entry in dist.files or []:
-                if entry.name.upper().startswith(("LICENSE", "LICENCE", "COPYING")) and ".dist-info" in str(
-                    entry
-                ):
+                entry_path = str(entry).replace("\\", "/")
+                if ".dist-info" in entry_path and ("/licenses/" in entry_path.lower() or entry.name.upper().startswith(("LICENSE", "LICENCE", "COPYING", "NOTICE"))):
                     path = dist.locate_file(entry)
                     if path.is_file():
                         checked_files.append(

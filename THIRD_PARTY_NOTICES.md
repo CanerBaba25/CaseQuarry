@@ -15,17 +15,17 @@ CaseQuarry uses Apache-2.0. Third-party rights remain independent. See [the mach
 | [argon2-cffi](https://pypi.org/project/argon2-cffi/25.1.0/) | 25.1.0 | MIT |
 | [argon2-cffi-bindings](https://pypi.org/project/argon2-cffi-bindings/26.1.0/) | 26.1.0 | MIT |
 | [beautifulsoup4](https://pypi.org/project/beautifulsoup4/4.15.0/) | 4.15.0 | MIT License |
-| [certifi](https://pypi.org/project/certifi/2026.7.22/) | 2026.7.22 | Mozilla Public License 2.0 (MPL 2.0) |
+| [certifi](https://pypi.org/project/certifi/2026.7.22/) | 2026.7.22 | MPL-2.0 |
 | [cffi](https://pypi.org/project/cffi/2.1.1/) | 2.1.1 | MIT-0 |
 | [click](https://pypi.org/project/click/8.5.0/) | 8.5.0 | BSD-3-Clause |
 | [colorama](https://pypi.org/project/colorama/0.4.6/) | 0.4.6 | BSD License |
 | [cryptography](https://pypi.org/project/cryptography/47.0.0/) | 47.0.0 | Apache-2.0 OR BSD-3-Clause |
-| [et-xmlfile](https://pypi.org/project/et-xmlfile/2.0.0/) | 2.0.0 | MIT License |
+| [et-xmlfile](https://pypi.org/project/et-xmlfile/2.0.0/) | 2.0.0 | MIT |
 | [fastapi](https://pypi.org/project/fastapi/0.143.0/) | 0.143.0 | MIT |
-| [h11](https://pypi.org/project/h11/0.16.0/) | 0.16.0 | MIT License |
+| [h11](https://pypi.org/project/h11/0.16.0/) | 0.16.0 | MIT |
 | [httpcore](https://pypi.org/project/httpcore/1.0.9/) | 1.0.9 | BSD-3-Clause |
 | [httptools](https://pypi.org/project/httptools/0.9.0/) | 0.9.0 | MIT |
-| [httpx](https://pypi.org/project/httpx/0.28.1/) | 0.28.1 | BSD License |
+| [httpx](https://pypi.org/project/httpx/0.28.1/) | 0.28.1 | BSD-3-Clause |
 | [idna](https://pypi.org/project/idna/3.20/) | 3.20 | BSD-3-Clause |
 | [iniconfig](https://pypi.org/project/iniconfig/2.3.1/) | 2.3.1 | MIT |
 | [jaraco-classes](https://pypi.org/project/jaraco-classes/3.4.0/) | 3.4.0 | MIT License |
@@ -39,11 +39,12 @@ CaseQuarry uses Apache-2.0. Third-party rights remain independent. See [the mach
 | [markupsafe](https://pypi.org/project/markupsafe/3.0.4/) | 3.0.4 | BSD-3-Clause |
 | [mdurl](https://pypi.org/project/mdurl/0.1.2/) | 0.1.2 | MIT License |
 | [more-itertools](https://pypi.org/project/more-itertools/11.1.0/) | 11.1.0 | MIT |
-| [openpyxl](https://pypi.org/project/openpyxl/3.1.5/) | 3.1.5 | MIT License |
+| [olefile](https://pypi.org/project/olefile/0.47/) | 0.47 | BSD |
+| [openpyxl](https://pypi.org/project/openpyxl/3.1.5/) | 3.1.5 | MIT |
 | [opentelemetry-api](https://pypi.org/project/opentelemetry-api/1.45.1/) | 1.45.1 | Apache-2.0 |
 | [packaging](https://pypi.org/project/packaging/26.3/) | 26.3 | Apache-2.0 OR BSD-2-Clause |
 | [pillow](https://pypi.org/project/pillow/12.3.0/) | 12.3.0 | MIT-CMU |
-| [pluggy](https://pypi.org/project/pluggy/1.6.0/) | 1.6.0 | MIT License |
+| [pluggy](https://pypi.org/project/pluggy/1.6.0/) | 1.6.0 | MIT |
 | [psycopg](https://pypi.org/project/psycopg/3.3.6/) | 3.3.6 | LGPL-3.0-only |
 | [psycopg-binary](https://pypi.org/project/psycopg-binary/3.3.6/) | 3.3.6 | LGPL-3.0-only |
 | [pycparser](https://pypi.org/project/pycparser/3.11/) | 3.11 | BSD-3-Clause |
@@ -53,18 +54,19 @@ CaseQuarry uses Apache-2.0. Third-party rights remain independent. See [the mach
 | [pygments](https://pypi.org/project/pygments/2.21.0/) | 2.21.0 | BSD-2-Clause |
 | [pyotp](https://pypi.org/project/pyotp/2.10.0/) | 2.10.0 | MIT |
 | [pypdf](https://pypi.org/project/pypdf/6.20.1/) | 6.20.1 | BSD-3-Clause |
+| [pypdfium2](https://pypi.org/project/pypdfium2/5.14.0/) | 5.14.0 | BSD-3-Clause, Apache-2.0, dependency licenses |
 | [pytest](https://pypi.org/project/pytest/9.1.1/) | 9.1.1 | MIT |
 | [pytest-asyncio](https://pypi.org/project/pytest-asyncio/1.4.0/) | 1.4.0 | Apache-2.0 |
-| [python-docx](https://pypi.org/project/python-docx/1.2.0/) | 1.2.0 | MIT License |
+| [python-docx](https://pypi.org/project/python-docx/1.2.0/) | 1.2.0 | MIT |
 | [python-dotenv](https://pypi.org/project/python-dotenv/1.2.4/) | 1.2.4 | BSD-3-Clause |
 | [python-multipart](https://pypi.org/project/python-multipart/0.0.32/) | 0.0.32 | Apache-2.0 |
-| [python-pptx](https://pypi.org/project/python-pptx/1.0.2/) | 1.0.2 | MIT License |
+| [python-pptx](https://pypi.org/project/python-pptx/1.0.2/) | 1.0.2 | MIT |
 | [pywin32-ctypes](https://pypi.org/project/pywin32-ctypes/0.2.3/) | 0.2.3 | BSD-3-Clause |
-| [pyyaml](https://pypi.org/project/pyyaml/6.0.3/) | 6.0.3 | MIT License |
-| [rich](https://pypi.org/project/rich/14.3.4/) | 14.3.4 | MIT License |
+| [pyyaml](https://pypi.org/project/pyyaml/6.0.3/) | 6.0.3 | MIT |
+| [rich](https://pypi.org/project/rich/14.3.4/) | 14.3.4 | MIT |
 | [ruff](https://pypi.org/project/ruff/0.17.0/) | 0.17.0 | MIT |
 | [secretstorage](https://pypi.org/project/secretstorage/3.5.0/) | 3.5.0 | BSD-3-Clause |
-| [shellingham](https://pypi.org/project/shellingham/1.5.4/) | 1.5.4 | ISC License (ISCL) |
+| [shellingham](https://pypi.org/project/shellingham/1.5.4/) | 1.5.4 | ISC License |
 | [soupsieve](https://pypi.org/project/soupsieve/3.0.3/) | 3.0.3 | MIT |
 | [sqlalchemy](https://pypi.org/project/sqlalchemy/2.1.4/) | 2.1.4 | MIT |
 | [starlette](https://pypi.org/project/starlette/1.7.0/) | 1.7.0 | BSD-3-Clause |
@@ -74,9 +76,9 @@ CaseQuarry uses Apache-2.0. Third-party rights remain independent. See [the mach
 | [tzdata](https://pypi.org/project/tzdata/2026.5/) | 2026.5 | Apache-2.0 |
 | [uvicorn](https://pypi.org/project/uvicorn/0.54.0/) | 0.54.0 | BSD-3-Clause |
 | [uvloop](https://pypi.org/project/uvloop/0.23.0/) | 0.23.0 | MIT License |
-| [watchfiles](https://pypi.org/project/watchfiles/1.3.0/) | 1.3.0 | MIT License |
+| [watchfiles](https://pypi.org/project/watchfiles/1.3.0/) | 1.3.0 | MIT |
 | [websockets](https://pypi.org/project/websockets/17.2/) | 17.2 | BSD-3-Clause |
-| [xlsxwriter](https://pypi.org/project/xlsxwriter/3.2.9/) | 3.2.9 | BSD License |
+| [xlsxwriter](https://pypi.org/project/xlsxwriter/3.2.9/) | 3.2.9 | BSD-2-Clause |
 
 | Production JavaScript package | Locked version | Reported license metadata |
 |---|---|---|

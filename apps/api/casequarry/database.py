@@ -14,11 +14,11 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from . import ai_models  # noqa: F401 - register the complete schema
+from . import ai_models, production_models, workflow_models  # noqa: F401 - register the complete schema
 from .config import Settings
 from .models import Base
 
-HEAD_REVISION = "0002_local_ai"
+HEAD_REVISION = "0003_disclosure_workflow"
 CORE_REVISION = "0001_core"
 _MIGRATION_LOCK = threading.RLock()
 _POSTGRES_LOCK_KEY = 0x4351534348454D41
@@ -151,7 +151,7 @@ class Database:
             return None
         if not adopt_existing or self.settings.environment == "production":
             raise SchemaMismatch("SCHEMA_ADOPTION_REQUIRED", "This database has no migration revision. Only an exact known development schema may be adopted using python -m casequarry.database migrate --adopt-existing-development.")
-        for revision in (HEAD_REVISION, CORE_REVISION):
+        for revision in sorted(known_schemas(), reverse=True):
             if not schema_differences(connection, revision):
                 command.stamp(self.alembic_config(connection), revision)
                 return revision
@@ -159,11 +159,12 @@ class Database:
         raise SchemaMismatch("SCHEMA_ADOPTION_REFUSED", "The unversioned development schema does not exactly match a known migration; no revision was stamped.", diagnostics)
 
     def migrate(self, revision="head", *, adopt_existing=False):
-        if revision not in {"head", CORE_REVISION, HEAD_REVISION}:
+        if revision != "head" and revision not in known_schemas():
             raise SchemaMismatch("SCHEMA_REVISION_UNKNOWN", "Choose head or a known forward migration revision.")
         with self.migration_connection() as connection:
             current = self.prepare_migration(connection, adopt_existing=adopt_existing)
-            if current == HEAD_REVISION and revision == CORE_REVISION:
+            revisions = sorted(known_schemas())
+            if current and revision != "head" and revisions.index(current) > revisions.index(revision):
                 raise SchemaMismatch("SCHEMA_DOWNGRADE_REFUSED", "Startup and migration setup never downgrade or discard evidence tables.")
             command.upgrade(self.alembic_config(connection), revision)
             target = HEAD_REVISION if revision == "head" else revision

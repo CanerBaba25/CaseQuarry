@@ -5,6 +5,8 @@ export type User = {
   tenant_id: string;
   role: string;
   csrf_token: string;
+  active?: boolean;
+  mfa_enabled?: boolean;
 };
 export type Matter = {
   id: string;
@@ -29,6 +31,7 @@ export type AuditEvent = {
   target_id?: string;
   target_type?: string;
   safe_metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 };
 export type Bucket = { key: string; count: number };
 export type Stats = {
@@ -65,6 +68,8 @@ export type Evidence = {
   parser_state: string;
   review_version: number;
   thread_id: string | null;
+  assigned_to?: string | null;
+  created_at?: string;
   date_raw?: string | null;
   parent_id?: string | null;
   parser_error?: string | null;
@@ -82,6 +87,8 @@ export type Span = {
   text_hash?: string;
 };
 export type EvidenceDetail = Evidence & {
+  artifact_version?: number;
+  metadata?: Record<string, unknown>;
   text: string;
   html: null;
   email: null | {
@@ -111,6 +118,7 @@ export type EvidenceDetail = Evidence & {
     text: string;
     created_at: string;
     author_id: string;
+    span_id?: string | null;
   }[];
   review_history: {
     id: string;
@@ -193,6 +201,13 @@ export type TimelineItem = {
   source: string;
 };
 export type SavedSearch = { id: string; name: string; query_spec: SearchSpec };
+export type Member = {
+  id: string;
+  user_id: string;
+  name: string;
+  email: string;
+  role: string;
+};
 export type ExportRecord = {
   id: string;
   state: string;

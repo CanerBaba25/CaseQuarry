@@ -4,6 +4,7 @@ export class ApiError extends Error {
     message: string,
     public code: string,
     public requestId?: string,
+    public retryAfterSeconds?: number,
   ) {
     super(message);
   }
@@ -57,8 +58,15 @@ export async function api<T>(
       data.message ||
       detail ||
       `Request failed (${response.status}). Please try again.`;
+    const retryHeader = response.headers.get("Retry-After");
+    const retryAfter = retryHeader
+      ? /^\d+$/.test(retryHeader)
+        ? Number(retryHeader)
+        : Math.max(0, Math.ceil((Date.parse(retryHeader) - Date.now()) / 1000))
+      : undefined;
     if (
       response.status === 401 &&
+      path !== "/me" &&
       typeof window !== "undefined" &&
       !["INVALID_CREDENTIALS", "MFA_CODE_INVALID"].includes(
         data.error?.error_code || data.error_code || "",
@@ -70,6 +78,9 @@ export async function api<T>(
       message,
       data.error?.error_code || data.error_code || "request_failed",
       data.request_id || data.error?.request_id,
+      retryAfter !== undefined && Number.isFinite(retryAfter)
+        ? retryAfter
+        : undefined,
     );
   }
   return body as T;

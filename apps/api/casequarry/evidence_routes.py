@@ -54,38 +54,53 @@ def checked_text(db, item, storage):
             Artifact.case_id == item.case_id,
             Artifact.tenant_id == item.tenant_id,
             Artifact.version == item.text_version,
+            Artifact.kind == "extracted-text",
         )
     )
     if artifact:
         verified = storage.verify(artifact)
         # Artifacts carry a digest but no byte-size column; verify the digest directly.
-        if verified["actual_sha256"] != artifact.sha256:
+        if verified["actual_sha256"] != artifact.sha256 or artifact.sha256 != item.text_hash:
             fail(409, "DERIVED_INTEGRITY_FAILED", "The extracted text artifact is missing or changed.")
     return artifact
 
 
-def spans_json(db, item):
+def spans_json(db, item, *, version=None, text=None):
+    version = item.text_version if version is None else version
+    text = item.text if text is None else text
     spans = db.scalars(
         select(Span)
-        .where(Span.evidence_id == item.id, Span.case_id == item.case_id, Span.tenant_id == item.tenant_id)
+        .join(Artifact, Artifact.id == Span.artifact_id)
+        .where(
+            Span.evidence_id == item.id,
+            Span.case_id == item.case_id,
+            Span.tenant_id == item.tenant_id,
+            Artifact.evidence_id == item.id,
+            Artifact.case_id == item.case_id,
+            Artifact.tenant_id == item.tenant_id,
+            Artifact.version == version,
+            Artifact.kind == "extracted-text",
+        )
         .order_by(Span.char_start)
     ).all()
     result = []
     for span in spans:
-        text = item.text[span.char_start : span.char_end]
-        if hashlib.sha256(text.encode()).hexdigest() != span.text_hash:
+        if not 0 <= span.char_start <= span.char_end <= len(text):
+            fail(409, "CITATION_INTEGRITY_FAILED", "A citation span has invalid character bounds.")
+        excerpt = text[span.char_start : span.char_end]
+        if hashlib.sha256(excerpt.encode()).hexdigest() != span.text_hash:
             fail(409, "CITATION_INTEGRITY_FAILED", "A citation span failed integrity verification.")
         result.append(
             {
                 "id": span.id,
                 "span_id": span.id,
                 "artifact_id": span.artifact_id,
-                "artifact_version": item.text_version,
+                "artifact_version": version,
                 "page": span.page,
                 "char_start": span.char_start,
                 "char_end": span.char_end,
                 "text_hash": span.text_hash,
-                "text": text,
+                "text": excerpt,
                 "location": f"page:{span.page}"
                 if span.page
                 else f"text:chars={span.char_start}-{span.char_end}",
@@ -225,10 +240,61 @@ def content(
     case_id: str,
     evidence_id: str,
     request: Request,
+    version: int | None = Query(default=None, ge=1),
     actor: Actor = Depends(current_actor),
     db=Depends(get_db),
 ):
-    item, _ = get_item(db, actor.user, case_id, evidence_id)
+    item, original = get_item(db, actor.user, case_id, evidence_id)
+    if not request.app.state.storage.verify(original)["valid"]:
+        fail(409, "INTEGRITY_FAILED", "The original evidence failed verification.")
+    if version is not None and version != item.text_version:
+        artifact = db.scalar(
+            select(Artifact).where(
+                Artifact.evidence_id == item.id,
+                Artifact.case_id == case_id,
+                Artifact.tenant_id == actor.user.tenant_id,
+                Artifact.kind == "extracted-text",
+                Artifact.version == version,
+            )
+        )
+        if artifact is None:
+            fail(404, "TEXT_VERSION_UNAVAILABLE", "This immutable text version is unavailable.")
+        try:
+            with request.app.state.storage.path(artifact.storage_key).open("rb") as stream:
+                encoded = stream.read(request.app.state.settings.max_extracted_chars * 4 + 1)
+            if (
+                len(encoded) > request.app.state.settings.max_extracted_chars * 4
+                or hashlib.sha256(encoded).hexdigest() != artifact.sha256
+            ):
+                fail(409, "DERIVED_INTEGRITY_FAILED", "The immutable text version failed verification.")
+            historical = encoded.decode("utf-8")
+        except (OSError, UnicodeDecodeError):
+            fail(409, "DERIVED_INTEGRITY_FAILED", "The immutable text version is unavailable or invalid.")
+        historical_spans = spans_json(db, item, version=version, text=historical)
+        audit.record(
+            db,
+            actor.user,
+            case_id,
+            "evidence.text_version_viewed",
+            "evidence",
+            item.id,
+            {"artifact_version": version},
+            request.state.request_id,
+        )
+        db.commit()
+        return {
+            "evidence_id": item.id,
+            "text": historical,
+            "artifact_id": artifact.id,
+            "artifact_version": version,
+            "current_version": item.text_version,
+            "superseded": True,
+            "spans": historical_spans,
+            "parser_state": "historical",
+            "warnings": [
+                "This immutable extraction was superseded; current review and production use the latest version."
+            ],
+        }
     if item.text:
         checked_text(db, item, request.app.state.storage)
     return {
@@ -237,6 +303,45 @@ def content(
         "artifact_version": item.text_version,
         "spans": spans_json(db, item),
         "parser_state": item.parser_state,
+        "current_version": item.text_version,
+        "superseded": False,
+    }
+
+
+@router.get("/cases/{case_id}/evidence/{evidence_id}/versions")
+def text_versions(
+    case_id: str,
+    evidence_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    before_version: int | None = Query(None, ge=1),
+    actor: Actor = Depends(current_actor),
+    db=Depends(get_db),
+):
+    item, _original = get_item(db, actor.user, case_id, evidence_id)
+    query = select(Artifact).where(
+        Artifact.evidence_id == item.id,
+        Artifact.tenant_id == actor.user.tenant_id,
+        Artifact.case_id == case_id,
+        Artifact.kind == "extracted-text",
+    )
+    if before_version is not None:
+        query = query.where(Artifact.version < before_version)
+    rows = list(db.scalars(query.order_by(Artifact.version.desc(), Artifact.id).limit(limit + 1)))
+    return {
+        "items": [
+            {
+                "id": row.id,
+                "artifact_id": row.id,
+                "version": row.version,
+                "current": row.version == item.text_version,
+                "sha256": row.sha256,
+                "parser_version": row.parser_version,
+                "created_at": utc(row.created_at).isoformat(),
+            }
+            for row in rows[:limit]
+        ],
+        "current_version": item.text_version,
+        "before_version": rows[limit - 1].version if len(rows) > limit else None,
     }
 
 
@@ -260,7 +365,9 @@ def citations(
     actor: Actor = Depends(current_actor),
     db=Depends(get_db),
 ):
-    item, _ = get_item(db, actor.user, case_id, evidence_id)
+    item, original = get_item(db, actor.user, case_id, evidence_id)
+    if not request.app.state.storage.verify(original)["valid"]:
+        fail(409, "INTEGRITY_FAILED", "The original evidence failed verification.")
     if item.text:
         checked_text(db, item, request.app.state.storage)
     return {"evidence_id": item.id, "items": spans_json(db, item)}
@@ -379,14 +486,32 @@ def original_download(
     )
 
 
-def apply_review(db, user, case_id, item, body, request_id):
+def apply_review(db, user, case_id, item, body, request_id, *, assignment_authorized=False):
     authorize_case(db, user, case_id, "review")
     changes = body.model_dump(exclude_none=True, exclude={"expected_version", "note"})
     if not changes and not body.note:
         fail(422, "REVIEW_EMPTY", "Choose a review change or write a note.")
+    if body.assigned_to is not None and not assignment_authorized:
+        authorize_case(db, user, case_id, "manage")
+        from .workflow_models import ActiveAllocation
+
+        reserved = db.scalar(
+            select(ActiveAllocation.evidence_id).where(
+                ActiveAllocation.evidence_id == item.id,
+                ActiveAllocation.tenant_id == user.tenant_id,
+                ActiveAllocation.case_id == case_id,
+            )
+        )
+        if reserved and body.assigned_to != item.assigned_to:
+            fail(
+                409,
+                "ASSIGNMENT_LOCKED",
+                "Release or cancel its active assignment before reallocating this evidence.",
+            )
     if body.privilege_status is not None and (
         body.privilege_status in {"confirmed", "cleared"}
-        or item.privilege_status in {"confirmed", "cleared"} and body.privilege_status != item.privilege_status
+        or item.privilege_status in {"confirmed", "cleared"}
+        and body.privilege_status != item.privilege_status
     ):
         authorize_case(db, user, case_id, "privilege")
     if body.assigned_to and not db.scalar(

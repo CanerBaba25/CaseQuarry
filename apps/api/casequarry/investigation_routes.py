@@ -7,7 +7,7 @@ from . import audit
 from .evidence_routes import get_item
 from .models import Evidence, Participant, Person, now
 from .schemas import Filters, SearchInput, Sort
-from .search import cursor_decode, cursor_encode, parse_date, run_search
+from .search import cursor_decode, cursor_encode, parse_date, run_search, search_conditions
 from .security import Actor, authorize_case, current_actor, fail, get_db, utc
 
 router = APIRouter(prefix="/api/v1")
@@ -17,6 +17,16 @@ COUNT_BASIS = "Preserved email source occurrences; unique_messages counts distin
 
 def scope(model, user, case_id):
     return [model.tenant_id == user.tenant_id, model.case_id == case_id]
+
+
+def communication_filters(date_from, date_to, source_id, custodian_id):
+    return Filters(
+        item_types=["email"],
+        date_from=date_from,
+        date_to=date_to,
+        source_ids=[source_id] if source_id else [],
+        custodian_ids=[custodian_id] if custodian_id else [],
+    )
 
 
 def people_query(user, case_id):
@@ -202,10 +212,16 @@ def network(
     case_id: str,
     request: Request,
     limit: int = Query(500, ge=1, le=500),
+    date_from: str | None = Query(None, max_length=64),
+    date_to: str | None = Query(None, max_length=64),
+    source_id: str | None = Query(None, max_length=64),
+    custodian_id: str | None = Query(None, max_length=64),
     actor: Actor = Depends(current_actor),
     db=Depends(get_db),
 ):
     authorize_case(db, actor.user, case_id)
+    filters = communication_filters(date_from, date_to, source_id, custodian_id)
+    conditions = search_conditions(actor.user.tenant_id, case_id, SearchInput(filters=filters))
     sender, recipient = aliased(Participant), aliased(Participant)
     sender_person, recipient_person = aliased(Person), aliased(Person)
     query = (
@@ -222,7 +238,7 @@ def network(
         .join(sender_person, sender_person.id == sender.person_id)
         .join(recipient_person, recipient_person.id == recipient.person_id)
         .where(
-            *scope(Evidence, actor.user, case_id),
+            *conditions,
             *scope(sender, actor.user, case_id),
             *scope(recipient, actor.user, case_id),
             *scope(sender_person, actor.user, case_id),
@@ -265,6 +281,7 @@ def network(
         "truncated": len(rows) > limit,
         "count_basis": COUNT_BASIS,
         "direction": "Header sender to collected to/cc/bcc addresses; no inferred identities.",
+        "scope": filters.model_dump(exclude_defaults=True),
     }
 
 
@@ -355,6 +372,10 @@ def traffic(
     request: Request,
     group_by: str = "day",
     limit: int = Query(500, ge=1, le=500),
+    date_from: str | None = Query(None, max_length=64),
+    date_to: str | None = Query(None, max_length=64),
+    source_id: str | None = Query(None, max_length=64),
+    custodian_id: str | None = Query(None, max_length=64),
     actor: Actor = Depends(current_actor),
     db=Depends(get_db),
 ):
@@ -367,7 +388,8 @@ def traffic(
         if db.bind.dialect.name == "sqlite"
         else func.to_char(Evidence.date_utc, formats[group_by][1])
     )
-    base = [*scope(Evidence, actor.user, case_id), Evidence.item_type == "email"]
+    filters = communication_filters(date_from, date_to, source_id, custodian_id)
+    base = search_conditions(actor.user.tenant_id, case_id, SearchInput(filters=filters))
     rows = db.execute(
         select(
             bucket.label("key"),
@@ -379,8 +401,14 @@ def traffic(
         .order_by(bucket)
         .limit(limit + 1)
     ).all()
+    undated_scope = filters.model_copy(update={"date_from": None, "date_to": None, "missing_date": True})
     missing = (
-        db.scalar(select(func.count()).select_from(Evidence).where(*base, Evidence.date_utc.is_(None))) or 0
+        db.scalar(
+            select(func.count())
+            .select_from(Evidence)
+            .where(*search_conditions(actor.user.tenant_id, case_id, SearchInput(filters=undated_scope)))
+        )
+        or 0
     )
     return {
         "items": [
@@ -396,6 +424,8 @@ def traffic(
         "missing_date_count": missing,
         "truncated": len(rows) > limit,
         "count_basis": COUNT_BASIS,
+        "scope": filters.model_dump(exclude_defaults=True),
+        "missing_date_basis": "Undated emails in the selected source/custodian scope; these cannot be placed in a date range.",
     }
 
 

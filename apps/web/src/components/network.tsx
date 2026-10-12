@@ -7,6 +7,13 @@ import { useResource } from "@/lib/hooks";
 import type { Matter } from "@/lib/types";
 import { Empty, ErrorBox, Icon, Loading } from "./ui";
 import { PageHeading, Pagination } from "./matter-pages";
+import {
+  CommunicationScopeForm,
+  scopeFilters,
+  scopeParams,
+  type CommunicationScope,
+} from "./communication-analytics";
+import { evidenceUrl } from "@/lib/search-scope";
 
 type Node = { id: string; email: string; name: string; state: string };
 type Edge = {
@@ -24,7 +31,10 @@ type Network = {
 };
 
 export default function NetworkPage({ matter }: { matter: Matter }) {
-  const resource = useResource<Network>(`/cases/${matter.id}/network`),
+  const [scope, setScope] = useState<CommunicationScope>({});
+  const resource = useResource<Network>(
+      `/cases/${matter.id}/network?${scopeParams(scope)}`,
+    ),
     [page, setPage] = useState(0);
   const nodes = new Map(
     resource.data?.nodes.map((node) => [node.id, node]) || [],
@@ -37,6 +47,13 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
         eyebrow="COLLECTED COMMUNICATIONS"
         title="See the connections."
         text="Directed sender-to-recipient relationships from email headers. Addresses are not automatically merged into human identities."
+      />
+      <CommunicationScopeForm
+        matter={matter}
+        apply={(value) => {
+          setScope(value);
+          setPage(0);
+        }}
       />
       <ErrorBox error={resource.error} retry={resource.refresh} />
       {resource.loading ? (
@@ -74,7 +91,11 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
                 {number(resource.data?.nodes.length)} returned addresses
               </span>
             </div>
-            <CommunicationMap matter={matter} data={resource.data!} />
+            <CommunicationMap
+              matter={matter}
+              data={resource.data!}
+              scope={scope}
+            />
           </section>
           <section className="section">
             <div className="section-heading">
@@ -91,6 +112,9 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
                     <th>Occurrences</th>
                     <th>Unique originals</th>
                     <th>Explicit threads</th>
+                    <th>
+                      <span className="sr-only">Directed evidence scope</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -99,13 +123,27 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
                       <td>
                         <div className="communication-pair">
                           <Link
-                            href={`/app/matters/${matter.id}/explorer?person_id=${encodeURIComponent(edge.source)}`}
+                            href={evidenceUrl(
+                              matter.id,
+                              {
+                                ...scopeFilters(scope),
+                                person_id: edge.source,
+                              },
+                              true,
+                            )}
                           >
                             {nodes.get(edge.source)?.email || edge.source}
                           </Link>
                           <Icon name="arrow" size={14} />
                           <Link
-                            href={`/app/matters/${matter.id}/explorer?person_id=${encodeURIComponent(edge.target)}`}
+                            href={evidenceUrl(
+                              matter.id,
+                              {
+                                ...scopeFilters(scope),
+                                person_id: edge.target,
+                              },
+                              true,
+                            )}
                           >
                             {nodes.get(edge.target)?.email || edge.target}
                           </Link>
@@ -116,6 +154,22 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
                       </td>
                       <td>{number(edge.unique_messages)}</td>
                       <td>{number(edge.unique_threads)}</td>
+                      <td>
+                        <Link
+                          className="text-link"
+                          href={evidenceUrl(
+                            matter.id,
+                            {
+                              ...scopeFilters(scope),
+                              sender_person_id: edge.source,
+                              recipient_person_id: edge.target,
+                            },
+                            true,
+                          )}
+                        >
+                          Open pair <Icon name="arrow" size={14} />
+                        </Link>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -137,7 +191,15 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
   );
 }
 
-function CommunicationMap({ matter, data }: { matter: Matter; data: Network }) {
+function CommunicationMap({
+  matter,
+  data,
+  scope,
+}: {
+  matter: Matter;
+  data: Network;
+  scope: CommunicationScope;
+}) {
   const chart = useMemo(() => {
     const weights = new Map<string, number>();
     for (const edge of data.edges)
@@ -246,7 +308,11 @@ function CommunicationMap({ matter, data }: { matter: Matter; data: Network }) {
       {chart.nodes.map((node, i) => (
         <a
           key={node.id}
-          href={`/app/matters/${matter.id}/explorer?person_id=${encodeURIComponent(node.id)}`}
+          href={evidenceUrl(
+            matter.id,
+            { ...scopeFilters(scope), person_id: node.id },
+            true,
+          )}
           aria-label={`Open exact messages for ${node.email}`}
         >
           <circle

@@ -4,11 +4,12 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import Field
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session, load_only
 
 from . import audit
 from .models import Evidence, Hold, Issue, IssueLink, Member, Task, User
+from .production_models import IssueReview
 from .schemas import HoldInput, Input, IssueInput, IssueLinkInput, Reason, TaskInput
 from .security import Actor, authorize_case, current_actor, fail, get_db, utc
 
@@ -19,6 +20,11 @@ class TaskPatch(Input):
     title: str | None = Field(default=None, min_length=1, max_length=300)
     state: Literal["open", "in_progress", "done", "cancelled"] | None = None
     assigned_to: str | None = None
+
+
+class IssueReviewInput(Reason):
+    expected_version: int = Field(ge=0)
+    state: Literal["reviewed", "disputed", "needs_review"]
 
 
 def _scoped(db, model, user, case_id, identifier):
@@ -100,15 +106,28 @@ def release_hold(case_id: str, hold_id: str, body: Reason, request: Request, act
     return hold_json(row)
 
 
-def issue_json(row):
-    return {"id": row.id, "title": row.title, "description": row.description, "created_by": row.created_by, "created_at": utc(row.created_at).isoformat()}
+def _issue_evidence_snapshot(db, issue, require_limit=True):
+    links = list(db.execute(select(IssueLink, Evidence).options(load_only(Evidence.id, Evidence.review_version, Evidence.text_hash, Evidence.text_version)).join(Evidence, IssueLink.evidence_id == Evidence.id).where(IssueLink.issue_id == issue.id, IssueLink.tenant_id == issue.tenant_id, IssueLink.case_id == issue.case_id, Evidence.tenant_id == issue.tenant_id, Evidence.case_id == issue.case_id).order_by(IssueLink.id).limit(1001)))
+    if len(links) > 1000:
+        if require_limit:
+            fail(413, "ISSUE_REVIEW_SCOPE_LIMIT", "Issue review supports at most 1,000 linked evidence items.")
+        return {"_scope_exceeds_review_limit": True}
+    return {link.id: {"evidence_id": item.id, "side": link.side, "note": link.note, "review_version": item.review_version, "text_hash": item.text_hash, "text_version": item.text_version} for link, item in links}
+
+
+def issue_json(row, db=None):
+    result = {"id": row.id, "title": row.title, "description": row.description, "created_by": row.created_by, "created_at": utc(row.created_at).isoformat()}
+    if db is not None:
+        review = db.scalar(select(IssueReview).where(IssueReview.issue_id == row.id, IssueReview.tenant_id == row.tenant_id, IssueReview.case_id == row.case_id))
+        result["review"] = {"state": review.state, "version": review.version, "reviewed_by": review.reviewed_by, "reason": review.reason, "stale": review.evidence_snapshot != _issue_evidence_snapshot(db, row, require_limit=False)} if review else {"state": "needs_review", "version": 0, "stale": False}
+    return result
 
 
 @router.get("/cases/{case_id}/issues")
 def list_issues(case_id: str, limit: int = 50, cursor: str | None = None, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
     authorize_case(db, actor.user, case_id)
     rows, cursor = _page(db, Issue, actor.user, case_id, limit, cursor)
-    return {"items": [issue_json(row) for row in rows], "next_cursor": cursor}
+    return {"items": [issue_json(row, db) for row in rows], "next_cursor": cursor}
 
 
 @router.post("/cases/{case_id}/issues", status_code=201)
@@ -136,7 +155,7 @@ def get_issue(case_id: str, issue_id: str, limit: int = 100, cursor: str | None 
             fail(422, "CURSOR_SCOPE_MISMATCH", "The cursor belongs to a different issue.")
         query = query.where(IssueLink.id > cursor)
     links = list(db.execute(query.order_by(IssueLink.id).limit(limit + 1)))
-    return {**issue_json(row), "evidence": [{"id": link.id, "evidence_id": link.evidence_id, "title": title, "side": link.side, "note": link.note, "created_by": link.created_by} for link, title in links[:limit]], "next_cursor": links[limit - 1][0].id if len(links) > limit else None}
+    return {**issue_json(row, db), "evidence": [{"id": link.id, "evidence_id": link.evidence_id, "title": title, "side": link.side, "note": link.note, "created_by": link.created_by} for link, title in links[:limit]], "next_cursor": links[limit - 1][0].id if len(links) > limit else None}
 
 
 @router.post("/cases/{case_id}/issues/{issue_id}/evidence", status_code=201)
@@ -204,7 +223,23 @@ def update_task(case_id: str, task_id: str, body: TaskPatch, request: Request, a
     return task_json(row)
 
 
-@router.post("/cases/{case_id}/productions")
-def productions_unavailable(case_id: str, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
-    authorize_case(db, actor.user, case_id, "export")
-    fail(503, "PRODUCTION_UNAVAILABLE", "Verified redaction, Bates numbering and second-reviewer production approval are not available in this release. Use reviewed native exports for testing only.")
+@router.post("/cases/{case_id}/issues/{issue_id}/review")
+def review_issue(case_id: str, issue_id: str, body: IssueReviewInput, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
+    authorize_case(db, actor.user, case_id, "privilege" if body.state == "reviewed" else "review")
+    issue = _scoped(db, Issue, actor.user, case_id, issue_id)
+    reason = _reason(body.reason)
+    snapshot = _issue_evidence_snapshot(db, issue)
+    if body.state == "reviewed" and not snapshot:
+        fail(409, "ISSUE_EVIDENCE_REQUIRED", "Link supporting, contradicting or unclear evidence before marking the issue reviewed.")
+    review = db.scalar(select(IssueReview).where(IssueReview.issue_id == issue.id, IssueReview.tenant_id == actor.user.tenant_id, IssueReview.case_id == case_id))
+    if review is None:
+        if body.expected_version != 0:
+            fail(409, "ISSUE_REVIEW_CONFLICT", "The issue review changed; reload its current version.")
+        review = IssueReview(tenant_id=actor.user.tenant_id, case_id=case_id, issue_id=issue.id, reviewed_by=actor.user.id, reason=reason, state=body.state, version=1, evidence_snapshot=snapshot)
+        db.add(review)
+        db.flush()
+    elif not db.execute(update(IssueReview).where(IssueReview.id == review.id, IssueReview.version == body.expected_version).values(state=body.state, version=body.expected_version + 1, reviewed_by=actor.user.id, reason=reason, evidence_snapshot=snapshot)).rowcount:
+        fail(409, "ISSUE_REVIEW_CONFLICT", "The issue review changed; reload its current version.")
+    audit.record(db, actor.user, case_id, "issue.reviewed", "issue", issue.id, {"state": body.state, "version": body.expected_version + 1})
+    db.commit()
+    return issue_json(issue, db)

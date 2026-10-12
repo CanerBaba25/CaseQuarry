@@ -14,6 +14,8 @@ Open `http://127.0.0.1:3000/setup`. Read the generated `CASEQUARRY_SETUP_TOKEN` 
 
 The API listens on `127.0.0.1:8000`; the web app proxies `/api` to it. This mode uses SQLite and an embedded durable worker. Ctrl+C stops the development processes. Data persists in `.data`; restarting does not erase it. If a port is occupied, stop the existing process or explicitly configure both the API address and frontend proxy.
 
+Optional local OCR requires Tesseract and its language data. Standard installations are detected automatically; use `CASEQUARRY_TESSERACT_COMMAND` for another trusted executable location. Scanned PDFs/images remain visibly partial when recognition is disabled or unavailable. [Adapter documentation](ADAPTERS.md) describes settings, quality flags, Outlook limits and explicit read-only mailbox acquisition.
+
 Run checks:
 
 ```powershell

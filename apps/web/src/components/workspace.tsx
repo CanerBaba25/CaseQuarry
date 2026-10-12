@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api, date, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import type { Matter, Stats, User } from "@/lib/types";
@@ -21,13 +21,19 @@ import { GovernancePage } from "./governance";
 import AccountSecurity from "./account-security";
 import NetworkPage from "./network";
 import SourceAssistant, { LocalModelPolicy } from "./local-model";
+import CommunicationAnalytics from "./communication-analytics";
+import FirmAdministration from "./firm-admin";
+import ReviewQueue from "./review-queue";
+import ProductionsPage from "./productions";
 
 const matterNavigation = [
   ["overview", "Overview", "grid"],
   ["explorer", "Evidence explorer", "search"],
+  ["emails", "Email workspace", "email"],
   ["sources", "Sources & imports", "upload"],
   ["people", "People", "people"],
   ["network", "Communication map", "network"],
+  ["analytics", "Traffic analytics", "timeline"],
   ["timeline", "Timeline", "timeline"],
   ["review", "Review queue", "review"],
   ["ai", "Source assistant", "sparkle"],
@@ -35,6 +41,7 @@ const matterNavigation = [
   ["tasks", "Tasks", "review"],
   ["holds", "Preservation holds", "lock"],
   ["reports", "Exports", "export"],
+  ["productions", "Productions", "export"],
   ["audit", "Audit trail", "shield"],
   ["settings", "Matter settings", "settings"],
 ];
@@ -57,6 +64,9 @@ export default function Workspace() {
         : null;
   const section = pieces[3] || "overview";
   const accountSettings = pieces[0] === "app" && pieces[1] === "settings";
+  const administration = pieces[0] === "app" && pieces[1] === "admin";
+  const navigationRef = useRef<HTMLElement>(null),
+    menuRef = useRef<HTMLButtonElement>(null);
   const matter = useResource<Matter>(
     user && caseId ? `/cases/${caseId}` : null,
   );
@@ -71,7 +81,7 @@ export default function Workspace() {
       const state = await api<{ required: boolean }>("/setup");
       setSetup(state.required);
       if (state.required) {
-        router.replace("/setup");
+        if (window.location.pathname !== "/setup") router.replace("/setup");
         return;
       }
       try {
@@ -82,7 +92,7 @@ export default function Workspace() {
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
           setUser(null);
-          router.replace("/login");
+          if (window.location.pathname !== "/login") router.replace("/login");
         } else throw error;
       }
     } catch (error) {
@@ -101,11 +111,12 @@ export default function Workspace() {
       theme === "dark" ? "dark" : "light";
     const unauthorized = () => {
       setUser(null);
-      router.replace("/login");
+      if (window.location.pathname !== "/login") router.replace("/login");
     };
     const keys = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
+        setNavOpen(false);
         setPalette((value) => !value);
       }
     };
@@ -119,6 +130,38 @@ export default function Workspace() {
   useEffect(() => {
     setNavOpen(false);
   }, [pathname]);
+  useEffect(() => {
+    if (!navOpen) return;
+    const focusable = () =>
+      Array.from(
+        navigationRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not(:disabled), summary, input:not(:disabled), [tabindex="0"]',
+        ) || [],
+      ).filter((element) => element.getClientRects().length > 0);
+    focusable()[0]?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setNavOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = focusable(),
+        first = items[0],
+        last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("keydown", key);
+      menuRef.current?.focus();
+    };
+  }, [navOpen]);
   function toggleTheme() {
     const value = !dark;
     setDark(value);
@@ -165,8 +208,17 @@ export default function Workspace() {
         />
       )}
       <aside
+        ref={navigationRef}
+        id="workspace-navigation"
         className={`sidebar ${navOpen ? "open" : ""}`}
         aria-label="Workspace navigation"
+        onClick={(event) => {
+          if (
+            event.target instanceof Element &&
+            event.target.closest("a[href]")
+          )
+            setNavOpen(false);
+        }}
       >
         <Link href="/app" className="brand-link">
           <Logo />
@@ -174,7 +226,7 @@ export default function Workspace() {
         <div className="sidebar-section-title">WORKSPACE</div>
         <Link
           href="/app"
-          className={`nav-link ${!caseId && pieces[2] !== "new" && !accountSettings ? "active" : ""}`}
+          className={`nav-link ${!caseId && pieces[2] !== "new" && !accountSettings && !administration ? "active" : ""}`}
         >
           <Icon name="matters" />
           All matters
@@ -182,6 +234,15 @@ export default function Workspace() {
             {cases.data ? number(cases.data.items.length) : "—"}
           </span>
         </Link>
+        {user.role === "firm_admin" && (
+          <Link
+            href="/app/admin"
+            className={`nav-link ${administration ? "active" : ""}`}
+          >
+            <Icon name="people" />
+            Firm administration
+          </Link>
+        )}
         <Link
           href="/app/matters/new"
           className={`nav-link ${pieces[2] === "new" ? "active" : ""}`}
@@ -249,7 +310,7 @@ export default function Workspace() {
           </>
         )}
         <div className="sidebar-bottom">
-          <div className="preview-label">PREVIEW 0.1</div>
+          <div className="preview-label">PREVIEW 0.2</div>
           <div className="privacy-status">
             <span className="status-dot" />
             <span>
@@ -283,12 +344,15 @@ export default function Workspace() {
           </div>
         </div>
       </aside>
-      <div className="main-shell">
+      <div className="main-shell" inert={navOpen}>
         <header className="topbar">
           <button
             className="icon-button mobile-menu"
+            ref={menuRef}
             onClick={() => setNavOpen((value) => !value)}
             aria-label="Open navigation"
+            aria-expanded={navOpen}
+            aria-controls="workspace-navigation"
           >
             <Icon name="menu" />
           </button>
@@ -309,7 +373,9 @@ export default function Workspace() {
                   ? "New matter"
                   : accountSettings
                     ? "Account security"
-                    : "All matters"}
+                    : administration
+                      ? "Firm administration"
+                      : "All matters"}
             </strong>
           </div>
           <div className="topbar-actions">
@@ -332,7 +398,7 @@ export default function Workspace() {
         </header>
         <main
           id="main-content"
-          className={`main-content ${caseId && ["explorer", "review", "evidence", "emails"].includes(section) ? "explorer-main" : ""}`}
+          className={`main-content ${caseId && ["explorer", "evidence", "emails"].includes(section) ? "explorer-main" : ""}`}
         >
           {caseId ? (
             matter.error ? (
@@ -341,12 +407,11 @@ export default function Workspace() {
               <Loading />
             ) : section === "overview" ? (
               <MatterOverview matter={matter.data} />
-            ) : ["explorer", "review", "evidence", "emails"].includes(
-                section,
-              ) ? (
+            ) : section === "review" ? (
+              <ReviewQueue matter={matter.data} user={user} />
+            ) : ["explorer", "evidence", "emails"].includes(section) ? (
               <Explorer
                 matter={matter.data}
-                reviewOnly={section === "review"}
                 emailOnly={section === "emails"}
                 evidenceId={section === "evidence" ? pieces[4] : undefined}
               />
@@ -361,6 +426,10 @@ export default function Workspace() {
               <TimelinePage matter={matter.data} />
             ) : section === "network" ? (
               <NetworkPage matter={matter.data} />
+            ) : section === "analytics" ? (
+              <CommunicationAnalytics matter={matter.data} />
+            ) : section === "productions" ? (
+              <ProductionsPage matter={matter.data} user={user} />
             ) : section === "ai" ? (
               <SourceAssistant matter={matter.data} />
             ) : section === "audit" ? (
@@ -372,7 +441,7 @@ export default function Workspace() {
               />
             ) : section === "reports" ? (
               <ReportsPage matter={matter.data} />
-            ) : (
+            ) : section === "settings" ? (
               <SettingsPage
                 matter={matter.data}
                 refresh={() => {
@@ -382,9 +451,17 @@ export default function Workspace() {
                 user={user}
                 modelPolicy={<LocalModelPolicy matter={matter.data} />}
               />
+            ) : (
+              <Empty
+                icon="file"
+                title="This page is unavailable"
+                text="Use the matter navigation to open evidence, review or administration."
+              />
             )
           ) : accountSettings ? (
             <AccountSecurity user={user} />
+          ) : administration ? (
+            <FirmAdministration user={user} />
           ) : pieces[2] === "new" ? (
             <CreateMatter
               created={(id) => {

@@ -1,4 +1,5 @@
 import hashlib
+import json
 import math
 import os
 from datetime import timedelta
@@ -27,7 +28,7 @@ def upload_identity(value):
 
 
 def batch_json(batch):
-    return {"id": batch.id, "batch_id": batch.id, "job_id": batch.id, "case_id": batch.case_id, "source_id": batch.source_id, "state": batch.state, "counts": {**empty_counts(), **(batch.counts or {})}, "errors": batch.errors, "file_count": len(batch.files), "files": [{key: file[key] for key in ("filename", "byte_size", "sha256") if key in file} for file in batch.files], "checkpoint": batch.checkpoint, "created_at": utc(batch.created_at).isoformat(), "updated_at": utc(batch.updated_at).isoformat(), "parser_version": batch.parser_version}
+    return {"id": batch.id, "batch_id": batch.id, "job_id": batch.id, "case_id": batch.case_id, "source_id": batch.source_id, "state": batch.state, "counts": {**empty_counts(), **(batch.counts or {})}, "errors": batch.errors, "file_count": len(batch.files), "files": [{key: file[key] for key in ("filename", "byte_size", "sha256") if key in file} for file in batch.files], "checkpoint": {key: value for key, value in batch.checkpoint.items() if key != "lease_owner"}, "created_at": utc(batch.created_at).isoformat(), "updated_at": utc(batch.updated_at).isoformat(), "parser_version": batch.parser_version}
 
 
 def get_batch(db, user, case_id, batch_id, permission="view"):
@@ -58,12 +59,36 @@ def ensure_source(db, user, case_id, source_id=None, source_label="Uploaded evid
 
 
 def enqueue(db, user, case_id, source, files, request_id, idempotency_key=None):
-    batch = ImportBatch(tenant_id=user.tenant_id, case_id=case_id, source_id=source.id, submitted_by=user.id, counts=empty_counts(), files=files, checkpoint={"file_index": 0, "mbox_offset": 0, "policy_version": "rbac-v1"}, idempotency_key=idempotency_key)
+    batch = ImportBatch(tenant_id=user.tenant_id, case_id=case_id, source_id=source.id, submitted_by=user.id, counts=empty_counts(), files=files, checkpoint={"file_index": 0, "mbox_offset": 0, "policy_version": "rbac-v1"}, idempotency_key=idempotency_key, parser_version="extract-local-v2")
     db.add(batch)
     db.flush()
     audit.record(db, user, case_id, "import.submitted", "import", batch.id, {"file_count": len(files), "source_id": source.id}, request_id)
     db.commit()
     return batch
+
+
+def original_storage_delta(db, tenant_id, case_id, value, size):
+    existing = db.scalar(select(Original.id).where(Original.tenant_id == tenant_id, Original.case_id == case_id, Original.sha256 == value, Original.byte_size == size))
+    return 0 if existing else size
+
+
+@router.get("/cases/{case_id}/imports/adapters")
+def adapters(case_id: str, request: Request, actor: Actor = Depends(current_actor), db=Depends(get_db)):
+    from .ocr import availability
+
+    authorize_case(db, actor.user, case_id)
+    settings = request.app.state.settings
+    items = []
+    for identifier, formats, pdf in [("pdf-ocr", ["pdf"], True), ("image-ocr", ["jpg", "jpeg", "png", "tif", "tiff"], False)]:
+        status, detail = availability(settings, pdf=pdf)
+        items.append({"id": identifier, "formats": formats, "status": status, "engine": "tesseract" if not pdf else "pypdfium2+tesseract", "detail": detail, "limits": {"max_pages": settings.ocr_max_pages if pdf else 1, "max_pixels": settings.ocr_max_pixels, "timeout_seconds_per_page": settings.ocr_timeout_seconds, "language": settings.ocr_language}})
+    items.extend([
+        {"id": "pdf-text", "formats": ["pdf"], "status": "available", "engine": "pypdf", "detail": "Native PDF text and page anchors; original bytes are preserved.", "limits": {"max_pages": settings.ocr_max_pages, "max_text_chars": settings.max_extracted_chars}},
+        {"id": "msg", "formats": ["msg"], "status": "available", "engine": "isolated-ms-oxmsg+olefile", "detail": "Email MSG bodies, recipients and binary file attachments. RTF-only, embedded messages, external/OLE attachments and other Outlook item classes remain partial or unsupported.", "limits": {"attachments": 200, "attachment_bytes": min(settings.max_archive_expanded_bytes, 64 * 1024 * 1024), "timeout_seconds": 60}},
+        {"id": "pst-ost", "formats": ["pst", "ost"], "status": "unsupported", "engine": None, "detail": "No tested local PST/OST adapter is configured. Export authorized EML/MBOX/MSG first; raw originals remain preserved.", "limits": {}},
+        {"id": "media", "formats": ["wav", "mp3", "m4a", "mp4", "mov"], "status": "unsupported", "engine": None, "detail": "No tested local speech model/runtime is configured; no transcript is fabricated.", "limits": {}},
+    ])
+    return {"items": items, "connectors": [{"id": identifier, "mode": "cli", "read_only": True, "requires_explicit_scope": True, "status": "available"} for identifier in ("local-folder", "maildir", "imap")], "remote_oauth_connectors": "not-configured"}
 
 
 @router.get("/cases/{case_id}/imports")
@@ -74,11 +99,25 @@ def imports(case_id: str, actor: Actor = Depends(current_actor), db=Depends(get_
 
 
 @router.post("/cases/{case_id}/imports", status_code=202)
-async def submit_import(case_id: str, request: Request, files: list[UploadFile] = File(...), source_id: str | None = Form(None), source_label: str = Form("Uploaded evidence"), custodian_name: str | None = Form(None), actor: Actor = Depends(current_actor), db=Depends(get_db)):
+async def submit_import(case_id: str, request: Request, files: list[UploadFile] = File(...), source_id: str | None = Form(None), source_label: str = Form("Uploaded evidence"), custodian_name: str | None = Form(None), source_paths: str | None = Form(None), actor: Actor = Depends(current_actor), db=Depends(get_db)):
     case, _ = authorize_case(db, actor.user, case_id, "import")
     settings, storage = request.app.state.settings, request.app.state.storage
     if not files or len(files) > settings.max_batch_files:
         fail(422, "FILE_COUNT_LIMIT", f"Upload between 1 and {settings.max_batch_files} files per batch.")
+    paths = {}
+    if source_paths:
+        try:
+            if len(source_paths) > settings.max_batch_files * 4200:
+                raise ValueError
+            paths = json.loads(source_paths)
+            if not isinstance(paths, dict) or len(paths) > len(files) or set(paths) - {file.filename for file in files}:
+                raise ValueError
+            for value in paths.values():
+                if not isinstance(value, str):
+                    raise ValueError
+                upload_identity(value)
+        except (ValueError, TypeError):
+            fail(422, "SOURCE_PATHS_INVALID", "Source paths must map uploaded filenames to bounded provenance labels.")
     idempotency = request.headers.get("idempotency-key")
     if idempotency and len(idempotency) > 100:
         fail(422, "IDEMPOTENCY_KEY_INVALID", "Use an idempotency key of at most 100 characters.")
@@ -88,9 +127,10 @@ async def submit_import(case_id: str, request: Request, files: list[UploadFile] 
             return batch_json(existing)
     source = ensure_source(db, actor.user, case_id, source_id, source_label, custodian_name)
     used = db.scalar(select(func.coalesce(func.sum(Original.byte_size), 0)).where(Original.case_id == case_id, Original.tenant_id == actor.user.tenant_id)) or 0
-    uploaded, total = [], 0
+    uploaded, unique_bytes, seen_hashes = [], 0, set()
     for file in files:
         filename, original_path = upload_identity(file.filename)
+        original_path = paths.get(file.filename, original_path)
         temporary = storage.path(f"staging/{new_id()}.upload")
         temporary.parent.mkdir(parents=True, exist_ok=True)
         size = 0
@@ -98,14 +138,20 @@ async def submit_import(case_id: str, request: Request, files: list[UploadFile] 
             with temporary.open("xb") as stream:
                 while chunk := await file.read(1024 * 1024):
                     size += len(chunk)
-                    total += len(chunk)
-                    if size > settings.max_upload_bytes or total + used > settings.max_case_bytes:
-                        fail(413, "UPLOAD_LIMIT", "This file or matter exceeds its configured storage limit.")
+                    if size > settings.max_upload_bytes:
+                        fail(413, "UPLOAD_LIMIT", "This file exceeds its configured upload limit.")
                     stream.write(chunk)
                 stream.flush()
                 os.fsync(stream.fileno())
             if not size:
                 fail(422, "EMPTY_FILE", "Empty files are not accepted for evidence import.")
+            value, byte_size = file_hash(temporary)
+            delta = 0 if value in seen_hashes else original_storage_delta(db, actor.user.tenant_id, case_id, value, byte_size)
+            if delta and used + unique_bytes + delta > settings.max_case_bytes:
+                fail(413, "UPLOAD_LIMIT", "This matter exceeds its configured storage limit.")
+            unique_bytes += delta
+            seen_hashes.add(value)
+            # Publication rechecks the unique-byte quota under the worker's case lock.
             key, value, byte_size = storage.store_file(actor.user.tenant_id, case_id, temporary)
             uploaded.append({"filename": filename, "original_path": original_path, "storage_key": key, "sha256": value, "byte_size": byte_size})
         finally:
@@ -135,7 +181,12 @@ def transition_import(db, actor, case_id, batch_id, action, request, reason=None
         fail(409, "IMPORT_STATE_CONFLICT", "This action is not allowed in the current import state.")
     batch.state, batch.lease_until = state, None
     if action == "retry":
-        batch.checkpoint = {"file_index": 0, "mbox_offset": 0, "policy_version": "rbac-v1"}
+        unpublished = int(batch.checkpoint.get("unpublished_quota_count", 0))
+        if unpublished:
+            batch.counts = {**batch.counts, "discovered": max(0, batch.counts.get("discovered", 0) - unpublished), "failed": max(0, batch.counts.get("failed", 0) - unpublished)}
+            batch.errors = [entry for entry in batch.errors if entry.get("code") != "CASE_STORAGE_LIMIT"]
+        batch.checkpoint = {"file_index": 0, "mbox_offset": 0, "policy_version": "rbac-v1", "reprocess": True, "reprocess_generation": int(batch.checkpoint.get("reprocess_generation", 0)) + 1}
+        batch.parser_version = "extract-local-v2"
     batch.updated_at = now()
     audit.record(db, actor.user, case_id, f"import.{action}", "import", batch.id, {"reason": reason} if reason else {}, request.state.request_id)
     db.commit()
@@ -247,7 +298,8 @@ def complete_upload(case_id: str, upload_id: str, request: Request, actor: Actor
         if size != upload.byte_size or (upload.sha256 and value != upload.sha256):
             fail(422, "UPLOAD_HASH_MISMATCH", "The assembled file failed its size or hash check.")
         used = db.scalar(select(func.coalesce(func.sum(Original.byte_size), 0)).where(Original.case_id == case_id, Original.tenant_id == actor.user.tenant_id)) or 0
-        if used + size > request.app.state.settings.max_case_bytes:
+        delta = original_storage_delta(db, actor.user.tenant_id, case_id, value, size)
+        if delta and used + delta > request.app.state.settings.max_case_bytes:
             fail(413, "CASE_QUOTA_EXCEEDED", "This matter exceeds its configured storage quota.")
         key, _, _ = storage.store_file(actor.user.tenant_id, case_id, temporary)
         filename, original_path = upload_identity(upload.filename)

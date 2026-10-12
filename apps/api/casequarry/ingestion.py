@@ -1,15 +1,19 @@
 import hashlib
+import logging
+import secrets
 import stat
 import subprocess
+import threading
 import zipfile
 from datetime import timedelta
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 
 from . import audit
 from .models import (
     Artifact,
+    Case,
     Evidence,
     ImportBatch,
     Occurrence,
@@ -23,6 +27,60 @@ from .models import (
 )
 from .parsers import Parsed, parse_document
 from .security import authorize_case
+from .storage import file_hash
+
+LOGGER = logging.getLogger("casequarry.ingestion")
+_THREAD_CLAIMS = threading.local()
+
+
+class LeaseLost(RuntimeError):
+    pass
+
+
+class BatchYield(RuntimeError):
+    pass
+
+
+class ImportClaim(str):
+    def __new__(cls, value, owner):
+        claim = super().__new__(cls, value)
+        claim.lease_owner = owner
+        return claim
+
+
+class LeaseHeartbeat:
+    def __init__(self, database, batch_id, owner):
+        self.database, self.batch_id, self.owner = database, batch_id, owner
+        self.stop, self.lost = threading.Event(), threading.Event()
+        self.thread = threading.Thread(target=self.run, name="casequarry-import-lease", daemon=True)
+
+    def run(self):
+        while not self.stop.wait(15):
+            try:
+                with self.database.sessions() as db:
+                    changed = db.execute(update(ImportBatch).where(ImportBatch.id == self.batch_id, ImportBatch.state == "running", ImportBatch.checkpoint["lease_owner"].as_string() == self.owner).values(lease_until=now() + timedelta(minutes=2))).rowcount
+                    db.commit()
+                    if not changed:
+                        self.lost.set()
+                        return
+            except Exception as error:
+                LOGGER.warning("import_lease_renewal_failed error_type=%s", type(error).__name__)
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, *_):
+        self.stop.set()
+        self.thread.join(timeout=2)
+
+
+def fence_claim(db, batch):
+    owner = db.info.get("lease_owner")
+    if owner:
+        changed = db.execute(update(ImportBatch).where(ImportBatch.id == batch.id, ImportBatch.state == "running", ImportBatch.checkpoint["lease_owner"].as_string() == owner).values(lease_until=now() + timedelta(minutes=2))).rowcount
+        if not changed:
+            raise LeaseLost("The import lease belongs to another worker or the job was stopped.")
 
 COUNTERS = (
     "discovered",
@@ -40,6 +98,13 @@ COUNTERS = (
 
 class ArchiveError(ValueError):
     pass
+
+
+class CaseStorageLimit(ArchiveError):
+    def __init__(self, filename, parent_id=None, used_bytes=0, byte_size=0):
+        super().__init__("CASE_STORAGE_LIMIT")
+        self.filename, self.parent_id = filename, parent_id
+        self.used_bytes, self.byte_size = used_bytes, byte_size
 
 
 def empty_counts():
@@ -115,6 +180,14 @@ def error_message(code):
         "PARSER_UNAVAILABLE": "No tested parser is configured for this format. The original is preserved.",
         "OCR_REQUIRED": "No readable PDF text was found. OCR is required; the original is preserved.",
         "OCR_DEPENDENCY_MISSING": "Install Tesseract to extract image text. The original is preserved.",
+        "OCR_DISABLED": "Local OCR is disabled by administrator policy. The original is preserved.",
+        "OCR_TIMEOUT": "Local recognition reached its page timeout. Inspect and retry this page; the original is preserved.",
+        "OCR_PIXEL_LIMIT": "The image exceeds the configured OCR pixel limit. The original is preserved.",
+        "EXTRACTION_TIME_LIMIT": "Extraction reached its isolated document time budget. The original is preserved; narrow or split an approved working copy before retrying.",
+        "PDF_PAGE_LIMIT": "The PDF exceeds its configured page limit; remaining pages were not extracted.",
+        "MSG_BODY_UNSUPPORTED": "Compressed-RTF-only MSG body extraction is unavailable. The original MSG is preserved.",
+        "MSG_EMBEDDED_MESSAGE_UNSUPPORTED": "Embedded Outlook message attachments are not decoded by this adapter; the containing original MSG is preserved.",
+        "CASE_STORAGE_LIMIT": "The case's unique-original byte quota was reached. This record was not published; increase the approved quota or narrow the import before retrying.",
         "PASSWORD_REQUIRED": "This document is locked. The original is preserved.",
         "ARCHIVE_PASSWORD_REQUIRED": "Archive is encrypted; an approved password adapter is required.",
         "WORKER_PERMISSION_REVOKED": "Import permissions were removed. No further items were processed.",
@@ -179,6 +252,65 @@ def index_participants(db, item, email):
         )
 
 
+def parse_safely(path, filename, settings):
+    """A configured malware scanner runs before any document parser is invoked."""
+    scan_status = "not-configured"
+    if settings.antivirus_command:
+        try:
+            scan = subprocess.run([settings.antivirus_command, str(path)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60, check=False)
+            if scan.returncode == 1:
+                return Parsed("file", filename, state="quarantined", error="MALWARE_DETECTED", metadata={"scan_status": "quarantined"})
+            if scan.returncode != 0:
+                return Parsed("file", filename, state="partial", error="SCANNER_UNAVAILABLE", metadata={"scan_status": "unavailable"})
+            scan_status = "clean"
+        except (OSError, subprocess.TimeoutExpired):
+            return Parsed("file", filename, state="partial", error="SCANNER_UNAVAILABLE", metadata={"scan_status": "unavailable"})
+    parsed = parse_document(path, filename, settings)
+    parsed.metadata["scan_status"] = scan_status
+    parsed.metadata["parser_version"] = "extract-local-v2"
+    return parsed
+
+
+def append_reprocessing(db, settings, storage, batch, item, parsed, expected_version, attempt):
+    fence_claim(db, batch)
+    if not assert_active(db, batch):
+        raise LeaseLost("The import is no longer active.")
+    old_state, old_hash = item.parser_state, item.text_hash
+    version = expected_version + 1
+    text_hash = hashlib.sha256(parsed.text.encode("utf-8")).hexdigest()
+    metadata = {**item.metadata_json, **parsed.metadata, "reprocess_attempt": attempt, "reprocessing_notice": "Extraction changed; verify the current derived text before relying on prior review."}
+    if not parsed.error:
+        metadata.pop("family_error", None)
+    thread_root = (parsed.email.get("references") or [parsed.email.get("in_reply_to") or parsed.email.get("message_id") or ""])[0]
+    thread_id = hashlib.sha256(f"{batch.case_id}:{thread_root}".encode()).hexdigest()[:32] if thread_root else None
+    changed = db.execute(update(Evidence).where(Evidence.id == item.id, Evidence.case_id == batch.case_id, Evidence.tenant_id == batch.tenant_id, Evidence.text_version == expected_version).values(text=parsed.text, text_hash=text_hash, text_version=version, item_type=parsed.item_type, title=parsed.title[:1000], sender=parsed.sender, recipients=parsed.recipients, email_metadata=parsed.email, metadata_json=metadata, date_raw=parsed.date_raw, date_utc=parsed.date_utc, timezone_source=parsed.timezone_source, parser_state=parsed.state, parser_error=parsed.error, has_attachments=bool(parsed.attachments), thread_id=thread_id, body_fingerprint=hashlib.sha256(" ".join(parsed.text.lower().split()).encode()).hexdigest()).execution_options(synchronize_session=False)).rowcount
+    if not changed:
+        raise ArchiveError("EXTRACTION_VERSION_CONFLICT")
+    db.refresh(item)
+    if parsed.text:
+        key, digest, _ = storage.store_bytes(batch.tenant_id, batch.case_id, parsed.text.encode("utf-8"), "derived")
+        artifact = Artifact(tenant_id=batch.tenant_id, case_id=batch.case_id, evidence_id=item.id, storage_key=key, sha256=digest, version=version, parser_version="extract-local-v2")
+        db.add(artifact)
+        db.flush()
+        for page, start, end in parsed.pages or [(None, start, min(start + 1600, len(parsed.text))) for start in range(0, len(parsed.text), 1600)]:
+            if end > start:
+                db.add(Span(tenant_id=batch.tenant_id, case_id=batch.case_id, evidence_id=item.id, artifact_id=artifact.id, page=page, char_start=start, char_end=end, text_hash=hashlib.sha256(parsed.text[start:end].encode()).hexdigest()))
+    counts = {**empty_counts(), **batch.counts}
+    if old_state in counts and old_state != "stored":
+        counts[old_state] = max(0, counts[old_state] - 1)
+    if parsed.state in counts and parsed.state != "stored":
+        counts[parsed.state] += 1
+    batch.counts = counts
+    batch.errors = [entry for entry in batch.errors if entry.get("evidence_id") != item.id]
+    if parsed.error:
+        add_error(batch, item.filename, parsed.error, item.id)
+    index_participants(db, item, parsed.email)
+    user = db.get(User, batch.submitted_by, populate_existing=True)
+    audit.record(db, user, batch.case_id, "evidence.reprocessed", "evidence", item.id, {"old_text_version": expected_version, "text_version": version, "old_text_sha256": old_hash, "text_sha256": text_hash, "state": parsed.state})
+    db.commit()
+    db.info["tick_processed"] = db.info.get("tick_processed", 0) + 1
+
+
 def put_record(db, settings, storage, batch, path, filename, record_key, parent_id=None, source_offset="", original_path=None):
     key = hashlib.sha256(f"{batch.id}:{record_key}".encode()).hexdigest()
     existing = db.scalar(
@@ -186,10 +318,38 @@ def put_record(db, settings, storage, batch, path, filename, record_key, parent_
     )
     if existing:
         item = db.scalar(select(Evidence).where(Evidence.occurrence_id == existing.id))
-        return item, parse_document(path, filename, settings)
+        if item.parser_state == "quarantined":
+            return item, Parsed(item.item_type, item.title, state="quarantined", error=item.parser_error)
+        original = db.get(Original, item.original_id)
+        if not storage.verify(original)["valid"] or file_hash(path) != (original.sha256, original.byte_size):
+            raise ArchiveError("INTEGRITY_FAILED")
+        generation = int(batch.checkpoint.get("reprocess_generation", 0))
+        attempt = f"{batch.id}/{generation}"
+        reprocess = bool(batch.checkpoint.get("reprocess")) and item.parser_state in {"partial", "failed", "unsupported"} and item.metadata_json.get("reprocess_attempt") != attempt
+        expected_version = item.text_version
+        db.commit()
+        parsed = parse_safely(path, filename, settings)
+        if not assert_active(db, batch):
+            raise LeaseLost("The import is no longer active.")
+        if reprocess:
+            append_reprocessing(db, settings, storage, batch, item, parsed, expected_version, attempt)
+        return item, parsed
     user = db.get(User, batch.submitted_by)
     authorize_case(db, user, batch.case_id, "import")
     storage_key, digest, byte_size = storage.store_file(batch.tenant_id, batch.case_id, path)
+    # Release the read transaction before slow parsers/OCR; acquire a fenced writer only afterward.
+    db.commit()
+    parsed = parse_safely(storage.path(storage_key), filename, settings)
+    fence_claim(db, batch)
+    if not assert_active(db, batch):
+        raise LeaseLost("The import is no longer active.")
+    user = db.get(User, batch.submitted_by, populate_existing=True)
+    authorize_case(db, user, batch.case_id, "import")
+    # Serialize quota and exact-dedup publication across distinct batches/workers.
+    # A real row write gives SQLite a writer lock and PostgreSQL a case-row lock.
+    case_locked = db.execute(update(Case).where(Case.id == batch.case_id, Case.tenant_id == batch.tenant_id).values(updated_at=Case.updated_at).execution_options(synchronize_session=False)).rowcount
+    if case_locked != 1:
+        raise PermissionError("WORKER_PERMISSION_REVOKED")
     original = db.scalar(
         select(Original).where(
             Original.tenant_id == batch.tenant_id,
@@ -199,6 +359,9 @@ def put_record(db, settings, storage, batch, path, filename, record_key, parent_
     )
     duplicate = original is not None
     if original is None:
+        used = db.scalar(select(func.coalesce(func.sum(Original.byte_size), 0)).where(Original.case_id == batch.case_id, Original.tenant_id == batch.tenant_id)) or 0
+        if used + byte_size > settings.max_case_bytes:
+            raise CaseStorageLimit(filename, parent_id, used, byte_size)
         original = Original(
             tenant_id=batch.tenant_id,
             case_id=batch.case_id,
@@ -208,22 +371,6 @@ def put_record(db, settings, storage, batch, path, filename, record_key, parent_
         )
         db.add(original)
         db.flush()
-    parsed = parse_document(storage.path(storage_key), filename, settings)
-    if settings.antivirus_command:
-        try:
-            scan = subprocess.run(
-                [settings.antivirus_command, str(storage.path(storage_key))],
-                capture_output=True,
-                timeout=60,
-                check=False,
-            )
-            if scan.returncode == 1:
-                parsed = Parsed(parsed.item_type, parsed.title, state="quarantined", error="MALWARE_DETECTED")
-            elif scan.returncode != 0:
-                parsed = Parsed(parsed.item_type, parsed.title, state="partial", error="SCANNER_UNAVAILABLE")
-        except (OSError, subprocess.TimeoutExpired):
-            parsed = Parsed(parsed.item_type, parsed.title, state="partial", error="SCANNER_UNAVAILABLE")
-    parsed.metadata["scan_status"] = "configured" if settings.antivirus_command else "not-configured"
     occurrence = Occurrence(
         tenant_id=batch.tenant_id,
         case_id=batch.case_id,
@@ -286,6 +433,7 @@ def put_record(db, settings, storage, batch, path, filename, record_key, parent_
             evidence_id=item.id,
             storage_key=artifact_key,
             sha256=artifact_hash,
+            parser_version="extract-local-v2",
         )
         db.add(artifact)
         db.flush()
@@ -333,14 +481,24 @@ def put_record(db, settings, storage, batch, path, filename, record_key, parent_
         },
     )
     db.commit()
+    db.info["tick_processed"] = db.info.get("tick_processed", 0) + 1
     return item, parsed
 
 
 def assert_active(db, batch):
+    stop = db.info.get("stop_event")
+    if stop is not None and stop.is_set():
+        raise BatchYield("Worker shutdown requested.")
+    lost = db.info.get("lease_lost")
+    if lost is not None and lost.is_set():
+        raise LeaseLost("The import lease was lost.")
     db.refresh(batch)
+    owner = db.info.get("lease_owner")
+    if owner and batch.checkpoint.get("lease_owner") != owner:
+        raise LeaseLost("The import lease belongs to another worker.")
     if batch.state not in {"running", "pending"}:
         return False
-    user = db.get(User, batch.submitted_by)
+    user = db.get(User, batch.submitted_by, populate_existing=True)
     if user is None or not user.active or user.tenant_id != batch.tenant_id:
         raise PermissionError("WORKER_PERMISSION_REVOKED")
     try:
@@ -356,10 +514,16 @@ def ingest_tree(
 ):
     if not assert_active(db, batch):
         return None
+    budget = budget if budget is not None else {"entries": 0, "bytes": 0}
+    quota = budget.get("quota")
+    if quota and quota["remaining"] == 0:
+        raise BatchYield("The import tick reached its record quota.")
+    processed_before = db.info.get("tick_processed", 0)
     item, parsed = put_record(db, settings, storage, batch, path, filename, record_key, parent_id, source_offset, original_path)
+    if quota and quota["remaining"] is not None:
+        quota["remaining"] -= db.info.get("tick_processed", 0) - processed_before
     if parsed.state in {"quarantined", "failed", "locked"}:
         return item
-    budget = budget if budget is not None else {"entries": 0, "bytes": 0}
     if depth >= settings.max_archive_depth and (parsed.attachments or filename.lower().endswith(".zip")):
         add_error(batch, filename, "NESTING_LIMIT", item.id)
         item.parser_state, item.parser_error = "partial", "NESTING_LIMIT"
@@ -397,6 +561,8 @@ def ingest_tree(
                         depth + 1,
                         budget,
                     )
+        except CaseStorageLimit:
+            raise
         except (ArchiveError, zipfile.BadZipFile, RuntimeError) as error:
             code = str(error) if isinstance(error, ArchiveError) else "ARCHIVE_PARSE_FAILED"
             item.parser_state, item.parser_error = "quarantined", code
@@ -434,14 +600,32 @@ def ingest_tree(
     return item
 
 
-def run_batch(database, settings, storage, batch_id):
+def run_batch(database, settings, storage, batch_id, max_records=None, lease_owner=None, stop_event=None):
+    local_claims = getattr(_THREAD_CLAIMS, "claims", {})
+    claim_key = (id(database), str(batch_id))
+    owner = lease_owner or getattr(batch_id, "lease_owner", None) or local_claims.get(claim_key)
+    if local_claims.get(claim_key) == owner:
+        local_claims.pop(claim_key, None)
+    if not owner:
+        claim = claim_import(database, batch_id=str(batch_id), remember=False)
+        if claim is None:
+            return
+        owner = claim.lease_owner
+    with LeaseHeartbeat(database, str(batch_id), owner) as heartbeat:
+        _run_batch_owned(database, settings, storage, str(batch_id), owner, heartbeat, max_records, stop_event)
+
+
+def _run_batch_owned(database, settings, storage, batch_id, owner, heartbeat, max_records, stop_event):
     with database.sessions() as db:
+        db.info.update(lease_owner=owner, lease_lost=heartbeat.lost, stop_event=stop_event)
+        quota = {"remaining": max_records}
         batch = db.get(ImportBatch, batch_id)
         if batch is None:
             return
         try:
             if not assert_active(db, batch):
                 return
+            fence_claim(db, batch)
             batch.state, batch.lease_until = "running", now() + timedelta(minutes=2)
             db.commit()
             start_index = int((batch.checkpoint or {}).get("file_index", 0))
@@ -451,7 +635,7 @@ def run_batch(database, settings, storage, batch_id):
                 file = batch.files[index]
                 path = storage.path(file["storage_key"])
                 name = file["filename"]
-                parent = ingest_tree(db, settings, storage, batch, path, name, f"file/{index}", original_path=file.get("original_path", name))
+                parent = ingest_tree(db, settings, storage, batch, path, name, f"file/{index}", budget={"entries": 0, "bytes": 0, "quota": quota}, original_path=file.get("original_path", name))
                 if parent is None:
                     return
                 if name.lower().endswith(".mbox"):
@@ -471,18 +655,21 @@ def run_batch(database, settings, storage, batch_id):
                             f"{Path(name).stem}-{source_offset}.eml",
                             f"file/{index}/mbox/{source_offset}",
                             parent.id,
+                            budget={"entries": 0, "bytes": 0, "quota": quota},
                             source_offset=str(source_offset),
                         )
                         batch.checkpoint = {
+                            **batch.checkpoint,
                             "file_index": index,
                             "mbox_offset": next_offset,
                             "policy_version": "rbac-v1",
                         }
                         db.commit()
-                batch.checkpoint = {"file_index": index + 1, "mbox_offset": 0, "policy_version": "rbac-v1"}
+                batch.checkpoint = {**batch.checkpoint, "file_index": index + 1, "mbox_offset": 0, "policy_version": "rbac-v1"}
                 db.commit()
             if not assert_active(db, batch):
                 return
+            fence_claim(db, batch)
             batch.state = (
                 "partial"
                 if any(
@@ -503,42 +690,78 @@ def run_batch(database, settings, storage, batch_id):
                 {"counts": batch.counts, "state": batch.state},
             )
             db.commit()
+        except (BatchYield, LeaseLost) as error:
+            db.rollback()
+            batch = db.get(ImportBatch, batch_id, populate_existing=True)
+            if isinstance(error, BatchYield) and batch and batch.state == "running" and batch.checkpoint.get("lease_owner") == owner:
+                fence_claim(db, batch)
+                batch.state, batch.lease_until, batch.updated_at = "pending", None, now()
+                db.commit()
         except Exception as error:
             db.rollback()
-            batch = db.get(ImportBatch, batch_id)
-            if batch:
+            batch = db.get(ImportBatch, batch_id, populate_existing=True)
+            if batch and batch.state == "running" and batch.checkpoint.get("lease_owner") == owner:
+                fence_claim(db, batch)
                 batch.state, batch.lease_until = "failed", None
+                if isinstance(error, CaseStorageLimit):
+                    counts = {**empty_counts(), **batch.counts}
+                    counts["discovered"] += 1
+                    counts["failed"] += 1
+                    if error.parent_id:
+                        parent = db.scalar(select(Evidence).where(Evidence.id == error.parent_id, Evidence.case_id == batch.case_id, Evidence.tenant_id == batch.tenant_id))
+                        if parent and parent.parser_state != "partial":
+                            if parent.parser_state in counts and parent.parser_state != "stored":
+                                counts[parent.parser_state] = max(0, counts[parent.parser_state] - 1)
+                            counts["partial"] += 1
+                            parent.parser_state, parent.parser_error = "partial", "CASE_STORAGE_LIMIT"
+                            parent.metadata_json = {**parent.metadata_json, "family_error": "CASE_STORAGE_LIMIT"}
+                    batch.counts = counts
+                    batch.checkpoint = {**batch.checkpoint, "unpublished_quota_count": int(batch.checkpoint.get("unpublished_quota_count", 0)) + 1}
+                    if counts["stored"]:
+                        batch.state = "partial"
+                    user = db.get(User, batch.submitted_by, populate_existing=True)
+                    audit.record(db, user, batch.case_id, "import.quota_blocked", "import", batch.id, {"filename": error.filename, "parent_id": error.parent_id, "limit_bytes": settings.max_case_bytes, "used_bytes": error.used_bytes, "candidate_bytes": error.byte_size})
                 code = (
                     str(error)
                     if isinstance(error, (ArchiveError, PermissionError))
                     else f"IMPORT_FAILED:{type(error).__name__}"
                 )
-                add_error(batch, "import", code)
+                add_error(batch, error.filename if isinstance(error, CaseStorageLimit) else "import", code, error.parent_id if isinstance(error, CaseStorageLimit) else None)
                 db.commit()
 
 
-def claim_import(database):
+def claim_import(database, batch_id=None, remember=True):
     with database.sessions() as db:
         candidates = (
-            select(ImportBatch.id)
+            select(ImportBatch)
             .where(
                 (ImportBatch.state == "pending")
                 | ((ImportBatch.state == "running") & (ImportBatch.lease_until < now()))
             )
-            .order_by(ImportBatch.created_at)
+            .order_by(ImportBatch.updated_at, ImportBatch.created_at, ImportBatch.id)
             .limit(1)
         )
+        if batch_id:
+            candidates = candidates.where(ImportBatch.id == batch_id)
         candidate = db.scalar(candidates)
         if not candidate:
             return None
+        owner = secrets.token_hex(24)
         changed = db.execute(
             update(ImportBatch)
             .where(
-                ImportBatch.id == candidate,
+                ImportBatch.id == candidate.id,
                 (ImportBatch.state == "pending")
                 | ((ImportBatch.state == "running") & (ImportBatch.lease_until < now())),
             )
-            .values(state="running", lease_until=now() + timedelta(minutes=2))
+            .values(state="running", lease_until=now() + timedelta(minutes=2), checkpoint={**candidate.checkpoint, "lease_owner": owner})
+            .execution_options(synchronize_session=False)
         ).rowcount
         db.commit()
-        return candidate if changed else None
+        if changed:
+            if remember:
+                if not hasattr(_THREAD_CLAIMS, "claims"):
+                    _THREAD_CLAIMS.claims = {}
+                _THREAD_CLAIMS.claims[(id(database), candidate.id)] = owner
+            return ImportClaim(candidate.id, owner)
+        return None

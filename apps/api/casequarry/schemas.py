@@ -24,7 +24,9 @@ class UserInput(Input):
     email: str = Field(min_length=3, max_length=320)
     name: str = Field(min_length=1, max_length=200)
     password: str = Field(min_length=12, max_length=1024)
-    role: Literal["firm_admin", "attorney", "review_manager", "reviewer", "expert", "read_only", "auditor"] = "reviewer"
+    role: Literal[
+        "firm_admin", "attorney", "review_manager", "reviewer", "expert", "read_only", "auditor"
+    ] = "reviewer"
 
 
 class CaseInput(Input):
@@ -46,6 +48,14 @@ class CasePatch(Input):
 
 class Reason(Input):
     reason: str = Field(min_length=3, max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def meaningful_reason(cls, value):
+        value = value.strip()
+        if len(value) < 3:
+            raise ValueError("Provide a meaningful reason of at least three characters.")
+        return value
 
 
 class MemberInput(Input):
@@ -82,6 +92,9 @@ class Filters(Input):
     bookmarked: bool | None = None
     thread_id: str | None = None
     person_id: str | None = None
+    sender_person_id: str | None = Field(default=None, max_length=64)
+    recipient_person_id: str | None = Field(default=None, max_length=64)
+    missing_date: bool | None = None
     parent_id: str | None = None
     assigned_to: str | None = None
 
