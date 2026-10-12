@@ -21,6 +21,7 @@ from rich.table import Table
 
 from . import __version__
 from .client import API, Options, fail, logout, profiles, save_login
+from .native import native_available
 
 app = typer.Typer(no_args_is_help=True, help="CaseQuarry: preserve, search and review evidence privately.")
 auth = typer.Typer(help="Sign in using the API; store sessions only in the OS keyring.")
@@ -166,7 +167,21 @@ def doctor(ctx: typer.Context, check: str = "storage,db,search,queue,ocr") -> No
 @app.command("version")
 def version_command(components: bool = False) -> None:
     typer.echo(
-        json.dumps({"casequarry": __version__, **({"python": sys.version.split()[0]} if components else {})})
+        json.dumps(
+            {
+                "casequarry": __version__,
+                **(
+                    {
+                        "python": sys.version.split()[0],
+                        "rust_native_verifier": "available"
+                        if native_available()
+                        else "not built; Python fallback available",
+                    }
+                    if components
+                    else {}
+                ),
+            }
+        )
     )
 
 
@@ -355,11 +370,19 @@ def ingest_files(
         return
     api = API(ctx.obj)
     route = api.case_route(case, "/imports")
+    import_root = path if path.is_dir() else path.parent
     batches = []
     for start in range(0, len(files), 25):
         with ExitStack() as stack:
             handles = [
-                ("files", (item.name, stack.enter_context(item.open("rb")), "application/octet-stream"))
+                (
+                    "files",
+                    (
+                        item.relative_to(import_root).as_posix(),
+                        stack.enter_context(item.open("rb")),
+                        "application/octet-stream",
+                    ),
+                )
                 for item in files[start : start + 25]
             ]
             data = {"source_label": source_label, "custodian_name": custodian}
@@ -492,6 +515,57 @@ def search_facets(
 def evidence_show(ctx: typer.Context, item_id: str, case: str | None = None) -> None:
     api = API(ctx.obj)
     show(api.request("GET", api.case_route(case, f"/evidence/{item_id}")), ctx.obj)
+
+
+@evidence.command("hash-file")
+def hash_local_file(ctx: typer.Context, path: Annotated[Path, typer.Option()], engine: str = "auto") -> None:
+    from .native import hash_file
+
+    show(hash_file(path, engine), ctx.obj)
+
+
+@evidence.command("verify-file")
+def verify_local_file(
+    ctx: typer.Context,
+    path: Annotated[Path, typer.Option()],
+    sha256: Annotated[str, typer.Option()],
+    byte_size: Annotated[int | None, typer.Option(min=0)] = None,
+    engine: str = "auto",
+) -> None:
+    from .native import verify_file
+
+    result = verify_file(path, sha256, byte_size, engine)
+    show(result, ctx.obj)
+    if not result["valid"]:
+        raise typer.Exit(8)
+
+
+@evidence.command("verify-manifest")
+def verify_native_manifest(
+    ctx: typer.Context,
+    path: Annotated[Path, typer.Option()],
+    root: Annotated[Path, typer.Option()],
+    engine: str = "auto",
+) -> None:
+    from .native import verify_manifest
+
+    result = verify_manifest(path, root, engine)
+    show(result, ctx.obj)
+    if not result["valid"]:
+        raise typer.Exit(8)
+
+
+@ingest.command("inventory-mbox")
+def inventory_local_mbox(
+    ctx: typer.Context,
+    path: Annotated[Path, typer.Option()],
+    engine: str = "auto",
+    max_message_bytes: Annotated[int, typer.Option(min=1)] = 256 * 1024 * 1024,
+    max_line_bytes: Annotated[int, typer.Option(min=1)] = 8 * 1024 * 1024,
+) -> None:
+    from .native import scan_mbox
+
+    show(scan_mbox(path, engine, max_message_bytes, max_line_bytes), ctx.obj)
 
 
 @evidence.command("text")
@@ -745,7 +819,7 @@ def benchmark_generate(
     generator_path = Path(__file__).resolve().parents[3] / "scripts" / "generate_synthetic_emails.py"
     if not generator_path.exists():
         fail(
-            "The synthetic generator is provided in the source checkout: uv run python scripts/generate_synthetic_emails.py --help.",
+            "Synthetic generation uses a local QA asset excluded from public source releases. The core application can import your authorized files without it.",
             7,
         )
     specification = importlib.util.spec_from_file_location("casequarry_synthetic_generator", generator_path)

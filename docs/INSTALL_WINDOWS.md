@@ -23,7 +23,7 @@ uv run python scripts/tasks.py typecheck
 uv run python scripts/tasks.py smoke
 ```
 
-`smoke` requires running services and checks availability only. Authenticated acceptance tests run with `test`. Browser checks are documented by the web package's actual scripts.
+`smoke` requires running services and checks availability only. `test` and browser commands require local QA assets, which are excluded from the public source distribution; a public checkout reports this accurately instead of pretending tests ran. Lint/typecheck/setup/dev do not require those assets.
 
 Run the isolated real browser workflow with synthetic records:
 
@@ -32,7 +32,7 @@ node apps/web/node_modules/@playwright/test/cli.js install chromium
 uv run python scripts/tasks.py test-e2e
 ```
 
-The E2E task creates a separate database and short-lived test account, starts private loopback API/web processes, checks the import/search/review/export workflow and saves actual screenshots under ignored `.data/browser-e2e`. It never changes an existing matter or prints credentials.
+Where the local QA harness is available, the E2E task creates a separate database and short-lived test account, starts private loopback API/web processes, checks the import/search/review/export workflow and saves actual screenshots under ignored `.data/browser-e2e`. It never changes an existing matter or prints credentials.
 
 ## Docker Desktop option
 
@@ -49,4 +49,8 @@ Only web port 3000 is published, bound to loopback. PostgreSQL, the API and the 
 
 Docker was not installed on the initial development machine. Until actual Compose acceptance results are recorded, treat container deployment as unverified configuration. The tested local runtime is the uv/Node flow.
 
-For confidential operation, require a completed security review, production TLS, encrypted disk/storage, independent backups and verified restore, finalized licensing, and professional workflow QA. Changing an environment flag does not satisfy those requirements.
+For confidential operation, require a completed security review, production TLS, encrypted disk/storage, independent backups and verified restore, preserved dependency notices, and professional workflow QA. Changing an environment flag does not satisfy those requirements. Store evidence outside automatically cloud-synchronized directories when matter policy requires local-only storage.
+
+## Optional Rust verification
+
+Install Rust using [official Rustup](https://rust-lang.org/tools/install/); Windows builds require Visual Studio C++ tools and a Windows SDK. Then `cargo build --release --locked`. `uv run casequarry evidence hash-file --path FILE --engine rust` and `uv run casequarry ingest inventory-mbox --path ARCHIVE --engine rust` run the native verifier. `--engine auto` selects the compiled binary when available, and `--engine python` uses the bounded fallback.

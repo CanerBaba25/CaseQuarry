@@ -3,7 +3,7 @@ FROM python:3.12-slim-bookworm
 COPY --from=uv /uv /uvx /usr/local/bin/
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md ./
 COPY apps/api ./apps/api
 COPY apps/cli ./apps/cli
 COPY migrations ./migrations

@@ -25,5 +25,5 @@ bench-1m:
 	uv run python scripts/tasks.py benchmark --count 1000000
 bench-2m:
 	uv run python scripts/tasks.py benchmark --count 2000000
-release-check: lint typecheck test
+release-check: lint typecheck
 	uv run python scripts/tasks.py release

@@ -196,11 +196,14 @@ def result_json(result):
 def job_json(job, results=()):
     return {
         "id": job.id, "job_id": job.id, "case_id": job.case_id, "task": job.task, "state": job.state,
-        "provider": job.provider, "model": job.model, "model_version": job.model, "prompt_version": job.prompt_version,
+        "provider": job.provider, "model": job.model, "model_tag": job.model, "model_version": None,
+        "model_version_status": "Configured tag; exact weights fingerprint not recorded.",
+        "prompt_version": job.prompt_version, "template_version": job.prompt_version,
         "question": job.question, "mode": "extractive_quotes", "scope": job.scope, "coverage": job.coverage,
         "answer": job.answer, "findings": [result_json(result) for result in results], "usage": job.usage,
         "error_code": job.error_code, "created_at": utc(job.created_at).isoformat(),
-        "generated_at": utc(job.completed_at).isoformat() if job.completed_at else None, "warnings": WARNINGS,
+        "generated_at": utc(job.completed_at).isoformat() if job.completed_at and job.state == "completed" else None,
+        "completed_at": utc(job.completed_at).isoformat() if job.completed_at else None, "warnings": WARNINGS,
     }
 
 
@@ -248,29 +251,35 @@ def _source_ref(db, user, case_id, evidence_id, span_id, storage):
     return {
         "span_id": span_id, "evidence_id": item.id, "artifact_id": artifact.id, "artifact_version": artifact.version,
         "artifact_sha256": artifact.sha256, "original_sha256": original.sha256, "page": span["page"],
+        "parser_state": item.parser_state,
         "char_start": span["char_start"], "char_end": span["char_start"] + len(text), "span_char_end": span["char_end"], "span_text_hash": span["text_hash"],
         "retrieved_text_sha256": hashlib.sha256(text.encode()).hexdigest(), "text": text,
     }
 
 
 def _gather_sources(db, user, job, storage):
-    sources, omitted, processed = [], {"restricted_items": 0, "unsearchable_items": 0}, set()
+    summaries = list(db.execute(select(Evidence.id, Evidence.privilege_status, Evidence.parser_state, func.length(Evidence.text)).where(Evidence.tenant_id == job.tenant_id, Evidence.case_id == job.case_id, Evidence.id.in_(job.evidence_ids))))
+    span_items = set(db.scalars(select(Span.evidence_id).where(Span.tenant_id == job.tenant_id, Span.case_id == job.case_id, Span.evidence_id.in_(job.evidence_ids)).distinct()))
+    restricted = {identifier for identifier, privilege, state, _length in summaries if privilege in {"suspected", "confirmed"} or state == "quarantined"}
+    unsearchable = {identifier for identifier, _privilege, _state, length in summaries if not length or identifier not in span_items} - restricted
+    sources, processed = [], set()
+    omitted = {"restricted_items": len(restricted), "unsearchable_items": len(unsearchable), "partial_items": sum(state == "partial" for _identifier, _privilege, state, _length in summaries)}
     available_spans = db.scalar(select(func.count()).select_from(Span).where(Span.tenant_id == job.tenant_id, Span.case_id == job.case_id, Span.evidence_id.in_(job.evidence_ids))) or 0
     for evidence_id in job.evidence_ids:
         if len(sources) >= MAX_SPANS:
             break
         item, _original = get_item(db, user, job.case_id, evidence_id)
-        if item.privilege_status in {"suspected", "confirmed"} or item.parser_state == "quarantined":
-            omitted["restricted_items"] += 1
+        if evidence_id in restricted:
             continue
         span_id = db.scalar(select(Span.id).where(Span.tenant_id == job.tenant_id, Span.case_id == job.case_id, Span.evidence_id == evidence_id).order_by(Span.char_start).limit(1))
         if span_id is None or not item.text:
-            omitted["unsearchable_items"] += 1
             continue
         sources.append(_source_ref(db, user, job.case_id, evidence_id, span_id, storage))
         processed.add(evidence_id)
     coverage = {
         **job.coverage, **omitted, "processed_items": len(processed), "retrieved_spans": len(sources),
+        "failed_items": omitted["unsearchable_items"],
+        "classification_scope": "selected_items",
         "available_spans": available_spans, "omitted_items": len(job.evidence_ids) - len(processed),
         "truncated_spans": sum(source["char_end"] < source["span_char_end"] for source in sources),
         "sampled": job.coverage.get("matched_items", 0) > len(processed) or available_spans > len(sources) or any(source["char_end"] < source["span_char_end"] for source in sources),

@@ -851,6 +851,12 @@ export function EvidenceInspector({
   useEffect(() => {
     if (data) setTags(data.tags.join(", "));
   }, [data]);
+  useEffect(() => {
+    if (!data || !window.location.hash.startsWith("#span-")) return;
+    document
+      .getElementById(window.location.hash.slice(1))
+      ?.scrollIntoView({ block: "center" });
+  }, [data]);
   async function review(changes: Record<string, unknown>) {
     if (!data) return;
     setBusy(true);
@@ -952,6 +958,24 @@ export function EvidenceInspector({
                 </button>
               </div>
             </div>
+            {data.integrity_status === "failed" && (
+              <div className="notice red" role="alert">
+                <Icon name="alert" size={17} />
+                <span>
+                  Original integrity verification failed. Download is blocked;
+                  investigate the preserved source.
+                </span>
+              </div>
+            )}
+            {data.parser_error && (
+              <div className="notice amber">
+                <Icon name="alert" size={17} />
+                <span>
+                  Extraction limitation: {label(data.parser_error)}. Review the
+                  original and import report for full coverage.
+                </span>
+              </div>
+            )}
             {verified && (
               <div
                 className={`notice ${verified.valid ? "green" : "red"}`}
@@ -980,9 +1004,39 @@ export function EvidenceInspector({
                   key={key}
                   role="tab"
                   aria-selected={tab === key}
+                  tabIndex={tab === key ? 0 : -1}
                   aria-controls={`inspector-${key}`}
                   id={`tab-${key}`}
                   onClick={() => setTab(key)}
+                  onKeyDown={(event) => {
+                    if (
+                      !["ArrowLeft", "ArrowRight", "Home", "End"].includes(
+                        event.key,
+                      )
+                    )
+                      return;
+                    event.preventDefault();
+                    const keys = [
+                      "content",
+                      "metadata",
+                      "review",
+                      ...(data.type === "email" ? ["thread"] : []),
+                    ];
+                    const position = keys.indexOf(key);
+                    const target =
+                      event.key === "Home"
+                        ? keys[0]
+                        : event.key === "End"
+                          ? keys[keys.length - 1]
+                          : keys[
+                              (position +
+                                (event.key === "ArrowRight" ? 1 : -1) +
+                                keys.length) %
+                                keys.length
+                            ];
+                    setTab(target);
+                    document.getElementById(`tab-${target}`)?.focus();
+                  }}
                 >
                   {title}
                 </button>
@@ -1606,9 +1660,8 @@ function ExplorerActionModal({
               <div className="notice amber">
                 <Icon name="lock" size={17} />
                 <span>
-                  Server privilege, confidentiality and integrity checks can
-                  block this export. Preview exports are limited to 20,000
-                  items.
+                  Server privilege, review and integrity checks can block this
+                  export. Preview exports are limited to 20,000 items.
                 </span>
               </div>
             </>

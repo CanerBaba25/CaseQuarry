@@ -1,0 +1,19 @@
+[package]
+name = "casequarry-evidence-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Bounded streaming integrity and MBOX inventory for CaseQuarry"
+
+[lib]
+name = "casequarry_evidence_core"
+
+[[bin]]
+name = "casequarry-evidence"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"

@@ -7,7 +7,7 @@ from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from secrets import token_bytes, token_urlsafe
 
-from fastapi import Body, Depends, FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, text
@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException
 
 from . import (
     __version__,
+    ai_routes,
     auth_routes,
     case_routes,
     evidence_routes,
@@ -27,7 +28,7 @@ from . import (
 from .config import Settings
 from .database import Database
 from .models import ImportBatch, Member, Setting, Tenant, now
-from .security import PASSWORDS, Actor, authorize_case, current_actor, digest, fail, get_db
+from .security import PASSWORDS, Actor, current_actor, digest, get_db
 from .storage import Storage
 from .worker import worker_loop
 
@@ -133,7 +134,7 @@ def create_app(settings: Settings | None = None):
         LOGGER.error("request_failed request_id=%s error_type=%s", getattr(request.state, "request_id", ""), type(error).__name__)
         return JSONResponse({"error_code": "INTERNAL_ERROR", "message": "An unexpected service error occurred.", "request_id": getattr(request.state, "request_id", ""), "retryable": False}, status_code=500)
 
-    for router in (auth_routes.router, case_routes.router, import_routes.router, evidence_routes.router, exports.router, governance_routes.router, investigation_routes.router, mfa_routes.router):
+    for router in (auth_routes.router, case_routes.router, import_routes.router, evidence_routes.router, exports.router, governance_routes.router, investigation_routes.router, mfa_routes.router, ai_routes.router):
         application.include_router(router)
 
     @application.get("/api/v1/health")
@@ -141,18 +142,6 @@ def create_app(settings: Settings | None = None):
         with database.sessions() as db:
             db.execute(text("SELECT 1"))
         return {"status": "ok", "version": __version__, "database": "ok", "storage": "local", "search": "scoped-sql", "queue": settings.worker_mode, "ai_enabled": settings.ai_enabled, "remote_ai_enabled": False, "production_ready": False}
-
-    @application.get("/api/v1/cases/{case_id}/ai/providers")
-    @application.get("/api/v1/cases/{case_id}/ai/policy")
-    def model_policy(case_id: str, actor: Actor = Depends(current_actor), db=Depends(get_db)):
-        authorize_case(db, actor.user, case_id)
-        return {"enabled": False, "provider": "none", "remote_ai_allowed": False, "providers": [{"id": "local", "name": "Local model", "configured": False, "enabled": False}], "reason": "The optional cited local-model adapter is not yet enabled in this release. Ingestion, search and human review work without a model."}
-
-    @application.post("/api/v1/cases/{case_id}/ai/ask")
-    @application.post("/api/v1/cases/{case_id}/ai/summarize")
-    def unavailable_model(case_id: str, body: dict = Body(default={}), actor: Actor = Depends(current_actor), db=Depends(get_db)):
-        authorize_case(db, actor.user, case_id)
-        fail(503, "AI_UNAVAILABLE", "No cited local model is configured. Use keyword search and human review; no evidence was sent to a provider.")
 
     @application.get("/api/v1/system/jobs")
     def jobs(actor: Actor = Depends(current_actor), db=Depends(get_db)):

@@ -1,0 +1,67 @@
+[
+  {
+    "name": "jeepney",
+    "version": "0.9.0",
+    "license_metadata": "MIT",
+    "primary_source": "https://files.pythonhosted.org/packages/7b/6f/357efd7602486741aa73ffc0617fb310a29b588ed0fd69c2399acbb85b0c/jeepney-0.9.0.tar.gz",
+    "primary_artifact_sha256": "cf0e9e845622b81e4a28df94c40345400256ec608d0e55bb8a3feaa9163f5732",
+    "license_files": [
+      {
+        "path": "jeepney-0.9.0/LICENSE",
+        "sha256": "1b22b049b5267d6dfc23a67bf4a84d8ec04b9fdfb1a51d360e42b4342c8b4154",
+        "bytes": 1081
+      }
+    ],
+    "verification": "Exact PyPI release source hash and licence-file presence verified; no code executed"
+  },
+  {
+    "name": "secretstorage",
+    "version": "3.5.0",
+    "license_metadata": "BSD-3-Clause",
+    "primary_source": "https://files.pythonhosted.org/packages/1c/03/e834bcd866f2f8a49a85eaff47340affa3bfa391ee9912a952a1faa68c7b/secretstorage-3.5.0.tar.gz",
+    "primary_artifact_sha256": "f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be",
+    "license_files": [
+      {
+        "path": "secretstorage-3.5.0/LICENSE",
+        "sha256": "e700357592bb93704cb040ce4a6663a85292716a4041b6a267f598f21658466f",
+        "bytes": 1504
+      }
+    ],
+    "verification": "Exact PyPI release source hash and licence-file presence verified; no code executed"
+  },
+  {
+    "name": "uvloop",
+    "version": "0.23.0",
+    "license_metadata": "MIT License",
+    "primary_source": "https://files.pythonhosted.org/packages/fa/42/02c739ce85fb2ee8d99212c61417da8140c6b87e9d97c430bea520d76044/uvloop-0.23.0.tar.gz",
+    "primary_artifact_sha256": "28d160f51ab4da3b187063652e643dea6831072add4adc1e6d62afbe73b6be27",
+    "license_files": [
+      {
+        "path": "uvloop-0.23.0/LICENSE-APACHE",
+        "sha256": "377025287798f9dcd819e1f826fa5fc5e2f382528691ab0528c5cf8c8c282c27",
+        "bytes": 11439
+      },
+      {
+        "path": "uvloop-0.23.0/LICENSE-MIT",
+        "sha256": "6dd4c399f26de043d77a2ad7e31db4cb5bf08ea8368b0a42d6e158635cc8ab62",
+        "bytes": 1105
+      },
+      {
+        "path": "uvloop-0.23.0/vendor/libuv/LICENSE",
+        "sha256": "16de0c32b265cb7d46a6d3bd614f259dd4d693a5e26b3407b04aae8d73041f0c",
+        "bytes": 1079
+      },
+      {
+        "path": "uvloop-0.23.0/vendor/libuv/LICENSE-docs",
+        "sha256": "cce5d01fa4a83b794271bd2c28cffdf99afd43c803e6ddefddae39b591ea7448",
+        "bytes": 18652
+      },
+      {
+        "path": "uvloop-0.23.0/vendor/libuv/LICENSE-extra",
+        "sha256": "262c44bd2cdba037e6d2a82fba15f5800d292bc993a6f5d6b6ea487744d02836",
+        "bytes": 1603
+      }
+    ],
+    "verification": "Exact PyPI release source hash and licence-file presence verified; no code executed"
+  }
+]

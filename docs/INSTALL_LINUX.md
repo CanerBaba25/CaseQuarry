@@ -16,6 +16,8 @@ With Docker/Compose installed, `uv run python scripts/tasks.py init` followed by
 
 For an offline installation, first obtain the pinned Python/npm distributions and container images through an approved connected environment. `uv sync --offline --locked` works only when every required distribution is cached. `npm ci --offline` similarly requires its cache. The application has no mandatory model or telemetry connection, but dependency installation is not automatically offline.
 
-Portable checks are `uv run python scripts/tasks.py test`, `lint`, `typecheck`, and `smoke`. GNU Make aliases are optional; all supported tasks have Python equivalents.
+Portable quality/diagnostic tasks are `lint`, `typecheck` and `smoke`. `test` and fixture/browser/benchmark tasks require local QA assets excluded from the public source distribution; missing assets produce a precise unavailable response. GNU Make aliases are optional; supported tasks have Python equivalents.
 
 For browser acceptance, run `node apps/web/node_modules/@playwright/test/cli.js install chromium`, then `uv run python scripts/tasks.py test-e2e`. Some Linux hosts need Playwright's documented system dependencies. The task uses an isolated synthetic database/account and writes real screenshots under ignored `.data/browser-e2e`.
+
+Optional native verification uses [official Rustup](https://rust-lang.org/tools/install/) and `cargo build --release --locked`. The CLI's `evidence hash-file`, `evidence verify-file`, `evidence verify-manifest` and `ingest inventory-mbox` select a fixed native binary with `--engine rust` or use the Python fallback with `--engine python`. Core ingestion/search/review do not depend on a Rust compiler.

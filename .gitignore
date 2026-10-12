@@ -63,6 +63,9 @@ tests/
 **/__tests__/
 **/*.test.*
 **/*.spec.*
+test_*.py
+*_test.py
+playwright.config.*
 scripts/browser_e2e.py
 scripts/browser_smoke.mjs
 scripts/benchmark.py

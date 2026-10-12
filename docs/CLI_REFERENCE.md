@@ -25,7 +25,18 @@ uv run casequarry audit verify --case CASE_ID
 
 Passwords are prompted with hidden input. `auth login --password-stdin` reads one line without echoing it. Bearer sessions are stored in the OS keyring; profile JSON contains server/email only. Tokens are never printed. A secure OS keyring is required for persistent login; there is no plaintext fallback.
 
-Imports are sent in bounded groups of 25 files. `--wait` polls at one-second intervals for up to ten minutes per batch; timeout does not cancel a running server job. MBOX is submitted as one file and parsed as a stream by the worker. Unsupported PST/MSG and other adapters are preserved/reported by the backend and cannot be represented as successful searchable imports.
+Imports are sent in bounded groups of 25 files. Folder uploads preserve paths relative to the selected folder; local absolute paths are not sent. `--wait` polls at one-second intervals for up to ten minutes per batch; timeout does not cancel a running server job. MBOX is submitted as one file and parsed as a stream by the worker. Unsupported PST/MSG and other adapters are preserved/reported by the backend and cannot be represented as successful searchable imports.
+
+Local integrity helpers work without an API session. Build the optional Rust helper with `cargo build --release --locked`; `--engine auto` uses that fixed binary when present and otherwise uses bounded Python streaming. `--engine rust` requires the binary. These commands preserve input bytes:
+
+```sh
+uv run cq evidence hash-file --path evidence.eml --engine auto
+uv run cq evidence verify-file --path evidence.eml --sha256 EXPECTED_SHA256 --engine auto
+uv run cq evidence verify-manifest --path package/manifest.json --root package --engine auto
+uv run cq ingest inventory-mbox --path evidence.mbox --engine auto
+```
+
+The MBOX inventory counts message boundaries and checks configured line/message limits; it does not replace MIME parsing or verify extraction completeness. Manifest verification requires the native export's `casequarry-hash-manifest-v1` format and rejects unsafe paths. Synthetic generation, benchmarks and browser acceptance harnesses remain local and are omitted from the public source distribution; commands depending on those assets report their absence explicitly.
 
 CSV/JSON exports save a separate `<path>.manifest.json` sidecar and verify the downloaded export hash before writing. Native ZIP requires completed human review for every included item; a blanket confirmation never substitutes for those decisions. Privilege/confidentiality and integrity policies also apply to metadata exports.
 

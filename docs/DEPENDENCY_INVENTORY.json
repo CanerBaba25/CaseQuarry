@@ -1,6 +1,7 @@
 {
-  "scope": "uv.lock Python packages including development/platform dependencies; production npm lock packages",
-  "legal_review": "pending; metadata inventory is not approval",
+  "scope": "Locked Python packages incl local QA/platform dependencies; production npm lock packages; Cargo crate distributions",
+  "project_license": "Apache-2.0",
+  "review_scope": "Declared metadata and available primary distribution licence-file hashes checked; no bundled binary/container/model clearance claim",
   "python": [
     {
       "name": "alembic",
@@ -9,7 +10,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/alembic/1.20.0/"
+      "source": "https://pypi.org/project/alembic/1.20.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "alembic-1.20.0.dist-info/licenses/LICENSE",
+          "sha256": "6e68d94a03a0e3e327ddf3e86d1ebedc14eece3922022618fc246a36296fd0cc"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "annotated-doc",
@@ -18,7 +26,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/annotated-doc/0.0.5/"
+      "source": "https://pypi.org/project/annotated-doc/0.0.5/",
+      "checked_distribution_license_files": [
+        {
+          "path": "annotated_doc-0.0.5.dist-info/licenses/LICENSE",
+          "sha256": "fff170779a6acbf65abdb405c087f1cee1786691e4a96a4034517e4a504a0cdf"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "annotated-types",
@@ -27,7 +42,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/annotated-types/0.8.0/"
+      "source": "https://pypi.org/project/annotated-types/0.8.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "annotated_types-0.8.0.dist-info/licenses/LICENSE",
+          "sha256": "fe1049884b1a0d9342901e88e07f32925d24b3121d9972b6a6805fb9824b095d"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "anyio",
@@ -36,7 +58,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/anyio/4.15.1/"
+      "source": "https://pypi.org/project/anyio/4.15.1/",
+      "checked_distribution_license_files": [
+        {
+          "path": "anyio-4.15.1.dist-info/licenses/LICENSE",
+          "sha256": "5361ac9dc58f2ef5fd2e9b09c68297c17f04950909bbc8023bdb82eacf22c2b0"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "argon2-cffi",
@@ -45,7 +74,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/argon2-cffi/25.1.0/"
+      "source": "https://pypi.org/project/argon2-cffi/25.1.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "argon2_cffi-25.1.0.dist-info/licenses/LICENSE",
+          "sha256": "b6944d386e87ccf49d9632da083685a4b7624733e686a7fe283dd2d428341d77"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "argon2-cffi-bindings",
@@ -54,7 +90,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/argon2-cffi-bindings/26.1.0/"
+      "source": "https://pypi.org/project/argon2-cffi-bindings/26.1.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "argon2_cffi_bindings-26.1.0.dist-info/licenses/LICENSE",
+          "sha256": "966998dc37070a83cc0507bed5e3241d31782c078d0d24870090dead7c471e36"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "beautifulsoup4",
@@ -64,7 +107,14 @@
         "AUTHORS",
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/beautifulsoup4/4.15.0/"
+      "source": "https://pypi.org/project/beautifulsoup4/4.15.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "beautifulsoup4-4.15.0.dist-info/licenses/LICENSE",
+          "sha256": "55b4d8d4b1e5bc86d10efac91b74c87bcb77526b0f5b9edaf8b9cd2adc7397b2"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "certifi",
@@ -73,7 +123,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/certifi/2026.7.22/"
+      "source": "https://pypi.org/project/certifi/2026.7.22/",
+      "checked_distribution_license_files": [
+        {
+          "path": "certifi-2026.7.22.dist-info/licenses/LICENSE",
+          "sha256": "e93716da6b9c0d5a4a1df60fe695b370f0695603d21f6f83f053e42cfc10caf7"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "cffi",
@@ -82,7 +139,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/cffi/2.1.1/"
+      "source": "https://pypi.org/project/cffi/2.1.1/",
+      "checked_distribution_license_files": [
+        {
+          "path": "cffi-2.1.1.dist-info/licenses/LICENSE",
+          "sha256": "5ba24ddc57067f9249add644c3afc41a5d6dc37e23433ef759d95df370b0af63"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "click",
@@ -91,7 +155,14 @@
       "license_files": [
         "LICENSE.txt"
       ],
-      "source": "https://pypi.org/project/click/8.5.0/"
+      "source": "https://pypi.org/project/click/8.5.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "click-8.5.0.dist-info/licenses/LICENSE.txt",
+          "sha256": "9a8ad106a394e853bfe21f42f4e72d592819a22805d991b5f3275029292b658d"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "colorama",
@@ -100,7 +171,14 @@
       "license_files": [
         "LICENSE.txt"
       ],
-      "source": "https://pypi.org/project/colorama/0.4.6/"
+      "source": "https://pypi.org/project/colorama/0.4.6/",
+      "checked_distribution_license_files": [
+        {
+          "path": "colorama-0.4.6.dist-info/licenses/LICENSE.txt",
+          "sha256": "cac35c02686e5d04a5a7140bfb3b36e73aed496656e891102e428886d7930318"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "cryptography",
@@ -111,7 +189,22 @@
         "LICENSE.APACHE",
         "LICENSE.BSD"
       ],
-      "source": "https://pypi.org/project/cryptography/47.0.0/"
+      "source": "https://pypi.org/project/cryptography/47.0.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "cryptography-47.0.0.dist-info/licenses/LICENSE",
+          "sha256": "3e0c7c091a948b82533ba98fd7cbb40432d6f1a9acbf85f5922d2f99a93ae6bb"
+        },
+        {
+          "path": "cryptography-47.0.0.dist-info/licenses/LICENSE.APACHE",
+          "sha256": "aac73b3148f6d1d7111dbca32099f68d26c644c6813ae1e4f05f6579aa2663fe"
+        },
+        {
+          "path": "cryptography-47.0.0.dist-info/licenses/LICENSE.BSD",
+          "sha256": "602c4c7482de6479dd2e9793cda275e5e63d773dacd1eca689232ab7008fb4fb"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "et-xmlfile",
@@ -122,7 +215,18 @@
         "LICENCE.rst",
         "AUTHORS.txt"
       ],
-      "source": "https://pypi.org/project/et-xmlfile/2.0.0/"
+      "source": "https://pypi.org/project/et-xmlfile/2.0.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "et_xmlfile-2.0.0.dist-info/LICENCE.python",
+          "sha256": "4ccdaaebc0f44b83720ec0399bb7ab329adce067dd62f73c5535a2dc05628ab2"
+        },
+        {
+          "path": "et_xmlfile-2.0.0.dist-info/LICENCE.rst",
+          "sha256": "0c84bb42f5d367e5ebf9fc2dde35b16141df5ee0fdc189250858bc6c5560f69e"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "fastapi",
@@ -131,7 +235,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/fastapi/0.143.0/"
+      "source": "https://pypi.org/project/fastapi/0.143.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "fastapi-0.143.0.dist-info/licenses/LICENSE",
+          "sha256": "4ec89ffc81485b97fec584b2d4a961032eeffe834453894fd9c1274906cc744e"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "h11",
@@ -140,7 +251,14 @@
       "license_files": [
         "LICENSE.txt"
       ],
-      "source": "https://pypi.org/project/h11/0.16.0/"
+      "source": "https://pypi.org/project/h11/0.16.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "h11-0.16.0.dist-info/licenses/LICENSE.txt",
+          "sha256": "37db5bb85926db28a427a25867f10b1232003aea1be69ccb851138adb8e6f361"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "httpcore",
@@ -149,7 +267,14 @@
       "license_files": [
         "LICENSE.md"
       ],
-      "source": "https://pypi.org/project/httpcore/1.0.9/"
+      "source": "https://pypi.org/project/httpcore/1.0.9/",
+      "checked_distribution_license_files": [
+        {
+          "path": "httpcore-1.0.9.dist-info/licenses/LICENSE.md",
+          "sha256": "fdcb59154c74cbaba16a11242f7740bea9f23d6feb5547917d8c5f94a80392a5"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "httptools",
@@ -160,14 +285,36 @@
         "vendor/http-parser/LICENSE-MIT",
         "vendor/llhttp/LICENSE"
       ],
-      "source": "https://pypi.org/project/httptools/0.9.0/"
+      "source": "https://pypi.org/project/httptools/0.9.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "httptools-0.9.0.dist-info/licenses/LICENSE",
+          "sha256": "1c028b059d7a58e14ccda38cabced698c591fe614ffbe4f721430446e86c8d69"
+        },
+        {
+          "path": "httptools-0.9.0.dist-info/licenses/vendor/http-parser/LICENSE-MIT",
+          "sha256": "5cd1b682c0ccbac0cb31b86a9a1104c3e2e7b1377a282b8169d2694b400db7c2"
+        },
+        {
+          "path": "httptools-0.9.0.dist-info/licenses/vendor/llhttp/LICENSE",
+          "sha256": "279012e02a10acfd59a3f2d8f13a497332535d871c2b27c89988985b06a3a438"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "httpx",
       "version": "0.28.1",
       "license_metadata": "BSD License",
       "license_files": [],
-      "source": "https://pypi.org/project/httpx/0.28.1/"
+      "source": "https://pypi.org/project/httpx/0.28.1/",
+      "checked_distribution_license_files": [
+        {
+          "path": "httpx-0.28.1.dist-info/licenses/LICENSE.md",
+          "sha256": "4ec59d544f12b5f539a3a716fd321ac58ccd8030b465221f2c880200cdf28d8d"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "idna",
@@ -176,7 +323,14 @@
       "license_files": [
         "LICENSE.md"
       ],
-      "source": "https://pypi.org/project/idna/3.20/"
+      "source": "https://pypi.org/project/idna/3.20/",
+      "checked_distribution_license_files": [
+        {
+          "path": "idna-3.20.dist-info/licenses/LICENSE.md",
+          "sha256": "1a9a4f0e3d479a27240ddd59a9137a66ab4a0f9dfdc8ca6188cc0bfd85187f04"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "iniconfig",
@@ -185,7 +339,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/iniconfig/2.3.1/"
+      "source": "https://pypi.org/project/iniconfig/2.3.1/",
+      "checked_distribution_license_files": [
+        {
+          "path": "iniconfig-2.3.1.dist-info/licenses/LICENSE",
+          "sha256": "3409fa91f7ace557894632676656e32264fe5ef7581535725dc9a23774551bd4"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "jaraco-classes",
@@ -194,7 +355,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/jaraco-classes/3.4.0/"
+      "source": "https://pypi.org/project/jaraco-classes/3.4.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "jaraco.classes-3.4.0.dist-info/LICENSE",
+          "sha256": "86da0f01aeae46348a3c3d465195dc1ceccde79f79e87769a64b8da04b2a4741"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "jaraco-context",
@@ -203,7 +371,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/jaraco-context/6.1.2/"
+      "source": "https://pypi.org/project/jaraco-context/6.1.2/",
+      "checked_distribution_license_files": [
+        {
+          "path": "jaraco_context-6.1.2.dist-info/licenses/LICENSE",
+          "sha256": "9755a18519666e5f0f4cae3daad3d7012bcae48a600b31237d75e9fe134e6683"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "jaraco-functools",
@@ -212,14 +387,39 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/jaraco-functools/4.6.0/"
+      "source": "https://pypi.org/project/jaraco-functools/4.6.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "jaraco_functools-4.6.0.dist-info/licenses/LICENSE",
+          "sha256": "9755a18519666e5f0f4cae3daad3d7012bcae48a600b31237d75e9fe134e6683"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "jeepney",
       "version": "0.9.0",
-      "license_metadata": "Not installed on the audit platform; review distribution before deployment",
-      "license_files": [],
-      "source": "https://pypi.org/project/jeepney/0.9.0/"
+      "license_metadata": "MIT",
+      "license_files": [
+        "jeepney-0.9.0/LICENSE"
+      ],
+      "source": "https://pypi.org/project/jeepney/0.9.0/",
+      "checked_distribution_license_files": [],
+      "platform_source_verification": {
+        "name": "jeepney",
+        "version": "0.9.0",
+        "license_metadata": "MIT",
+        "primary_source": "https://files.pythonhosted.org/packages/7b/6f/357efd7602486741aa73ffc0617fb310a29b588ed0fd69c2399acbb85b0c/jeepney-0.9.0.tar.gz",
+        "primary_artifact_sha256": "cf0e9e845622b81e4a28df94c40345400256ec608d0e55bb8a3feaa9163f5732",
+        "license_files": [
+          {
+            "path": "jeepney-0.9.0/LICENSE",
+            "sha256": "1b22b049b5267d6dfc23a67bf4a84d8ec04b9fdfb1a51d360e42b4342c8b4154",
+            "bytes": 1081
+          }
+        ],
+        "verification": "Exact PyPI release source hash and licence-file presence verified; no code executed"
+      }
     },
     {
       "name": "keyring",
@@ -228,7 +428,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/keyring/25.7.0/"
+      "source": "https://pypi.org/project/keyring/25.7.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "keyring-25.7.0.dist-info/licenses/LICENSE",
+          "sha256": "5a57cb4db85e2a2dd88c290628908add57e3451449e0a9a71fdfb38776fd759d"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "lxml",
@@ -238,7 +445,18 @@
         "LICENSE.txt",
         "LICENSES.txt"
       ],
-      "source": "https://pypi.org/project/lxml/6.1.3/"
+      "source": "https://pypi.org/project/lxml/6.1.3/",
+      "checked_distribution_license_files": [
+        {
+          "path": "lxml-6.1.3.dist-info/licenses/LICENSE.txt",
+          "sha256": "e7c3ce8d76331b0101cc46790ab43958ea90a364bcf962ed8763d5a818340e69"
+        },
+        {
+          "path": "lxml-6.1.3.dist-info/licenses/LICENSES.txt",
+          "sha256": "df682c668de65321677b5e4861dca4128a8bad8067f230956e9da3f985b3d398"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "mako",
@@ -247,7 +465,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/mako/1.4.3/"
+      "source": "https://pypi.org/project/mako/1.4.3/",
+      "checked_distribution_license_files": [
+        {
+          "path": "mako-1.4.3.dist-info/licenses/LICENSE",
+          "sha256": "8c1d171bc5d341ad9cd33d5e2c39b96a82c7bd49b3ae89a470c37e5822232054"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "markdown-it-py",
@@ -257,7 +482,18 @@
         "LICENSE",
         "LICENSE.markdown-it"
       ],
-      "source": "https://pypi.org/project/markdown-it-py/4.2.0/"
+      "source": "https://pypi.org/project/markdown-it-py/4.2.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "markdown_it_py-4.2.0.dist-info/licenses/LICENSE",
+          "sha256": "4a2260d6e2cd0f5a151a1e86dbfe7d3ed552b1e2beabf9941c1ba5c49cbce484"
+        },
+        {
+          "path": "markdown_it_py-4.2.0.dist-info/licenses/LICENSE.markdown-it",
+          "sha256": "792c48c5a849a15fdf9e37e8bcf9e6d1dd13b32b46c642a748a0a46a9919d473"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "markupsafe",
@@ -266,14 +502,28 @@
       "license_files": [
         "LICENSE.txt"
       ],
-      "source": "https://pypi.org/project/markupsafe/3.0.4/"
+      "source": "https://pypi.org/project/markupsafe/3.0.4/",
+      "checked_distribution_license_files": [
+        {
+          "path": "markupsafe-3.0.4.dist-info/licenses/LICENSE.txt",
+          "sha256": "4631ec0db5fd90a547e336817264c6798214338146f8ac94b4a57f96ee8c9ec4"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "mdurl",
       "version": "0.1.2",
       "license_metadata": "MIT License",
       "license_files": [],
-      "source": "https://pypi.org/project/mdurl/0.1.2/"
+      "source": "https://pypi.org/project/mdurl/0.1.2/",
+      "checked_distribution_license_files": [
+        {
+          "path": "mdurl-0.1.2.dist-info/LICENSE",
+          "sha256": "7c605df6e28667a9603118e98274f64a49ce3eed0d26fccce9534a345e0ef955"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "more-itertools",
@@ -282,7 +532,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/more-itertools/11.1.0/"
+      "source": "https://pypi.org/project/more-itertools/11.1.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "more_itertools-11.1.0.dist-info/licenses/LICENSE",
+          "sha256": "09f1c8c9e941af3e584d59641ea9b87d83c0cb0fd007eb5ef391a7e2643c1a46"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "openpyxl",
@@ -291,7 +548,14 @@
       "license_files": [
         "LICENCE.rst"
       ],
-      "source": "https://pypi.org/project/openpyxl/3.1.5/"
+      "source": "https://pypi.org/project/openpyxl/3.1.5/",
+      "checked_distribution_license_files": [
+        {
+          "path": "openpyxl-3.1.5.dist-info/LICENCE.rst",
+          "sha256": "0c84bb42f5d367e5ebf9fc2dde35b16141df5ee0fdc189250858bc6c5560f69e"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "opentelemetry-api",
@@ -300,7 +564,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/opentelemetry-api/1.45.1/"
+      "source": "https://pypi.org/project/opentelemetry-api/1.45.1/",
+      "checked_distribution_license_files": [
+        {
+          "path": "opentelemetry_api-1.45.1.dist-info/licenses/LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "packaging",
@@ -311,7 +582,22 @@
         "LICENSE.APACHE",
         "LICENSE.BSD"
       ],
-      "source": "https://pypi.org/project/packaging/26.3/"
+      "source": "https://pypi.org/project/packaging/26.3/",
+      "checked_distribution_license_files": [
+        {
+          "path": "packaging-26.3.dist-info/licenses/LICENSE",
+          "sha256": "cad1ef5bd340d73e074ba614d26f7deaca5c7940c3d8c34852e65c4909686c48"
+        },
+        {
+          "path": "packaging-26.3.dist-info/licenses/LICENSE.APACHE",
+          "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+        },
+        {
+          "path": "packaging-26.3.dist-info/licenses/LICENSE.BSD",
+          "sha256": "b70e7e9b742f1cc6f948b34c16aa39ffece94196364bc88ff0d2180f0028fac5"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pillow",
@@ -320,7 +606,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pillow/12.3.0/"
+      "source": "https://pypi.org/project/pillow/12.3.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pillow-12.3.0.dist-info/licenses/LICENSE",
+          "sha256": "4f7866a74802c6326f81faff59a56546b6aec2b10b91973e0e9308de95e79857"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pluggy",
@@ -329,7 +622,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pluggy/1.6.0/"
+      "source": "https://pypi.org/project/pluggy/1.6.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pluggy-1.6.0.dist-info/licenses/LICENSE",
+          "sha256": "d6b65e6c213a5d0b577911d34d6e5949b9f59d76c238c5071a2f3fc16cfb2606"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "psycopg",
@@ -338,7 +638,14 @@
       "license_files": [
         "LICENSE.txt"
       ],
-      "source": "https://pypi.org/project/psycopg/3.3.6/"
+      "source": "https://pypi.org/project/psycopg/3.3.6/",
+      "checked_distribution_license_files": [
+        {
+          "path": "psycopg-3.3.6.dist-info/licenses/LICENSE.txt",
+          "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "psycopg-binary",
@@ -347,7 +654,14 @@
       "license_files": [
         "LICENSE.txt"
       ],
-      "source": "https://pypi.org/project/psycopg-binary/3.3.6/"
+      "source": "https://pypi.org/project/psycopg-binary/3.3.6/",
+      "checked_distribution_license_files": [
+        {
+          "path": "psycopg_binary-3.3.6.dist-info/licenses/LICENSE.txt",
+          "sha256": "7d3a95e5e06978064ed3f8e2b7c8f845e7fd8a405294727cc708f94cb83b8059"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pycparser",
@@ -356,7 +670,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pycparser/3.11/"
+      "source": "https://pypi.org/project/pycparser/3.11/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pycparser-3.11.dist-info/licenses/LICENSE",
+          "sha256": "0a9e78156ae8b96caf1b4f11ac2df424b83de29736f9e757630548a6272fdf90"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pydantic",
@@ -365,7 +686,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pydantic/2.14.1/"
+      "source": "https://pypi.org/project/pydantic/2.14.1/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pydantic-2.14.1.dist-info/licenses/LICENSE",
+          "sha256": "a9e186f3ca16b5eef84318e7a701721351a00cb7b8ae3a4394b67b49e3529ef3"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pydantic-core",
@@ -374,7 +702,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pydantic-core/2.50.1/"
+      "source": "https://pypi.org/project/pydantic-core/2.50.1/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pydantic_core-2.50.1.dist-info/licenses/LICENSE",
+          "sha256": "fbe7f615f18d135c07000e5a86325db27f42c7729699ef166ac1f7a3f4586bf4"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pydantic-settings",
@@ -383,7 +718,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pydantic-settings/2.15.0/"
+      "source": "https://pypi.org/project/pydantic-settings/2.15.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pydantic_settings-2.15.0.dist-info/licenses/LICENSE",
+          "sha256": "eb355a753e020346d33d83bf9769135b89fc610568ac531a01c295bcee7fd998"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pygments",
@@ -393,7 +735,14 @@
         "AUTHORS",
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pygments/2.21.0/"
+      "source": "https://pypi.org/project/pygments/2.21.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pygments-2.21.0.dist-info/licenses/LICENSE",
+          "sha256": "a9d66f1d526df02e29dce73436d34e56e8632f46c275bbdffc70569e882f9f17"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pyotp",
@@ -402,7 +751,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pyotp/2.10.0/"
+      "source": "https://pypi.org/project/pyotp/2.10.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pyotp-2.10.0.dist-info/licenses/LICENSE",
+          "sha256": "795885123341458172aad6ebfab31b071cc7b40524929e6901662d5dbbf57ea3"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pypdf",
@@ -411,7 +767,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pypdf/6.20.1/"
+      "source": "https://pypi.org/project/pypdf/6.20.1/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pypdf-6.20.1.dist-info/licenses/LICENSE",
+          "sha256": "a97ac230e5f33ef10a5367a850eb01f91f1a0b064e34742c7794d2294557f524"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pytest",
@@ -420,7 +783,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pytest/9.1.1/"
+      "source": "https://pypi.org/project/pytest/9.1.1/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pytest-9.1.1.dist-info/licenses/LICENSE",
+          "sha256": "ca836a5f9ecca3b2f350230faa20a48fb8b145653b5568d784862df864706b9b"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pytest-asyncio",
@@ -429,7 +799,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pytest-asyncio/1.4.0/"
+      "source": "https://pypi.org/project/pytest-asyncio/1.4.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pytest_asyncio-1.4.0.dist-info/licenses/LICENSE",
+          "sha256": "a8ad31b1c3f40dca5a84119351b8fa8ddc868edd77fad8a8ebf6d8f2d16fa4ae"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "python-docx",
@@ -438,7 +815,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/python-docx/1.2.0/"
+      "source": "https://pypi.org/project/python-docx/1.2.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "python_docx-1.2.0.dist-info/licenses/LICENSE",
+          "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "python-dotenv",
@@ -447,7 +831,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/python-dotenv/1.2.4/"
+      "source": "https://pypi.org/project/python-dotenv/1.2.4/",
+      "checked_distribution_license_files": [
+        {
+          "path": "python_dotenv-1.2.4.dist-info/licenses/LICENSE",
+          "sha256": "80619b7049f08c81683ad0e01f08f257a840652dd71ee83146d36658c7d2c2b9"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "python-multipart",
@@ -456,7 +847,14 @@
       "license_files": [
         "LICENSE.txt"
       ],
-      "source": "https://pypi.org/project/python-multipart/0.0.32/"
+      "source": "https://pypi.org/project/python-multipart/0.0.32/",
+      "checked_distribution_license_files": [
+        {
+          "path": "python_multipart-0.0.32.dist-info/licenses/LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "python-pptx",
@@ -465,14 +863,28 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/python-pptx/1.0.2/"
+      "source": "https://pypi.org/project/python-pptx/1.0.2/",
+      "checked_distribution_license_files": [
+        {
+          "path": "python_pptx-1.0.2.dist-info/LICENSE",
+          "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pywin32-ctypes",
       "version": "0.2.3",
       "license_metadata": "BSD-3-Clause",
       "license_files": [],
-      "source": "https://pypi.org/project/pywin32-ctypes/0.2.3/"
+      "source": "https://pypi.org/project/pywin32-ctypes/0.2.3/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pywin32_ctypes-0.2.3.dist-info/LICENSE.txt",
+          "sha256": "dfa83b3e2709adfcdb838d9ad55823ca674abb780e60563d9dd9544ccbf785e9"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "pyyaml",
@@ -481,7 +893,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/pyyaml/6.0.3/"
+      "source": "https://pypi.org/project/pyyaml/6.0.3/",
+      "checked_distribution_license_files": [
+        {
+          "path": "pyyaml-6.0.3.dist-info/licenses/LICENSE",
+          "sha256": "8d3928f9dc4490fd635707cb88eb26bd764102a7282954307d3e5167a577e8a4"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "rich",
@@ -490,7 +909,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/rich/14.3.4/"
+      "source": "https://pypi.org/project/rich/14.3.4/",
+      "checked_distribution_license_files": [
+        {
+          "path": "rich-14.3.4.dist-info/licenses/LICENSE",
+          "sha256": "deed7c17a4318158190a3ea239cc879a5a50271cebb98ae7025f48fbe58dca15"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "ruff",
@@ -499,14 +925,39 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/ruff/0.17.0/"
+      "source": "https://pypi.org/project/ruff/0.17.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "ruff-0.17.0.dist-info/licenses/LICENSE",
+          "sha256": "2597d854122b77ddc71971564ca2350a37608575ce324adc5650a2b2051c8f18"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "secretstorage",
       "version": "3.5.0",
-      "license_metadata": "Not installed on the audit platform; review distribution before deployment",
-      "license_files": [],
-      "source": "https://pypi.org/project/secretstorage/3.5.0/"
+      "license_metadata": "BSD-3-Clause",
+      "license_files": [
+        "secretstorage-3.5.0/LICENSE"
+      ],
+      "source": "https://pypi.org/project/secretstorage/3.5.0/",
+      "checked_distribution_license_files": [],
+      "platform_source_verification": {
+        "name": "secretstorage",
+        "version": "3.5.0",
+        "license_metadata": "BSD-3-Clause",
+        "primary_source": "https://files.pythonhosted.org/packages/1c/03/e834bcd866f2f8a49a85eaff47340affa3bfa391ee9912a952a1faa68c7b/secretstorage-3.5.0.tar.gz",
+        "primary_artifact_sha256": "f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be",
+        "license_files": [
+          {
+            "path": "secretstorage-3.5.0/LICENSE",
+            "sha256": "e700357592bb93704cb040ce4a6663a85292716a4041b6a267f598f21658466f",
+            "bytes": 1504
+          }
+        ],
+        "verification": "Exact PyPI release source hash and licence-file presence verified; no code executed"
+      }
     },
     {
       "name": "shellingham",
@@ -515,7 +966,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/shellingham/1.5.4/"
+      "source": "https://pypi.org/project/shellingham/1.5.4/",
+      "checked_distribution_license_files": [
+        {
+          "path": "shellingham-1.5.4.dist-info/LICENSE",
+          "sha256": "f388fd38cad13112c1dc0f669bbe80e7f84541edbafb72f3030d2ca7642c3c9d"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "soupsieve",
@@ -524,7 +982,14 @@
       "license_files": [
         "LICENSE.md"
       ],
-      "source": "https://pypi.org/project/soupsieve/3.0.3/"
+      "source": "https://pypi.org/project/soupsieve/3.0.3/",
+      "checked_distribution_license_files": [
+        {
+          "path": "soupsieve-3.0.3.dist-info/licenses/LICENSE.md",
+          "sha256": "76a0acdb98c3a63681e20b6f096699ef8cad5fb35d56eef8387e0fa71d797a9a"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "sqlalchemy",
@@ -534,7 +999,14 @@
         "LICENSE",
         "AUTHORS"
       ],
-      "source": "https://pypi.org/project/sqlalchemy/2.1.4/"
+      "source": "https://pypi.org/project/sqlalchemy/2.1.4/",
+      "checked_distribution_license_files": [
+        {
+          "path": "sqlalchemy-2.1.4.dist-info/licenses/LICENSE",
+          "sha256": "9bb754071e711cf75728b9051b170bfb8f9e3b879c08386c96a36989c42cd5f1"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "starlette",
@@ -543,7 +1015,14 @@
       "license_files": [
         "LICENSE.md"
       ],
-      "source": "https://pypi.org/project/starlette/1.7.0/"
+      "source": "https://pypi.org/project/starlette/1.7.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "starlette-1.7.0.dist-info/licenses/LICENSE.md",
+          "sha256": "dcb95677a02240243187e964f941847d19b17821cf99e5afae684fab328c19bf"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "typer",
@@ -552,7 +1031,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/typer/0.27.3/"
+      "source": "https://pypi.org/project/typer/0.27.3/",
+      "checked_distribution_license_files": [
+        {
+          "path": "typer-0.27.3.dist-info/licenses/LICENSE",
+          "sha256": "58992cebcf8dfb6e40c4e2112ed12126c243666dca3912a3d78b7ecac4859d49"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "typing-extensions",
@@ -561,7 +1047,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/typing-extensions/4.16.0/"
+      "source": "https://pypi.org/project/typing-extensions/4.16.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "typing_extensions-4.16.0.dist-info/licenses/LICENSE",
+          "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "typing-inspection",
@@ -570,7 +1063,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/typing-inspection/0.4.4/"
+      "source": "https://pypi.org/project/typing-inspection/0.4.4/",
+      "checked_distribution_license_files": [
+        {
+          "path": "typing_inspection-0.4.4.dist-info/licenses/LICENSE",
+          "sha256": "804b59b25f2c31bd278f9202a19ae49a3945aa2664387e2d0a128c7cacc61ec3"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "tzdata",
@@ -580,7 +1080,18 @@
         "LICENSE",
         "licenses/LICENSE_APACHE"
       ],
-      "source": "https://pypi.org/project/tzdata/2026.5/"
+      "source": "https://pypi.org/project/tzdata/2026.5/",
+      "checked_distribution_license_files": [
+        {
+          "path": "tzdata-2026.5.dist-info/licenses/LICENSE",
+          "sha256": "df58f69ea88683035d720b5375bcef0cf5aeaa98a1d098d572e0992c378deb46"
+        },
+        {
+          "path": "tzdata-2026.5.dist-info/licenses/licenses/LICENSE_APACHE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "uvicorn",
@@ -589,14 +1100,63 @@
       "license_files": [
         "LICENSE.md"
       ],
-      "source": "https://pypi.org/project/uvicorn/0.54.0/"
+      "source": "https://pypi.org/project/uvicorn/0.54.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "uvicorn-0.54.0.dist-info/licenses/LICENSE.md",
+          "sha256": "efe1acf3e62fb99c288b0ec73e5a773b7268ef4320fe757ea994214e4b63c371"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "uvloop",
       "version": "0.23.0",
-      "license_metadata": "Not installed on the audit platform; review distribution before deployment",
-      "license_files": [],
-      "source": "https://pypi.org/project/uvloop/0.23.0/"
+      "license_metadata": "MIT License",
+      "license_files": [
+        "uvloop-0.23.0/LICENSE-APACHE",
+        "uvloop-0.23.0/LICENSE-MIT",
+        "uvloop-0.23.0/vendor/libuv/LICENSE",
+        "uvloop-0.23.0/vendor/libuv/LICENSE-docs",
+        "uvloop-0.23.0/vendor/libuv/LICENSE-extra"
+      ],
+      "source": "https://pypi.org/project/uvloop/0.23.0/",
+      "checked_distribution_license_files": [],
+      "platform_source_verification": {
+        "name": "uvloop",
+        "version": "0.23.0",
+        "license_metadata": "MIT License",
+        "primary_source": "https://files.pythonhosted.org/packages/fa/42/02c739ce85fb2ee8d99212c61417da8140c6b87e9d97c430bea520d76044/uvloop-0.23.0.tar.gz",
+        "primary_artifact_sha256": "28d160f51ab4da3b187063652e643dea6831072add4adc1e6d62afbe73b6be27",
+        "license_files": [
+          {
+            "path": "uvloop-0.23.0/LICENSE-APACHE",
+            "sha256": "377025287798f9dcd819e1f826fa5fc5e2f382528691ab0528c5cf8c8c282c27",
+            "bytes": 11439
+          },
+          {
+            "path": "uvloop-0.23.0/LICENSE-MIT",
+            "sha256": "6dd4c399f26de043d77a2ad7e31db4cb5bf08ea8368b0a42d6e158635cc8ab62",
+            "bytes": 1105
+          },
+          {
+            "path": "uvloop-0.23.0/vendor/libuv/LICENSE",
+            "sha256": "16de0c32b265cb7d46a6d3bd614f259dd4d693a5e26b3407b04aae8d73041f0c",
+            "bytes": 1079
+          },
+          {
+            "path": "uvloop-0.23.0/vendor/libuv/LICENSE-docs",
+            "sha256": "cce5d01fa4a83b794271bd2c28cffdf99afd43c803e6ddefddae39b591ea7448",
+            "bytes": 18652
+          },
+          {
+            "path": "uvloop-0.23.0/vendor/libuv/LICENSE-extra",
+            "sha256": "262c44bd2cdba037e6d2a82fba15f5800d292bc993a6f5d6b6ea487744d02836",
+            "bytes": 1603
+          }
+        ],
+        "verification": "Exact PyPI release source hash and licence-file presence verified; no code executed"
+      }
     },
     {
       "name": "watchfiles",
@@ -605,7 +1165,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/watchfiles/1.3.0/"
+      "source": "https://pypi.org/project/watchfiles/1.3.0/",
+      "checked_distribution_license_files": [
+        {
+          "path": "watchfiles-1.3.0.dist-info/licenses/LICENSE",
+          "sha256": "2d40a03346bded8daa4bd22d23825a6f2568a0820fbef76ac05bae534421e189"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "websockets",
@@ -614,7 +1181,14 @@
       "license_files": [
         "LICENSE"
       ],
-      "source": "https://pypi.org/project/websockets/17.2/"
+      "source": "https://pypi.org/project/websockets/17.2/",
+      "checked_distribution_license_files": [
+        {
+          "path": "websockets-17.2.dist-info/licenses/LICENSE",
+          "sha256": "0f44514998aca209d3482d10204a8adf2aa4296ff157a36a5c0922f2280632d3"
+        }
+      ],
+      "platform_source_verification": null
     },
     {
       "name": "xlsxwriter",
@@ -623,7 +1197,14 @@
       "license_files": [
         "LICENSE.txt"
       ],
-      "source": "https://pypi.org/project/xlsxwriter/3.2.9/"
+      "source": "https://pypi.org/project/xlsxwriter/3.2.9/",
+      "checked_distribution_license_files": [
+        {
+          "path": "xlsxwriter-3.2.9.dist-info/LICENSE.txt",
+          "sha256": "cf08b60a4ded986b58a617cb8304373bda5c4eff42fb4e30d7597b616e116e87"
+        }
+      ],
+      "platform_source_verification": null
     }
   ],
   "javascript": [
@@ -631,343 +1212,874 @@
       "name": "@emnapi/runtime",
       "version": "1.11.3",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/@emnapi/runtime"
+      "source": "https://www.npmjs.com/package/@emnapi/runtime",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "2088f55c6731498410b20c95ebd345ed4a4a800bf74c0fba4d282fd2a021daaa"
+        }
+      ]
     },
     {
       "name": "@img/colour",
       "version": "1.1.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/@img/colour"
+      "source": "https://www.npmjs.com/package/@img/colour",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE.md",
+          "sha256": "e2eaa4603c14cb26f301e88648c12a853fa3f0f5da6d4b0972958c666e7f2ab8"
+        }
+      ]
     },
     {
       "name": "@img/sharp-darwin-arm64",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-darwin-arm64"
+      "source": "https://www.npmjs.com/package/@img/sharp-darwin-arm64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-darwin-x64",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-darwin-x64"
+      "source": "https://www.npmjs.com/package/@img/sharp-darwin-x64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-freebsd-wasm32",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-freebsd-wasm32"
+      "source": "https://www.npmjs.com/package/@img/sharp-freebsd-wasm32",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-libvips-darwin-arm64",
       "version": "1.3.4",
       "license_metadata": "LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-libvips-darwin-arm64"
+      "source": "https://www.npmjs.com/package/@img/sharp-libvips-darwin-arm64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-libvips-darwin-x64",
       "version": "1.3.4",
       "license_metadata": "LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-libvips-darwin-x64"
+      "source": "https://www.npmjs.com/package/@img/sharp-libvips-darwin-x64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-libvips-linux-arm",
       "version": "1.3.4",
       "license_metadata": "LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-arm"
+      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-arm",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-libvips-linux-arm64",
       "version": "1.3.4",
       "license_metadata": "LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-arm64"
+      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-arm64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-libvips-linux-ppc64",
       "version": "1.3.4",
       "license_metadata": "LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-ppc64"
+      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-ppc64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-libvips-linux-riscv64",
       "version": "1.3.4",
       "license_metadata": "LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-riscv64"
+      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-riscv64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-libvips-linux-s390x",
       "version": "1.3.4",
       "license_metadata": "LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-s390x"
+      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-s390x",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-libvips-linux-x64",
       "version": "1.3.4",
       "license_metadata": "LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-x64"
+      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linux-x64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-libvips-linuxmusl-arm64",
       "version": "1.3.4",
       "license_metadata": "LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linuxmusl-arm64"
+      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linuxmusl-arm64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-libvips-linuxmusl-x64",
       "version": "1.3.4",
       "license_metadata": "LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linuxmusl-x64"
+      "source": "https://www.npmjs.com/package/@img/sharp-libvips-linuxmusl-x64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-linux-arm",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-linux-arm"
+      "source": "https://www.npmjs.com/package/@img/sharp-linux-arm",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-linux-arm64",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-linux-arm64"
+      "source": "https://www.npmjs.com/package/@img/sharp-linux-arm64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-linux-ppc64",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-linux-ppc64"
+      "source": "https://www.npmjs.com/package/@img/sharp-linux-ppc64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-linux-riscv64",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-linux-riscv64"
+      "source": "https://www.npmjs.com/package/@img/sharp-linux-riscv64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-linux-s390x",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-linux-s390x"
+      "source": "https://www.npmjs.com/package/@img/sharp-linux-s390x",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-linux-x64",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-linux-x64"
+      "source": "https://www.npmjs.com/package/@img/sharp-linux-x64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-linuxmusl-arm64",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-linuxmusl-arm64"
+      "source": "https://www.npmjs.com/package/@img/sharp-linuxmusl-arm64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-linuxmusl-x64",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-linuxmusl-x64"
+      "source": "https://www.npmjs.com/package/@img/sharp-linuxmusl-x64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-wasm32",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0 AND LGPL-3.0-or-later AND MIT",
-      "source": "https://www.npmjs.com/package/@img/sharp-wasm32"
+      "source": "https://www.npmjs.com/package/@img/sharp-wasm32",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68"
+        }
+      ]
     },
     {
       "name": "@img/sharp-webcontainers-wasm32",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@img/sharp-webcontainers-wasm32"
+      "source": "https://www.npmjs.com/package/@img/sharp-webcontainers-wasm32",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-win32-arm64",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0 AND LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-win32-arm64"
+      "source": "https://www.npmjs.com/package/@img/sharp-win32-arm64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-win32-ia32",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0 AND LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-win32-ia32"
+      "source": "https://www.npmjs.com/package/@img/sharp-win32-ia32",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@img/sharp-win32-x64",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0 AND LGPL-3.0-or-later",
-      "source": "https://www.npmjs.com/package/@img/sharp-win32-x64"
+      "source": "https://www.npmjs.com/package/@img/sharp-win32-x64",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "dc1f5d2d43c5531dfe0acaf4e950ea5dbe3e61e1850cf0e983bda7efc10d6693"
+        }
+      ]
     },
     {
       "name": "@next/env",
       "version": "16.4.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/@next/env"
+      "source": "https://www.npmjs.com/package/@next/env",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@next/swc-darwin-arm64",
       "version": "16.4.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/@next/swc-darwin-arm64"
+      "source": "https://www.npmjs.com/package/@next/swc-darwin-arm64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@next/swc-darwin-x64",
       "version": "16.4.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/@next/swc-darwin-x64"
+      "source": "https://www.npmjs.com/package/@next/swc-darwin-x64",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@next/swc-linux-arm64-gnu",
       "version": "16.4.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/@next/swc-linux-arm64-gnu"
+      "source": "https://www.npmjs.com/package/@next/swc-linux-arm64-gnu",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@next/swc-linux-arm64-musl",
       "version": "16.4.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/@next/swc-linux-arm64-musl"
+      "source": "https://www.npmjs.com/package/@next/swc-linux-arm64-musl",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@next/swc-linux-x64-gnu",
       "version": "16.4.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/@next/swc-linux-x64-gnu"
+      "source": "https://www.npmjs.com/package/@next/swc-linux-x64-gnu",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@next/swc-linux-x64-musl",
       "version": "16.4.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/@next/swc-linux-x64-musl"
+      "source": "https://www.npmjs.com/package/@next/swc-linux-x64-musl",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@next/swc-win32-arm64-msvc",
       "version": "16.4.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/@next/swc-win32-arm64-msvc"
+      "source": "https://www.npmjs.com/package/@next/swc-win32-arm64-msvc",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@next/swc-win32-x64-msvc",
       "version": "16.4.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/@next/swc-win32-x64-msvc"
+      "source": "https://www.npmjs.com/package/@next/swc-win32-x64-msvc",
+      "checked_distribution_license_files": []
     },
     {
       "name": "@playwright/test",
       "version": "1.64.0",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@playwright/test"
+      "source": "https://www.npmjs.com/package/@playwright/test",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "45873d00a0dd243596deb4aa23b2493b3d1f0671921bf2538ea431d7380220eb"
+        }
+      ]
     },
     {
       "name": "@swc/helpers",
       "version": "0.5.23",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/@swc/helpers"
+      "source": "https://www.npmjs.com/package/@swc/helpers",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "d96eba1f1881334d50ffc144276dfa98e147a415e7c591ecdfcb81680361dc91"
+        }
+      ]
     },
     {
       "name": "baseline-browser-mapping",
       "version": "2.11.28",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/baseline-browser-mapping"
+      "source": "https://www.npmjs.com/package/baseline-browser-mapping",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE.txt",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        }
+      ]
     },
     {
       "name": "caniuse-lite",
       "version": "1.0.30001815",
       "license_metadata": "CC-BY-4.0",
-      "source": "https://www.npmjs.com/package/caniuse-lite"
+      "source": "https://www.npmjs.com/package/caniuse-lite",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "fd3a263fe19ed8faa9068b43abaebafc02c77897b0c6fc09abc04bb592e5f16e"
+        }
+      ]
     },
     {
       "name": "client-only",
       "version": "0.0.1",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/client-only"
+      "source": "https://www.npmjs.com/package/client-only",
+      "checked_distribution_license_files": []
     },
     {
       "name": "detect-libc",
       "version": "2.1.2",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/detect-libc"
+      "source": "https://www.npmjs.com/package/detect-libc",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+        }
+      ]
     },
     {
       "name": "nanoid",
       "version": "3.3.20",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/nanoid"
+      "source": "https://www.npmjs.com/package/nanoid",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "da4db1480d9beea3483a2eda5c53b22238d0827d57da162b48f122e04d2d9987"
+        }
+      ]
     },
     {
       "name": "next",
       "version": "16.4.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/next"
+      "source": "https://www.npmjs.com/package/next",
+      "checked_distribution_license_files": [
+        {
+          "path": "license.md",
+          "sha256": "ee765244e2d59f5234d474f62e0766fa0c8b99af967fdd4c0cb8dcb0c76ea224"
+        }
+      ]
     },
     {
       "name": "picocolors",
       "version": "1.1.1",
       "license_metadata": "ISC",
-      "source": "https://www.npmjs.com/package/picocolors"
+      "source": "https://www.npmjs.com/package/picocolors",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "6582629e2979466878f6014313dcc2f3756c9616148682227ce3063dde310750"
+        }
+      ]
     },
     {
       "name": "playwright",
       "version": "1.64.0",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/playwright"
+      "source": "https://www.npmjs.com/package/playwright",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "45873d00a0dd243596deb4aa23b2493b3d1f0671921bf2538ea431d7380220eb"
+        }
+      ]
     },
     {
       "name": "playwright-core",
       "version": "1.64.0",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/playwright-core"
+      "source": "https://www.npmjs.com/package/playwright-core",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "45873d00a0dd243596deb4aa23b2493b3d1f0671921bf2538ea431d7380220eb"
+        }
+      ]
     },
     {
       "name": "postcss",
       "version": "8.5.23",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/postcss"
+      "source": "https://www.npmjs.com/package/postcss",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "5be1f3465bba68a626777f984878814aaf35e7ef8e9fd314d469bcf887050fb8"
+        }
+      ]
     },
     {
       "name": "react",
       "version": "19.3.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/react"
+      "source": "https://www.npmjs.com/package/react",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
     },
     {
       "name": "react-dom",
       "version": "19.3.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/react-dom"
+      "source": "https://www.npmjs.com/package/react-dom",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
     },
     {
       "name": "scheduler",
       "version": "0.28.0",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/scheduler"
+      "source": "https://www.npmjs.com/package/scheduler",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
     },
     {
       "name": "semver",
       "version": "7.8.5",
       "license_metadata": "ISC",
-      "source": "https://www.npmjs.com/package/semver"
+      "source": "https://www.npmjs.com/package/semver",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b"
+        }
+      ]
     },
     {
       "name": "sharp",
       "version": "0.35.5",
       "license_metadata": "Apache-2.0",
-      "source": "https://www.npmjs.com/package/sharp"
+      "source": "https://www.npmjs.com/package/sharp",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68"
+        }
+      ]
     },
     {
       "name": "source-map-js",
       "version": "1.2.2",
       "license_metadata": "BSD-3-Clause",
-      "source": "https://www.npmjs.com/package/source-map-js"
+      "source": "https://www.npmjs.com/package/source-map-js",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "6cb0631f71c7749763fd3dd1d5bee52dd1070ec17f2edc1710079ad070bd2fbd"
+        }
+      ]
     },
     {
       "name": "styled-jsx",
       "version": "5.1.6",
       "license_metadata": "MIT",
-      "source": "https://www.npmjs.com/package/styled-jsx"
+      "source": "https://www.npmjs.com/package/styled-jsx",
+      "checked_distribution_license_files": [
+        {
+          "path": "license.md",
+          "sha256": "24d4a4580df855c345705b3016404f0c9da7e7674dc3b21a3ce7d0e5d0c37e2d"
+        }
+      ]
     },
     {
       "name": "tslib",
       "version": "2.8.1",
       "license_metadata": "0BSD",
-      "source": "https://www.npmjs.com/package/tslib"
+      "source": "https://www.npmjs.com/package/tslib",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE.txt",
+          "sha256": "210b19e543130388c68654b7497e967119ce17145f66ab7d85688fbd70f08751"
+        }
+      ]
+    }
+  ],
+  "rust": [
+    {
+      "name": "block-buffer",
+      "version": "0.10.4",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/block-buffer/0.10.4",
+      "primary_artifact_sha256": "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "d5c22aa3118d240e877ad41c5d9fa232f9c77d757d4aac0c2f943afc0a95e0ef"
+        }
+      ]
+    },
+    {
+      "name": "cfg-if",
+      "version": "1.0.5",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/cfg-if/1.0.5",
+      "primary_artifact_sha256": "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397"
+        }
+      ]
+    },
+    {
+      "name": "cpufeatures",
+      "version": "0.2.17",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/cpufeatures/0.2.17",
+      "primary_artifact_sha256": "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "ae9baa7beea910273c2f384c2a6b721fb7bd02bda3436074a1072e4ee689f985"
+        }
+      ]
+    },
+    {
+      "name": "crypto-common",
+      "version": "0.1.7",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/crypto-common/0.1.7",
+      "primary_artifact_sha256": "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "3521672491a3479422d5fe1aca6645dd2984090f85da6e5205abfb18fb7a6897"
+        }
+      ]
+    },
+    {
+      "name": "digest",
+      "version": "0.10.7",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/digest/0.10.7",
+      "primary_artifact_sha256": "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "9e0dfd2dd4173a530e238cb6adb37aa78c34c6bc7444e0e10c1ab5d8881f63ba"
+        }
+      ]
+    },
+    {
+      "name": "generic-array",
+      "version": "0.14.7",
+      "license_metadata": "MIT",
+      "source": "https://crates.io/crates/generic-array/0.14.7",
+      "primary_artifact_sha256": "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "c09aae9d3c77b531f56351a9947bc7446511d6b025b3255312d3e3442a9a7583"
+        }
+      ]
+    },
+    {
+      "name": "itoa",
+      "version": "1.0.18",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/itoa/1.0.18",
+      "primary_artifact_sha256": "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "libc",
+      "version": "0.2.190",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/libc/0.2.190",
+      "primary_artifact_sha256": "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "123a331b5dbf04c30097fa43b8f858bc85df671fe776de498d01f3d6b7c1f69e"
+        }
+      ]
+    },
+    {
+      "name": "memchr",
+      "version": "2.8.3",
+      "license_metadata": "Unlicense OR MIT",
+      "source": "https://crates.io/crates/memchr/2.8.3",
+      "primary_artifact_sha256": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98",
+      "checked_distribution_license_files": [
+        {
+          "path": "COPYING",
+          "sha256": "01c266bced4a434da0051174d6bee16a4c82cf634e2679b6155d40d75012390f"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "0f96a83840e146e43c0ec96a22ec1f392e0680e6c1226e6f3ba87e0740af850f"
+        }
+      ]
+    },
+    {
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/proc-macro2/1.0.107",
+      "primary_artifact_sha256": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "quote",
+      "version": "1.0.47",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/quote/1.0.47",
+      "primary_artifact_sha256": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "serde",
+      "version": "1.0.229",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/serde/1.0.229",
+      "primary_artifact_sha256": "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "serde_core",
+      "version": "1.0.229",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/serde_core/1.0.229",
+      "primary_artifact_sha256": "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "serde_derive",
+      "version": "1.0.229",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/serde_derive/1.0.229",
+      "primary_artifact_sha256": "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "serde_json",
+      "version": "1.0.154",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/serde_json/1.0.154",
+      "primary_artifact_sha256": "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "sha2",
+      "version": "0.10.9",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/sha2/0.10.9",
+      "primary_artifact_sha256": "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "b4eb00df6e2a4d22518fcaa6a2b4646f249b3a3c9814509b22bd2091f1392ff1"
+        }
+      ]
+    },
+    {
+      "name": "syn",
+      "version": "3.0.9",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/syn/3.0.9",
+      "primary_artifact_sha256": "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
+    },
+    {
+      "name": "typenum",
+      "version": "1.20.1",
+      "license_metadata": "MIT OR Apache-2.0",
+      "source": "https://crates.io/crates/typenum/1.20.1",
+      "primary_artifact_sha256": "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "db11fec9946737df39ca3898d9cd8c10ec6f6c3a884a6802b0ad0b81b4e8f23a"
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "516b24e051bf5630880ebbd55c40a25ce9552ebaf8970a53e8976eb70e522406"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "a825bd853ab71619a4923d7b4311221427848070ff44d990da39b0b274c1683f"
+        }
+      ]
+    },
+    {
+      "name": "unicode-ident",
+      "version": "1.0.27",
+      "license_metadata": "(MIT OR Apache-2.0) AND Unicode-3.0",
+      "source": "https://crates.io/crates/unicode-ident/1.0.27",
+      "primary_artifact_sha256": "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        },
+        {
+          "path": "LICENSE-UNICODE",
+          "sha256": "f7db81051789b729fea528a63ec4c938fdcb93d9d61d97dc8cc2e9df6d47f2a1"
+        }
+      ]
+    },
+    {
+      "name": "version_check",
+      "version": "0.9.5",
+      "license_metadata": "MIT/Apache-2.0",
+      "source": "https://crates.io/crates/version_check/0.9.5",
+      "primary_artifact_sha256": "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "b7e650f3fce5c53249d1cdc608b54df156a97edd636cf9d23498d0cfe7aec63e"
+        }
+      ]
+    },
+    {
+      "name": "zmij",
+      "version": "1.0.23",
+      "license_metadata": "MIT",
+      "source": "https://crates.io/crates/zmij/1.0.23",
+      "primary_artifact_sha256": "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b",
+      "checked_distribution_license_files": [
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+        }
+      ]
     }
   ],
   "separately_deployed": [

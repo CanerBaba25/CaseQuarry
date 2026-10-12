@@ -17,4 +17,4 @@ Protected assets are original evidence, derived text, credentials/sessions, case
 | Supply-chain or public-repository leak | Pinned lockfiles, dependency inventory, secret/tooling ignores, source-only package review and no real client fixtures |
 | Host loss / theft | Encrypted disk and independent encrypted backups, key separation and an actually executed restore drill |
 
-Tests provide evidence for the particular paths they exercise. Unexecuted controls, incomplete adapters, production deployment and recovery/redaction assurances must remain visibly pending. The initial SQL search/queue backend has not proven multi-million-record capacity. Practitioner review and final dependency/license approval are required before genuine client use.
+Tests provide evidence for the particular paths they exercise. Unexecuted controls, incomplete adapters, production deployment and recovery/redaction assurances must remain visibly pending. The initial SQL search/queue backend has not proven multi-million-record capacity. Operators must assess their deployment, evidence handling duties and third-party dependency notices before genuine client use.

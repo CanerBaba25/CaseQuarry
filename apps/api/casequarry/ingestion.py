@@ -179,7 +179,7 @@ def index_participants(db, item, email):
         )
 
 
-def put_record(db, settings, storage, batch, path, filename, record_key, parent_id=None, source_offset=""):
+def put_record(db, settings, storage, batch, path, filename, record_key, parent_id=None, source_offset="", original_path=None):
     key = hashlib.sha256(f"{batch.id}:{record_key}".encode()).hexdigest()
     existing = db.scalar(
         select(Occurrence).where(Occurrence.case_id == batch.case_id, Occurrence.occurrence_key == key)
@@ -231,7 +231,7 @@ def put_record(db, settings, storage, batch, path, filename, record_key, parent_
         source_id=batch.source_id,
         batch_id=batch.id,
         original_name=filename[:500],
-        original_path=filename,
+        original_path=original_path if original_path is not None else filename,
         source_offset=str(source_offset),
         occurrence_key=key,
     )
@@ -351,11 +351,12 @@ def assert_active(db, batch):
 
 
 def ingest_tree(
-    db, settings, storage, batch, path, filename, record_key, parent_id=None, depth=0, budget=None
+    db, settings, storage, batch, path, filename, record_key, parent_id=None, depth=0, budget=None,
+    *, original_path=None, source_offset=""
 ):
     if not assert_active(db, batch):
         return None
-    item, parsed = put_record(db, settings, storage, batch, path, filename, record_key, parent_id)
+    item, parsed = put_record(db, settings, storage, batch, path, filename, record_key, parent_id, source_offset, original_path)
     if parsed.state in {"quarantined", "failed", "locked"}:
         return item
     budget = budget if budget is not None else {"entries": 0, "bytes": 0}
@@ -450,7 +451,7 @@ def run_batch(database, settings, storage, batch_id):
                 file = batch.files[index]
                 path = storage.path(file["storage_key"])
                 name = file["filename"]
-                parent = ingest_tree(db, settings, storage, batch, path, name, f"file/{index}")
+                parent = ingest_tree(db, settings, storage, batch, path, name, f"file/{index}", original_path=file.get("original_path", name))
                 if parent is None:
                     return
                 if name.lower().endswith(".mbox"):
@@ -470,6 +471,7 @@ def run_batch(database, settings, storage, batch_id):
                             f"{Path(name).stem}-{source_offset}.eml",
                             f"file/{index}/mbox/{source_offset}",
                             parent.id,
+                            source_offset=str(source_offset),
                         )
                         batch.checkpoint = {
                             "file_index": index,

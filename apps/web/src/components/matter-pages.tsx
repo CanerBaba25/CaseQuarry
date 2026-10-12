@@ -1282,7 +1282,7 @@ export function ReportsPage({ matter }: { matter: Matter }) {
           <div className="notice amber">
             <Icon name="lock" size={18} />
             <span>
-              Privilege and confidentiality holdbacks are enforced by the
+              Privilege, review and integrity holdbacks are enforced by the
               server. Review decisions may block this export.
             </span>
           </div>
@@ -1397,21 +1397,16 @@ export function SettingsPage({
   matter,
   refresh,
   user,
+  modelPolicy,
 }: {
   matter: Matter;
   refresh: () => void;
   user: User;
+  modelPolicy: React.ReactNode;
 }) {
   const [error, setError] = useState<unknown>(null),
     [saved, setSaved] = useState(false),
     [busy, setBusy] = useState(false);
-  const policy = useResource<{
-    enabled?: boolean;
-    provider?: string;
-    allow_remote?: boolean;
-    remote_enabled?: boolean;
-    local_endpoint?: string;
-  }>(`/cases/${matter.id}/ai/policy`);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -1484,62 +1479,107 @@ export function SettingsPage({
             </button>
           </div>
         </form>
-        <section className="panel model-policy">
-          <div className="section-heading">
-            <h2>Model policy</h2>
-            <Icon name="lock" />
-          </div>
-          <ErrorBox error={policy.error} retry={policy.refresh} />
-          {policy.loading ? (
-            <Loading />
-          ) : (
-            <>
-              <Badge
-                value={policy.data?.enabled ? "Configured" : "Not configured"}
-                tone={policy.data?.enabled ? "green" : "neutral"}
-              />
-              <h3>
-                {policy.data?.enabled
-                  ? "A model is configured for this matter."
-                  : "Your workflow works without a model."}
-              </h3>
-              <p>
-                Keyword search, evidence review and exports remain available. A
-                local provider must be explicitly configured before cited model
-                summaries can run.
-              </p>
-              <dl className="metadata-list">
-                <div>
-                  <dt>Provider</dt>
-                  <dd>{policy.data?.provider || "None"}</dd>
-                </div>
-                <div>
-                  <dt>External transmission</dt>
-                  <dd>
-                    {policy.data?.allow_remote || policy.data?.remote_enabled
-                      ? "Enabled by policy"
-                      : "Disabled"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Evidence scope</dt>
-                  <dd>This matter only</dd>
-                </div>
-              </dl>
-              <div className="notice subtle">
-                <Icon name="shield" size={18} />
-                <span>
-                  Model outputs require human review and verified source
-                  citations. Administration setup is documented in the install
-                  guide.
-                </span>
-              </div>
-            </>
-          )}
-        </section>
+        {modelPolicy}
       </div>
       <MatterTeam matter={matter} user={user} />
+      <MatterState matter={matter} refresh={refresh} />
     </>
+  );
+}
+
+function MatterState({
+  matter,
+  refresh,
+}: {
+  matter: Matter;
+  refresh: () => void;
+}) {
+  const [modal, setModal] = useState(false),
+    [error, setError] = useState<unknown>(null),
+    [busy, setBusy] = useState(false);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    const form = new FormData(event.currentTarget);
+    try {
+      await post(
+        `/cases/${matter.id}/${matter.archived_at ? "restore" : "archive"}`,
+        matter.archived_at ? {} : { reason: form.get("reason") },
+      );
+      setModal(false);
+      refresh();
+    } catch (error) {
+      setError(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel matter-state-panel">
+      <div>
+        <h2>Matter status</h2>
+        <p>
+          {matter.archived_at
+            ? "This matter is archived. Its preserved evidence remains available for authorized viewing."
+            : "Archiving removes this matter from the active list and retains its preserved evidence. It can be restored."}
+        </p>
+        <Badge value={matter.archived_at ? "Archived" : "Active"} />
+      </div>
+      <button
+        className="button secondary"
+        disabled={!can(matter.role, "manage")}
+        onClick={() => setModal(true)}
+      >
+        <Icon name={matter.archived_at ? "back" : "matters"} size={17} />
+        {matter.archived_at ? "Restore matter" : "Archive matter"}
+      </button>
+      {modal && (
+        <Modal
+          title={
+            matter.archived_at ? "Restore this matter" : "Archive this matter"
+          }
+          close={() => setModal(false)}
+        >
+          <form onSubmit={submit}>
+            <ErrorBox error={error} />
+            <p className="muted">
+              {matter.archived_at
+                ? "Restore this matter to the active workspace. This action is recorded in the audit trail."
+                : "Original evidence is retained. An active preservation hold prevents archival and will be checked by the server."}
+            </p>
+            {!matter.archived_at && (
+              <label>
+                Archive reason
+                <textarea
+                  name="reason"
+                  required
+                  minLength={3}
+                  maxLength={2000}
+                  rows={3}
+                />
+              </label>
+            )}
+            <label className="checkbox-label">
+              <input type="checkbox" required />
+              <span>
+                I am authorized to {matter.archived_at ? "restore" : "archive"}{" "}
+                this matter.
+              </span>
+            </label>
+            <div className="form-actions">
+              <button className="button primary" disabled={busy}>
+                {busy
+                  ? "Updating matter…"
+                  : matter.archived_at
+                    ? "Restore matter"
+                    : "Archive matter"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </section>
   );
 }
 

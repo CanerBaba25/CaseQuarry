@@ -17,6 +17,15 @@ from .storage import file_hash
 router = APIRouter(prefix="/api/v1")
 
 
+def upload_identity(value):
+    original_path = value or "evidence.bin"
+    filename = Path(original_path.replace("\\", "/")).name
+    if not filename or len(original_path) > 4000 or any(ord(char) < 32 for char in original_path):
+        fail(422, "FILENAME_INVALID", "Use a valid filename or source path of at most 4,000 characters.")
+    # Client paths are provenance labels; storage always uses server-created hash keys.
+    return filename[:500], original_path
+
+
 def batch_json(batch):
     return {"id": batch.id, "batch_id": batch.id, "job_id": batch.id, "case_id": batch.case_id, "source_id": batch.source_id, "state": batch.state, "counts": {**empty_counts(), **(batch.counts or {})}, "errors": batch.errors, "file_count": len(batch.files), "files": [{key: file[key] for key in ("filename", "byte_size", "sha256") if key in file} for file in batch.files], "checkpoint": batch.checkpoint, "created_at": utc(batch.created_at).isoformat(), "updated_at": utc(batch.updated_at).isoformat(), "parser_version": batch.parser_version}
 
@@ -81,9 +90,7 @@ async def submit_import(case_id: str, request: Request, files: list[UploadFile] 
     used = db.scalar(select(func.coalesce(func.sum(Original.byte_size), 0)).where(Original.case_id == case_id, Original.tenant_id == actor.user.tenant_id)) or 0
     uploaded, total = [], 0
     for file in files:
-        filename = Path((file.filename or "evidence.bin").replace("\\", "/")).name[:500]
-        if not filename or "\x00" in filename:
-            fail(422, "FILENAME_INVALID", "Use a valid filename.")
+        filename, original_path = upload_identity(file.filename)
         temporary = storage.path(f"staging/{new_id()}.upload")
         temporary.parent.mkdir(parents=True, exist_ok=True)
         size = 0
@@ -100,7 +107,7 @@ async def submit_import(case_id: str, request: Request, files: list[UploadFile] 
             if not size:
                 fail(422, "EMPTY_FILE", "Empty files are not accepted for evidence import.")
             key, value, byte_size = storage.store_file(actor.user.tenant_id, case_id, temporary)
-            uploaded.append({"filename": filename, "storage_key": key, "sha256": value, "byte_size": byte_size})
+            uploaded.append({"filename": filename, "original_path": original_path, "storage_key": key, "sha256": value, "byte_size": byte_size})
         finally:
             temporary.unlink(missing_ok=True)
             await file.close()
@@ -172,10 +179,11 @@ def upload_json(upload):
 @router.post("/cases/{case_id}/upload-sessions", status_code=201)
 def begin_upload(case_id: str, body: UploadInput, request: Request, actor: Actor = Depends(current_actor), db=Depends(get_db)):
     authorize_case(db, actor.user, case_id, "import")
+    _filename, original_path = upload_identity(body.filename)
     if body.byte_size > request.app.state.settings.max_upload_bytes:
         fail(413, "UPLOAD_LIMIT", "The file exceeds the configured upload limit.")
     source = ensure_source(db, actor.user, case_id, body.source_id, body.source_label)
-    upload = UploadSession(tenant_id=actor.user.tenant_id, case_id=case_id, user_id=actor.user.id, filename=Path(body.filename.replace("\\", "/")).name, byte_size=body.byte_size, sha256=body.sha256.lower() if body.sha256 else None, part_size=body.part_size, source_id=source.id, expires_at=now() + timedelta(days=1))
+    upload = UploadSession(tenant_id=actor.user.tenant_id, case_id=case_id, user_id=actor.user.id, filename=original_path, byte_size=body.byte_size, sha256=body.sha256.lower() if body.sha256 else None, part_size=body.part_size, source_id=source.id, expires_at=now() + timedelta(days=1))
     db.add(upload)
     db.flush()
     audit.record(db, actor.user, case_id, "upload.started", "upload", upload.id, {"byte_size": body.byte_size}, request.state.request_id)
@@ -242,7 +250,8 @@ def complete_upload(case_id: str, upload_id: str, request: Request, actor: Actor
         if used + size > request.app.state.settings.max_case_bytes:
             fail(413, "CASE_QUOTA_EXCEEDED", "This matter exceeds its configured storage quota.")
         key, _, _ = storage.store_file(actor.user.tenant_id, case_id, temporary)
-        batch = enqueue(db, actor.user, case_id, db.get(Source, upload.source_id), [{"filename": upload.filename, "storage_key": key, "sha256": value, "byte_size": size}], request.state.request_id, f"upload:{upload.id}")
+        filename, original_path = upload_identity(upload.filename)
+        batch = enqueue(db, actor.user, case_id, db.get(Source, upload.source_id), [{"filename": filename, "original_path": original_path, "storage_key": key, "sha256": value, "byte_size": size}], request.state.request_id, f"upload:{upload.id}")
         upload.state, upload.batch_id = "complete", batch.id
         db.commit()
         return batch_json(batch)

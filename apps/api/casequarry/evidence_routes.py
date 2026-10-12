@@ -384,7 +384,10 @@ def apply_review(db, user, case_id, item, body, request_id):
     changes = body.model_dump(exclude_none=True, exclude={"expected_version", "note"})
     if not changes and not body.note:
         fail(422, "REVIEW_EMPTY", "Choose a review change or write a note.")
-    if body.privilege_status in {"confirmed", "cleared"}:
+    if body.privilege_status is not None and (
+        body.privilege_status in {"confirmed", "cleared"}
+        or item.privilege_status in {"confirmed", "cleared"} and body.privilege_status != item.privilege_status
+    ):
         authorize_case(db, user, case_id, "privilege")
     if body.assigned_to and not db.scalar(
         select(Member.id).where(

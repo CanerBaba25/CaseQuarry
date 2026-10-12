@@ -147,6 +147,20 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=ROOT / ".data/synthetic")
     args = parser.parse_args()
     os.chdir(ROOT)
+    qa_paths = {
+        "test": "tests",
+        "test-unit": "tests",
+        "test-integration": "tests",
+        "test-security": "tests",
+        "test-e2e": "scripts/browser_e2e.py",
+        "fixtures": "scripts/generate_synthetic_emails.py",
+        "benchmark": "scripts/benchmark.py",
+    }
+    if args.task in qa_paths and not (ROOT / qa_paths[args.task]).exists():
+        parser.exit(
+            7,
+            "This command uses local QA assets that are excluded from the public source distribution. Core setup/dev/diagnostics do not require them.\n",
+        )
     npm = "npm.cmd" if os.name == "nt" else "npm"
     if args.task == "init":
         initialize()
@@ -165,9 +179,25 @@ def main() -> None:
     elif args.task.startswith("test"):
         run(sys.executable, "-m", "pytest", "-q", "tests")
     elif args.task == "lint":
-        run("ruff", "check", "apps/api", "apps/cli", "scripts", "tests", "migrations")
+        run(
+            "ruff",
+            "check",
+            *(
+                path
+                for path in ["apps/api", "apps/cli", "scripts", "tests", "migrations"]
+                if (ROOT / path).exists()
+            ),
+        )
     elif args.task == "format":
-        run("ruff", "format", "apps/api", "apps/cli", "scripts", "tests", "migrations")
+        run(
+            "ruff",
+            "format",
+            *(
+                path
+                for path in ["apps/api", "apps/cli", "scripts", "tests", "migrations"]
+                if (ROOT / path).exists()
+            ),
+        )
     elif args.task == "typecheck":
         run(npm, "--prefix", "apps/web", "run", "typecheck")
     elif args.task == "smoke":

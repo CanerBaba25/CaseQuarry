@@ -27,15 +27,7 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    ".next/e2e-20261012T214736-58b394/types/**/*.ts",
-    ".next/e2e-20261012T214736-58b394/dev/types/**/*.ts",
-    ".next/e2e-20261012T214811-48ed8e/types/**/*.ts",
-    ".next/e2e-20261012T214811-48ed8e/dev/types/**/*.ts",
-    ".next/e2e-20261012T214913-425730/types/**/*.ts",
-    ".next/e2e-20261012T214913-425730/dev/types/**/*.ts",
-    ".next/e2e-20261012T215032-776e1e/types/**/*.ts",
-    ".next/e2e-20261012T215032-776e1e/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

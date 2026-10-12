@@ -21,4 +21,6 @@ AI and remote transmission are disabled by default. Optional local analysis must
 
 `apps/api/casequarry` contains domain/API/worker code; `apps/cli/casequarry_cli` is the public API client; `apps/web` is the interface; `migrations` tracks schema; `scripts` contains portable setup, fixture, benchmark and source-release utilities. Application-level preservation and hash-chain auditing are not tamper-proof against a machine administrator.
 
-Version 0.1.0 is a development slice. Confidential deployment, final licensing, redaction/production interoperability, backup recovery assurance, practitioner QA and larger capacity claims remain release gates until their exact tests and reviews are recorded.
+The optional Rust evidence core provides bounded streaming SHA-256, native-package manifest verification and MBOX preflight. The CLI invokes a fixed locally built binary through an operation allowlist without a shell; Python fallbacks keep these local diagnostics available when the binary is not built. It does not replace server-side matter authorization or MIME/document parsing.
+
+Version 0.1.0 is a development slice under Apache-2.0. Confidential deployment, production recovery/redaction interoperability, practitioner QA and larger capacity claims remain release gates until their exact tests and reviews are recorded. The local 10k SQLite trial is documented in [benchmarks](BENCHMARKS.md); it proves its recorded scope only.

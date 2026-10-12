@@ -29,3 +29,12 @@ BRAND_NAME_RESEARCH.md
 test-results
 playwright-report
 *.log
+target
+LICENSE_DRAFT.md
+CONTRIBUTOR_TERMS_DRAFT.md
+tests
+scripts/browser_e2e.py
+scripts/browser_smoke.mjs
+scripts/benchmark.py
+scripts/generate_synthetic_emails.py
+scripts/smoke_test.*

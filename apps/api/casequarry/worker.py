@@ -1,6 +1,7 @@
 import logging
 import threading
 
+from .ai_routes import process_pending_ai
 from .config import Settings
 from .database import Database
 from .exports import process_pending_exports
@@ -17,6 +18,7 @@ def worker_loop(database, settings, storage, stop_event):
             if batch_id:
                 run_batch(database, settings, storage, batch_id)
             process_pending_exports(database, settings, storage)
+            process_pending_ai(database, settings, storage)
         except Exception as error:
             LOGGER.error("worker_tick_failed error_type=%s", type(error).__name__)
         stop_event.wait(settings.worker_poll_seconds)

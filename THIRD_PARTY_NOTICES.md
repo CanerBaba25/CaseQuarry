@@ -2,9 +2,9 @@
 
 CaseQuarry source does not include vendored dependency code. Installed libraries and container components retain their independent licenses and packaged notices. Do not remove those notices from deployments or distributions.
 
-This inventory was generated from the checked-in lockfiles and installed Python package metadata. It is a review aid, not a legal compatibility determination. Platform-only packages that were not installed, ambiguous metadata, image transitives and optional model weights need separate review before public distribution.
+This inventory records locked Python, production JavaScript and Rust dependencies, declared license metadata and hashes of available primary distribution license files. Linux-only Python packages were checked against hash-verified PyPI source distributions. It is a review aid, not a legal compatibility determination. Optional platform binaries, container image transitives and model weights require bundle-specific review when redistributed.
 
-The proposed CaseQuarry license remains a draft; it does not replace third-party license rights. See [the machine-readable inventory](docs/DEPENDENCY_INVENTORY.json).
+CaseQuarry uses Apache-2.0. Third-party rights remain independent. See [the machine-readable inventory](docs/DEPENDENCY_INVENTORY.json) and [platform source-distribution verification](docs/PLATFORM_LICENSE_VERIFICATION.json).
 
 | Python package | Locked version | Reported license metadata |
 |---|---|---|
@@ -31,7 +31,7 @@ The proposed CaseQuarry license remains a draft; it does not replace third-party
 | [jaraco-classes](https://pypi.org/project/jaraco-classes/3.4.0/) | 3.4.0 | MIT License |
 | [jaraco-context](https://pypi.org/project/jaraco-context/6.1.2/) | 6.1.2 | MIT |
 | [jaraco-functools](https://pypi.org/project/jaraco-functools/4.6.0/) | 4.6.0 | MIT |
-| [jeepney](https://pypi.org/project/jeepney/0.9.0/) | 0.9.0 | Not installed on the audit platform; review distribution before deployment |
+| [jeepney](https://pypi.org/project/jeepney/0.9.0/) | 0.9.0 | MIT |
 | [keyring](https://pypi.org/project/keyring/25.7.0/) | 25.7.0 | MIT |
 | [lxml](https://pypi.org/project/lxml/6.1.3/) | 6.1.3 | BSD-3-Clause |
 | [mako](https://pypi.org/project/mako/1.4.3/) | 1.4.3 | MIT |
@@ -63,7 +63,7 @@ The proposed CaseQuarry license remains a draft; it does not replace third-party
 | [pyyaml](https://pypi.org/project/pyyaml/6.0.3/) | 6.0.3 | MIT License |
 | [rich](https://pypi.org/project/rich/14.3.4/) | 14.3.4 | MIT License |
 | [ruff](https://pypi.org/project/ruff/0.17.0/) | 0.17.0 | MIT |
-| [secretstorage](https://pypi.org/project/secretstorage/3.5.0/) | 3.5.0 | Not installed on the audit platform; review distribution before deployment |
+| [secretstorage](https://pypi.org/project/secretstorage/3.5.0/) | 3.5.0 | BSD-3-Clause |
 | [shellingham](https://pypi.org/project/shellingham/1.5.4/) | 1.5.4 | ISC License (ISCL) |
 | [soupsieve](https://pypi.org/project/soupsieve/3.0.3/) | 3.0.3 | MIT |
 | [sqlalchemy](https://pypi.org/project/sqlalchemy/2.1.4/) | 2.1.4 | MIT |
@@ -73,7 +73,7 @@ The proposed CaseQuarry license remains a draft; it does not replace third-party
 | [typing-inspection](https://pypi.org/project/typing-inspection/0.4.4/) | 0.4.4 | MIT |
 | [tzdata](https://pypi.org/project/tzdata/2026.5/) | 2026.5 | Apache-2.0 |
 | [uvicorn](https://pypi.org/project/uvicorn/0.54.0/) | 0.54.0 | BSD-3-Clause |
-| [uvloop](https://pypi.org/project/uvloop/0.23.0/) | 0.23.0 | Not installed on the audit platform; review distribution before deployment |
+| [uvloop](https://pypi.org/project/uvloop/0.23.0/) | 0.23.0 | MIT License |
 | [watchfiles](https://pypi.org/project/watchfiles/1.3.0/) | 1.3.0 | MIT License |
 | [websockets](https://pypi.org/project/websockets/17.2/) | 17.2 | BSD-3-Clause |
 | [xlsxwriter](https://pypi.org/project/xlsxwriter/3.2.9/) | 3.2.9 | BSD License |
@@ -137,5 +137,29 @@ The proposed CaseQuarry license remains a draft; it does not replace third-party
 | [source-map-js](https://www.npmjs.com/package/source-map-js) | 1.2.2 | BSD-3-Clause |
 | [styled-jsx](https://www.npmjs.com/package/styled-jsx) | 5.1.6 | MIT |
 | [tslib](https://www.npmjs.com/package/tslib) | 2.8.1 | 0BSD |
+
+| Rust crate | Locked version | Primary distribution license metadata |
+|---|---|---|
+| [block-buffer](https://crates.io/crates/block-buffer/0.10.4) | 0.10.4 | MIT OR Apache-2.0 |
+| [cfg-if](https://crates.io/crates/cfg-if/1.0.5) | 1.0.5 | MIT OR Apache-2.0 |
+| [cpufeatures](https://crates.io/crates/cpufeatures/0.2.17) | 0.2.17 | MIT OR Apache-2.0 |
+| [crypto-common](https://crates.io/crates/crypto-common/0.1.7) | 0.1.7 | MIT OR Apache-2.0 |
+| [digest](https://crates.io/crates/digest/0.10.7) | 0.10.7 | MIT OR Apache-2.0 |
+| [generic-array](https://crates.io/crates/generic-array/0.14.7) | 0.14.7 | MIT |
+| [itoa](https://crates.io/crates/itoa/1.0.18) | 1.0.18 | MIT OR Apache-2.0 |
+| [libc](https://crates.io/crates/libc/0.2.190) | 0.2.190 | MIT OR Apache-2.0 |
+| [memchr](https://crates.io/crates/memchr/2.8.3) | 2.8.3 | Unlicense OR MIT |
+| [proc-macro2](https://crates.io/crates/proc-macro2/1.0.107) | 1.0.107 | MIT OR Apache-2.0 |
+| [quote](https://crates.io/crates/quote/1.0.47) | 1.0.47 | MIT OR Apache-2.0 |
+| [serde](https://crates.io/crates/serde/1.0.229) | 1.0.229 | MIT OR Apache-2.0 |
+| [serde_core](https://crates.io/crates/serde_core/1.0.229) | 1.0.229 | MIT OR Apache-2.0 |
+| [serde_derive](https://crates.io/crates/serde_derive/1.0.229) | 1.0.229 | MIT OR Apache-2.0 |
+| [serde_json](https://crates.io/crates/serde_json/1.0.154) | 1.0.154 | MIT OR Apache-2.0 |
+| [sha2](https://crates.io/crates/sha2/0.10.9) | 0.10.9 | MIT OR Apache-2.0 |
+| [syn](https://crates.io/crates/syn/3.0.9) | 3.0.9 | MIT OR Apache-2.0 |
+| [typenum](https://crates.io/crates/typenum/1.20.1) | 1.20.1 | MIT OR Apache-2.0 |
+| [unicode-ident](https://crates.io/crates/unicode-ident/1.0.27) | 1.0.27 | (MIT OR Apache-2.0) AND Unicode-3.0 |
+| [version_check](https://crates.io/crates/version_check/0.9.5) | 0.9.5 | MIT/Apache-2.0 |
+| [zmij](https://crates.io/crates/zmij/1.0.23) | 1.0.23 | MIT |
 
 Container base images and PostgreSQL are deployed as separate components. Their own distributions contain notices for bundled operating-system packages. This repository does not claim to have completed a container image license/security audit.

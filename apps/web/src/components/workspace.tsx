@@ -20,6 +20,7 @@ import Explorer from "./explorer";
 import { GovernancePage } from "./governance";
 import AccountSecurity from "./account-security";
 import NetworkPage from "./network";
+import SourceAssistant, { LocalModelPolicy } from "./local-model";
 
 const matterNavigation = [
   ["overview", "Overview", "grid"],
@@ -29,6 +30,7 @@ const matterNavigation = [
   ["network", "Communication map", "network"],
   ["timeline", "Timeline", "timeline"],
   ["review", "Review queue", "review"],
+  ["ai", "Source assistant", "sparkle"],
   ["issues", "Issue matrix", "matters"],
   ["tasks", "Tasks", "review"],
   ["holds", "Preservation holds", "lock"],
@@ -47,6 +49,7 @@ export default function Workspace() {
   const [palette, setPalette] = useState(false),
     [navOpen, setNavOpen] = useState(false),
     [dark, setDark] = useState(false);
+  const [includeArchived, setIncludeArchived] = useState(false);
   const pieces = pathname.split("/").filter(Boolean),
     caseId =
       pieces[0] === "app" && pieces[1] === "matters" && pieces[2] !== "new"
@@ -58,7 +61,7 @@ export default function Workspace() {
     user && caseId ? `/cases/${caseId}` : null,
   );
   const cases = useResource<{ items: Matter[]; next_cursor: string | null }>(
-    user ? "/cases" : null,
+    user ? `/cases${includeArchived ? "?archived=true" : ""}` : null,
   );
 
   const boot = useCallback(async () => {
@@ -205,7 +208,8 @@ export default function Workspace() {
             <nav>
               {matterNavigation
                 .filter(
-                  ([key]) => !["tasks", "holds", "settings"].includes(key),
+                  ([key]) =>
+                    !["tasks", "holds", "settings", "ai"].includes(key),
                 )
                 .map(([key, text, icon]) => (
                   <Link
@@ -219,7 +223,7 @@ export default function Workspace() {
                 ))}
               <details
                 className="nav-more"
-                open={["tasks", "holds", "settings"].includes(section)}
+                open={["tasks", "holds", "settings", "ai"].includes(section)}
               >
                 <summary>
                   <Icon name="settings" />
@@ -228,7 +232,7 @@ export default function Workspace() {
                 </summary>
                 {matterNavigation
                   .filter(([key]) =>
-                    ["tasks", "holds", "settings"].includes(key),
+                    ["tasks", "holds", "settings", "ai"].includes(key),
                   )
                   .map(([key, text, icon]) => (
                     <Link
@@ -357,6 +361,8 @@ export default function Workspace() {
               <TimelinePage matter={matter.data} />
             ) : section === "network" ? (
               <NetworkPage matter={matter.data} />
+            ) : section === "ai" ? (
+              <SourceAssistant matter={matter.data} />
             ) : section === "audit" ? (
               <AuditPage matter={matter.data} />
             ) : ["holds", "issues", "tasks"].includes(section) ? (
@@ -369,8 +375,12 @@ export default function Workspace() {
             ) : (
               <SettingsPage
                 matter={matter.data}
-                refresh={matter.refresh}
+                refresh={() => {
+                  matter.refresh();
+                  cases.refresh();
+                }}
                 user={user}
+                modelPolicy={<LocalModelPolicy matter={matter.data} />}
               />
             )
           ) : accountSettings ? (
@@ -383,7 +393,11 @@ export default function Workspace() {
               }}
             />
           ) : (
-            <MatterDashboard cases={cases} />
+            <MatterDashboard
+              cases={cases}
+              includeArchived={includeArchived}
+              toggleArchived={setIncludeArchived}
+            />
           )}
         </main>
       </div>
@@ -547,10 +561,14 @@ function AuthPage({
 
 function MatterDashboard({
   cases,
+  includeArchived,
+  toggleArchived,
 }: {
   cases: ReturnType<
     typeof useResource<{ items: Matter[]; next_cursor: string | null }>
   >;
+  includeArchived: boolean;
+  toggleArchived: (value: boolean) => void;
 }) {
   const [filter, setFilter] = useState("");
   const rows =
@@ -596,6 +614,14 @@ function MatterDashboard({
               {number(cases.data?.items.length)}
             </span>
           </h2>
+          <label className="archived-toggle">
+            <input
+              type="checkbox"
+              checked={includeArchived}
+              onChange={(event) => toggleArchived(event.target.checked)}
+            />
+            <span>Include archived</span>
+          </label>
           <label className="search-small">
             <Icon name="search" size={17} />
             <input

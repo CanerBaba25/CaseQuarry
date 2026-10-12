@@ -30,6 +30,8 @@ EXCLUDED_DIRS = {
     "coverage",
     "dist",
     "build",
+    "target",
+    "tests",
 }
 EXCLUDED_NAMES = {
     "IMPLEMENTATION_STATUS.md",
@@ -39,6 +41,8 @@ EXCLUDED_NAMES = {
     "hooks.json",
     "GRAPH_REPORT.md",
     "RTK.toml",
+    "LICENSE_DRAFT.md",
+    "CONTRIBUTOR_TERMS_DRAFT.md",
 }
 EXCLUDED_PATTERNS = [
     "*CODEX_MASTER_SPEC*",
@@ -59,10 +63,27 @@ EXCLUDED_PATTERNS = [
     "*.key",
     ".env",
     ".env.*",
+    "test_*.py",
+    "*_test.py",
+    "*.test.*",
+    "*.spec.*",
+    "playwright.config.*",
+    "smoke_test.*",
 ]
+
+LOCAL_QA_PATHS = {
+    "scripts/browser_e2e.py",
+    "scripts/browser_smoke.mjs",
+    "scripts/benchmark.py",
+    "scripts/generate_synthetic_emails.py",
+    "scripts/smoke_test.ps1",
+    "scripts/smoke_test.sh",
+}
 
 
 def allowed(name: str) -> bool:
+    if name.replace("\\", "/") in LOCAL_QA_PATHS:
+        return False
     path = Path(name)
     if any(part in EXCLUDED_DIRS or part.casefold().startswith((".graphify", ".rtk")) for part in path.parts):
         return False
