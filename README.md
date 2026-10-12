@@ -2,39 +2,58 @@
 
 **Find the facts. Follow the evidence.**
 
-**Free legal eDiscovery, email investigation, digital evidence review, and source-cited AI summaries.**
+CaseQuarry is a self-hosted workspace for preserving, searching and reviewing digital evidence. It combines a TypeScript/React interface, a Python API and document parsers, and a Rust command-line integrity engine.
 
-CaseQuarry is a **planned** self-hosted, privacy-first platform for law firms, attorneys, investigators and paralegals. It is designed to organize large document collections, index millions of emails, reconstruct conversations, trace people and relationships, search and categorize evidence, and prepare source-linked summaries for human review.
+Version **0.1.0** is a working development release for synthetic data and evaluation. It is not production-ready or validated for confidential client matters.
 
-> **Project status:** This starter kit is a product and engineering specification, not a working application. Scale and security claims must be validated before the app is used for client data.
+## What works
 
-## Planned features
+- Account setup, password authentication, optional authenticator MFA, tenant separation and matter-specific roles.
+- Resumable imports of EML, MBOX, text, HTML, CSV, JSON, PDF, DOCX, XLSX, PPTX, images and bounded ZIP archives. Missing OCR and parser errors remain visible.
+- Immutable content-addressed originals, SHA-256 verification, duplicate occurrences, attachment families, source spans and raw email dates/headers.
+- Boolean and field search, facets, grouping, server pagination, people, communication networks, threads and timelines.
+- Human review, tags, notes, saved searches, review sets, issues, tasks and legal holds.
+- Audited CSV/JSON exports and reviewed native ZIP packages with manifests, integrity checks and privilege/family safeguards.
+- Optional local quotation extraction with verified source citations and human review. It is off by default.
+- Authenticated CLI, Rust streaming hash/manifest verification and MBOX preflight, versioned database migrations, and encrypted development backup/restore.
 
-- Import and index EML, MBOX, PST and other evidence formats, subject to tested parser availability.
-- Search, filter, sort, group, bulk-tag and review records without loading whole datasets into the browser.
-- Investigate senders, recipients, conversations, organizations, links, chronology, attachments and document families.
-- Preserve originals, calculate SHA-256 hashes, record source and provenance, and audit reviewer operations.
-- Optional AI summaries, contradiction candidates, issue maps and timelines **with links to specific evidence**.
-- Matter-level access control, review queues, privacy protection, legal holds and permissioned exports.
-- Self-hosted by default; document search and review remain useful with AI disabled.
+The interface uses live APIs and persisted records. PST/OST, media transcription, external connectors, advanced redaction/Bates production and large-scale search remain unfinished.
 
-## Free use and contributions — intended license model
+## Run locally
 
-- **Free to use:** individuals and law firms may run official, unmodified builds without paying the copyright owner, including when providing paid legal services.
-- **Community help welcome:** please open [Issues](../../issues) for bugs or suggestions and submit [Pull Requests](../../pulls) to the **original CaseQuarry repository**. Contribution-only branches and forks are allowed for this purpose.
-- **No independent modified editions:** you may not release, run as a separately marketed modified service, sell, rebrand or independently maintain a modified copy of the product without the copyright owner's written permission.
-- **Source-available, not OSI open source.** Normal GitHub public forks used to contribute are allowed; independently exploiting a fork is a different activity.
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and Node.js 24, then:
 
-Read [`CONTRIBUTING.md`](./CONTRIBUTING.md), [`LICENSE_DRAFT.md`](./LICENSE_DRAFT.md) and [`CONTRIBUTOR_TERMS_DRAFT.md`](./CONTRIBUTOR_TERMS_DRAFT.md). **All license/contributor terms are working drafts requiring qualified legal review before public release.** Rights in independently licensed third-party components remain subject to their own licenses.
+```shell
+uv sync --locked
+uv run python scripts/tasks.py setup
+uv run python scripts/tasks.py dev
+```
 
-## Search and discoverability
+Open **http://127.0.0.1:3000/setup**. Enter the generated setup token from your local `.env` and choose your administrator password. Keep `.env` and `.data` private.
 
-Suggested GitHub repository: **`casequarry`**. Suggested description:
+For the optional native integrity engine, install Rust and run:
 
-> Free, self-hosted legal eDiscovery and AI evidence review. Search millions of emails, organize digital evidence, analyze conversations and generate source-cited case summaries.
+```shell
+cargo build --release -p casequarry-evidence-core
+uv run cq ingest inventory-mbox path/to/mailbox.mbox
+```
 
-Suggested topics: `legal-tech`, `ediscovery`, `legal-ai`, `evidence-management`, `digital-evidence`, `email-analysis`, `self-hosted`, `investigations`.
+The CLI selects the built local engine automatically and provides an explicit Python fallback. It does not download executables while processing evidence.
 
-## Disclaimer
+See [Windows installation](docs/INSTALL_WINDOWS.md), [Linux installation](docs/INSTALL_LINUX.md), [CLI reference](docs/CLI_REFERENCE.md), [reviewer guide](docs/REVIEWER_GUIDE.md) and [administrator guide](docs/ADMIN_GUIDE.md). Container configuration is supplied; Docker/PostgreSQL execution has not been verified on this development machine.
 
-CaseQuarry, once built, is intended to assist professional judgment, not provide legal advice, guarantee legal outcomes, perform privilege decisions automatically, guarantee admissibility, or claim regulatory certification. Never upload confidential client materials to a public issue or PR.
+## Verification and limits
+
+A local SQLite benchmark imported **10,000 synthetic emails plus 100 mixed documents** with no failed items. It recorded 10,902 occurrences, 199 duplicate objects and a 245 ms grouped-search p95. Ten image documents were retained with extraction marked partial because OCR was unavailable. See [measured results and limitations](docs/BENCHMARKS.md).
+
+Local automated verification covers authorization, hostile archives, provenance, imports, exports, MFA, migrations, CLI behavior, backup/restore and real browser workflows. Test suites, synthetic generators and browser harnesses are kept local and excluded from this source distribution. Source linting, frontend typechecking/builds and Rust compilation remain available.
+
+The two-million-email target, PostgreSQL behavior, real-model quality, production hardening and disaster recovery are unvalidated. Consult the [threat model](docs/THREAT_MODEL.md), [evidence integrity](docs/EVIDENCE_INTEGRITY.md) and [data handling](docs/DATA_HANDLING.md) before evaluation. Audit hash chains detect local inconsistency; they are not independently signed attestations.
+
+## License and branding
+
+The code is licensed under [Apache 2.0](LICENSE). Modification, independent forks, redistribution and commercial use are permitted under its terms. Dependencies retain their [own licenses](THIRD_PARTY_NOTICES.md). Contributions follow [CONTRIBUTING.md](CONTRIBUTING.md).
+
+The license does not grant general trademark rights. Read the [branding policy](docs/BRAND_POLICY.md) and [preliminary name check](docs/NAME_CHECK.md). No trademark registration or legal clearance is claimed.
+
+CaseQuarry supports professional judgment. It does not provide legal advice, decide privilege automatically, guarantee admissibility or claim regulatory certification. Never post client evidence or secrets in public issues.

@@ -1,38 +1,24 @@
-## Proposed change
+## Problem and resulting behavior
 
-<!-- Explain what this change does, who benefits, and why the original upstream project needs it. -->
+<!-- Explain the trigger, previous behavior and what changes for users. -->
 
-Related issue: #
-
-## Type
-
-- [ ] Bug fix
-- [ ] Feature
-- [ ] Tests/quality
-- [ ] Documentation
-- [ ] Security fix (public-safe only)
+Related issue:
 
 ## Validation
 
-- [ ] I used only synthetic or properly shareable test data, not confidential real client evidence
-- [ ] I added/updated relevant tests and recorded their actual results below
-- [ ] I checked authorization, evidence integrity, audit effects and AI/source citation behavior where relevant
-- [ ] I reviewed backward compatibility, migrations and any new dependencies
-- [ ] I did not include keys, tokens, secrets or privileged material
+<!-- Record commands and actual results. Use synthetic material only. -->
 
-Commands run and actual results:
+## Compatibility and operations
 
-```text
-# Paste actual commands/results; do not claim tests passed unless run.
-```
+<!-- Describe migrations, rollback, permissions, exports or new dependencies when relevant. -->
 
-## License and contribution
+- [ ] I have authority to submit these changes under Apache 2.0.
+- [ ] Third-party code and required notices are identified.
+- [ ] I reviewed and validated the changes and recorded actual results.
+- [ ] No client evidence, credentials or other private material is included.
+- [ ] Authorization, provenance and bounded processing remain intact.
+- [ ] Product documentation matches the resulting behavior.
 
-- [ ] This PR is intended for the **original CaseQuarry repository** only. I am not using it to distribute an independent modified product.
-- [ ] I have legal authority to submit my own contribution and have documented any third-party code used.
-- [ ] I have read the contributor terms **draft** and understand maintainers will require an approved rights grant before accepting external code. This checkbox is **not** an automatic copyright transfer or acceptance of unfinalized terms.
-- [ ] All changes have been reviewed and validated.
+## Screenshots
 
-## Screenshots/notes (optional)
-
-<!-- Use fake/synthetic data only. -->
+<!-- Optional; synthetic evidence only. -->
