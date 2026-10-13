@@ -177,12 +177,13 @@ the larger benchmark has not yet been repeated with the new extraction pipeline.
 Percentiles use 15 queries; these results are not a production SLA or a multi-million
 capacity claim. See [benchmark scope and method](docs/BENCHMARKS.md).
 
-The complete local Python suite passed **316 tests**. The Rust integrity component
+The complete local Python suite passed **337 tests**. The Rust integrity component
 passed **five tests**, and the native desktop client passed **seven Rust tests** plus
 **12 actual WebView2 and installer checks**. A real PostgreSQL browser run passed
 **25 workflows**, including automatic task refresh, review/production controls,
-375px mobile views and account isolation. Six further browser checks cover provider
-consent, the worklist, live access revocation and server-side matter search.
+375px mobile views and account isolation. Seven further browser checks cover provider
+consent, fresh confirmation for every external job, the worklist, live access revocation
+and server-side matter search.
 Controlled HTTP responses exercise all
 four provider transports; live vendor accounts and model quality remain unvalidated.
 GitHub verifies linting, PostgreSQL migrations and Python/web/Rust/desktop builds.

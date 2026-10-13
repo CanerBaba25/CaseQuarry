@@ -7,11 +7,17 @@ The installer does not deploy a server, create a separate evidence database or p
 ## Install and connect
 
 1. Download `CaseQuarry_0.3.0_x64-setup.exe` from the GitHub release and verify its SHA-256 against the release checksums.
-2. Run the installer. It installs for the current Windows user. Microsoft Edge WebView2 is required; the bundled Microsoft bootstrapper downloads the runtime if missing. That first runtime installation requires internet access. Windows 10 or later is the supported baseline.
+2. Run the installer. It installs for the current Windows user. Microsoft Edge WebView2 is required; if missing, the installer downloads the bootstrapper directly from Microsoft and opens Microsoft's prerequisite installation interface. Review its applicable terms before proceeding. That first runtime installation requires internet access. Windows 10 or later is the supported baseline.
 3. Open CaseQuarry and enter the firm website origin, such as `https://cases.example.com`, without a sign-in path, query or token. The website must expose `/api/v1/setup` on the same origin.
 4. Select **Connect to firm server**. The client checks TLS and the setup API before opening the workspace. Sign in with your existing account. An uninitialized server uses the existing setup flow; its administrator still needs the server's setup token.
 
 The release installer and application are **unsigned**. No publisher certificate, signing identity or SmartScreen reputation is claimed. Automatic binary updates are not included: install a newer GitHub release to update the desktop. The live workspace follows the version deployed by the firm administrator.
+
+## Microsoft runtime terms and privacy
+
+The desktop installer does not embed Microsoft's bootstrapper or a fixed WebView2 runtime. Existing runtime installations are reused; a missing prerequisite is obtained directly from Microsoft's service. WebView2 is separately governed by Microsoft's terms and is not relicensed under CaseQuarry's Apache License. The installed third-party notices contain the Microsoft component disclosure and official links. [Microsoft download and license terms](https://developer.microsoft.com/en-us/microsoft-edge/webview2/), [runtime distribution documentation](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution).
+
+WebView2 collects required and optional diagnostic information; Windows diagnostic settings govern optional collection. Microsoft Defender SmartScreen is enabled by default and can send security-related navigation or download information to Microsoft. CaseQuarry does not claim to disable those runtime mechanisms. Evergreen runtime updates are managed by Microsoft independently of CaseQuarry's release updates. Review [WebView2 data and privacy](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/data-privacy) and [Microsoft's Privacy Statement](https://privacy.microsoft.com/en-us/privacystatement) when deploying the client for confidential matters.
 
 ## Connection settings and sessions
 

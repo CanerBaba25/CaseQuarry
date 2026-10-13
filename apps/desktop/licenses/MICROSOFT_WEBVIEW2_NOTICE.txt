@@ -1,0 +1,39 @@
+Microsoft Edge WebView2 Runtime - separately installed prerequisite
+
+CaseQuarry Desktop uses Microsoft Edge WebView2 Runtime to display the firm
+workspace. Microsoft owns and separately licenses this component. CaseQuarry's
+Apache License 2.0 does not license Microsoft's proprietary runtime or installer.
+
+The CaseQuarry installer does not embed or redistribute Microsoft's Evergreen
+bootstrapper or a fixed runtime. If the runtime is missing, the installer obtains
+the bootstrapper directly from Microsoft's official download service and runs
+Microsoft's prerequisite installation with its normal user interface. Existing
+runtime installations are reused. Installation of a missing runtime requires
+internet access. Microsoft's applicable terms govern that software; review them
+through Microsoft's download and installation flow.
+
+WebView2 can collect required and optional diagnostic information and send it to
+Microsoft. Windows diagnostic settings govern optional diagnostic collection.
+Microsoft Defender SmartScreen is enabled by default in WebView2 and can send
+navigation or download security information to Microsoft. CaseQuarry does not
+claim to disable all WebView2 diagnostics or SmartScreen. The Evergreen runtime
+can receive automatic Microsoft updates independently of CaseQuarry updates.
+
+Official download and Microsoft Software License Terms:
+https://developer.microsoft.com/en-us/microsoft-edge/webview2/
+
+Microsoft WebView2 distribution documentation:
+https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution
+
+Microsoft WebView2 data and privacy documentation:
+https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/data-privacy
+
+Microsoft Privacy Statement:
+https://privacy.microsoft.com/en-us/privacystatement
+
+Microsoft Edge privacy whitepaper, including SmartScreen:
+https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/data-privacy#smartscreen
+
+This notice identifies a separate Microsoft component and its official
+documentation. It does not reproduce or replace Microsoft's current license
+agreement or certify legal compliance for a particular deployment.

@@ -39,17 +39,24 @@ Web and Windows desktop development preview with a shared PostgreSQL firm server
 - Release assets include the Windows desktop installer, built Windows/Linux web
   server packages, source ZIP and SHA-256 sidecars. Packages carry the project and
   applicable third-party license notices.
+- Standalone server packages include pinned image-library source archives, build
+  recipes, patches and complete notices for their bundled native/WASM libraries.
+  Microsoft’s WebView2 bootstrapper is downloaded directly during installation when
+  needed, with its own prerequisite UI and terms; it is not included in the desktop binary.
 
 ### Validation and limits
 
-The complete local Python suite passed 316 tests. Real PostgreSQL acceptance covered imports, queued/concurrent quotas and immutable
+The complete local Python suite passed 337 tests. Real PostgreSQL acceptance covered
+imports, queued/concurrent quotas and immutable
 reprocessing. The complete browser run passed 25 workflows, including provider key
 handling, shared task refresh, review, productions, mobile views and account isolation.
-Six focused browser checks additionally verify firm/matter/per-job consent, mobile
+Seven focused browser checks additionally verify firm/matter/per-job consent, mobile
 provider settings, shared worklists, live membership revocation and matter search.
+External confirmation resets after scope changes and every submitted or failed request;
+an unchecked retry cannot transmit evidence.
 Native Windows verification passed seven Rust tests and 12 actual WebView2/installer
 checks, including PostgreSQL-backed login, remote IPC denial, install and uninstall.
-Cloud/local adapter checks passed 82 focused tests, with two actual API checks also
+Cloud/local adapter checks passed 94 focused tests, with two actual API checks also
 run on PostgreSQL. These use controlled provider HTTP responses; no paid vendor
 request or real account/model compatibility claim is made.
 

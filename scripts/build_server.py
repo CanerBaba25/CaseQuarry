@@ -12,6 +12,11 @@ import tomllib
 import zipfile
 from pathlib import Path
 
+if __package__:
+    from .server_runtime_licenses import preserve_runtime_sources
+else:
+    from server_runtime_licenses import preserve_runtime_sources
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -83,7 +88,10 @@ def build(args):
                         target.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(entry, target)
                         files.append(target.relative_to(package).as_posix())
-            notices.append({"name": dependency, "version": dependency_version, "declared_license": metadata.get("license"), "preserved_license_files": files})
+            repository = metadata.get("repository")
+            repository = repository.get("url") if isinstance(repository, dict) else repository
+            notices.append({"name": dependency, "version": dependency_version, "declared_license": metadata.get("license"), "upstream_repository": repository, "upstream_distribution": f"https://www.npmjs.com/package/{dependency}/v/{dependency_version}", "preserved_license_files": files})
+        preserve_runtime_sources(package, args.platform, notices)
         (package / "runtime-licenses").mkdir(exist_ok=True)
         (package / "runtime-licenses/inventory.json").write_text(json.dumps(notices, indent=2) + "\n", encoding="utf8")
         shutil.copyfile(ROOT / "docs/SERVER_INSTALL.md", package / "INSTALL.md")

@@ -65,7 +65,7 @@ def save_credential(identifier: ProviderID, body: CredentialInput, request: Requ
         key = decrypt_key(request.app.state.settings, existing)
     else:
         key = _key(body.api_key.get_secret_value())
-    if model == key:
+    if key in model:
         fail(422, "PROVIDER_MODEL_INVALID", "The model identifier must not contain your API key.")
     if existing is None:
         row = ProviderCredential(id=new_id(), tenant_id=actor.user.tenant_id, user_id=actor.user.id, provider=identifier, model=model, last_four=key[-4:], revision=1, revoked=False)

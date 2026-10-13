@@ -2,7 +2,7 @@
   "platform": "windows-x64",
   "scope": "Locked Windows Cargo graph and installed npm source/build packages; includes build tools.",
   "notice_file": "THIRD_PARTY_NOTICES.txt",
-  "notice_sha256": "446a030075428d6628d1ddce39d6cabdf1be78982ef95e180ed5480642f45cf5",
+  "notice_sha256": "46bd39b03887a45ac173a90c749a8aedf93f476eca2b206d35418254f1e37d3b",
   "packages": [
     {
       "ecosystem": "Cargo",

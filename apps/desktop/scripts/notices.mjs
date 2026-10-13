@@ -162,6 +162,11 @@ for (const entry of entries) {
     output += "\n--- " + text.name + " ---\n" + text.text + "\n";
   output += "\n";
 }
+output += "=".repeat(76) + "\n";
+output +=
+  readFileSync(join(desktop, "licenses/MICROSOFT_WEBVIEW2_NOTICE.txt"), "utf8")
+    .replace(/\r\n/g, "\n")
+    .trim() + "\n";
 writeFileSync(join(desktop, "THIRD_PARTY_NOTICES.txt"), output);
 writeFileSync(
   join(desktop, "DEPENDENCY_INVENTORY.json"),

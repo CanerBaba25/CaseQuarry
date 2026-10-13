@@ -21,6 +21,8 @@ type Policy = {
   warnings: string[];
   reason: string;
   revision: number;
+  credential_revision?: number | null;
+  firm_policy_revision?: number;
 };
 type Citation = {
   evidence_id: string;
@@ -127,6 +129,7 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
     [busy, setBusy] = useState(false),
     [review, setReview] = useState<Finding | null>(null),
     [decision, setDecision] = useState("accept");
+  const [externalConfirmed, setExternalConfirmed] = useState(false);
   const selected = useResource<Job>(
     jobId ? `/cases/${matter.id}/ai/jobs/${jobId}` : null,
   );
@@ -141,6 +144,9 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
     setError(null);
   }, [matter.id]);
   useEffect(() => {
+    setExternalConfirmed(false);
+  }, [matter.id, policy.data?.provider, policy.data?.model, policy.data?.revision, policy.data?.credential_revision, policy.data?.firm_policy_revision]);
+  useEffect(() => {
     if (!active) return;
     const timer = setInterval(() => {
       selected.refresh();
@@ -151,6 +157,7 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    setExternalConfirmed(false);
     const ids = String(form.get("evidence_ids") || "")
       .split(",")
       .map((id) => id.trim())
@@ -229,7 +236,10 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
               </div>
             )
           )}
-          <form onSubmit={submit}>
+          <form onSubmit={submit} onChange={(event) => {
+            const target = event.target;
+            if ((target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) && target.name !== "confirmed_external") setExternalConfirmed(false);
+          }}>
             <ErrorBox error={error} />
             <label>
               Question or extraction focus
@@ -269,7 +279,7 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
             {external && <div className="external-job-confirmation" key={`${policy.data?.provider}:${policy.data?.model}`}>
               <p className="field-help">This request sends your question and selected source excerpts to {providerName(policy.data!.provider)} using your saved model ({policy.data!.model || "not configured"}). Provider charges and retention terms apply.</p>
               <label>External processing purpose<textarea name="external_reason" required minLength={3} maxLength={2000} rows={2} disabled={busy || !policy.data?.effective_enabled} /></label>
-              <label className="checkbox-label"><input name="confirmed_external" type="checkbox" required disabled={busy || !policy.data?.effective_enabled} /><span>I approve sending this job’s selected excerpts to {providerName(policy.data!.provider)}.</span></label>
+              <label className="checkbox-label"><input name="confirmed_external" type="checkbox" checked={externalConfirmed} onChange={(event) => setExternalConfirmed(event.target.checked)} required disabled={busy || !policy.data?.effective_enabled} /><span>I approve sending this job’s selected excerpts to {providerName(policy.data!.provider)}.</span></label>
             </div>}
             <button
               className="button primary"

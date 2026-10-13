@@ -1,0 +1,528 @@
+{
+  "format": 1,
+  "sharp_version": "0.35.5",
+  "libvips_package_version": "1.3.4",
+  "libvips_version": "8.18.7",
+  "emscripten_version": "6.0.10",
+  "materials_scope": "Unmodified upstream source archives, matching native/WASM build recipes, primary distribution licenses and upstream patches; component versions are checked against actual bundled package manifests. No claim of bit-for-bit native rebuild or legal clearance.",
+  "wasm_revision_provenance": {
+    "revision": "dca91909178800875b575eb896d1fe4ed0a27931",
+    "resolution": "Inferred last recorded commit before the upstream public release job; the timing and matching versions support this revision, but the exact SHA resolved by the upstream build was not recorded. The upstream build recipe selects HEAD.",
+    "job": "https://github.com/lovell/sharp-libvips/actions/runs/36315646015/job/108609814244",
+    "started_at": "2026-09-27T11:25:26Z",
+    "completed_at": "2026-09-27T11:43:51Z",
+    "last_prior_commit": "https://github.com/kleisauke/wasm-vips/commit/dca91909178800875b575eb896d1fe4ed0a27931",
+    "last_prior_commit_time": "2026-09-26T11:44:25Z"
+  },
+  "sources": [
+    {
+      "component": "sharp",
+      "version": "0.35.5",
+      "url": "https://codeload.github.com/lovell/sharp/tar.gz/refs/tags/v0.35.5",
+      "filename": "sharp-0.35.5.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "5c609162a873c7d67c903f5dab39351642eedfc967f090c85e48cb6b8dd395c1",
+      "bytes": 41792658
+    },
+    {
+      "component": "sharp-libvips-build",
+      "version": "1.3.4",
+      "url": "https://codeload.github.com/lovell/sharp-libvips/tar.gz/refs/tags/v1.3.4",
+      "filename": "sharp-libvips-build-1.3.4.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "a8e96acb479c9bc1a5b7950f8f25aa6c8e1ef3a19755b45cf2f00d506aeaccc0",
+      "bytes": 24490
+    },
+    {
+      "component": "windows-libvips-build",
+      "version": "8.18.7",
+      "url": "https://codeload.github.com/libvips/build-win64-mxe/tar.gz/refs/tags/v8.18.7",
+      "filename": "windows-libvips-build-8.18.7.tar.gz",
+      "platforms": [
+        "windows-x64"
+      ],
+      "sha256": "6e3c03a6af46f06f15495d72d116ceeb0c91faa2bdd7a8f31ffb811a74458fbd",
+      "bytes": 65711
+    },
+    {
+      "component": "wasm-vips-build",
+      "version": "dca91909178800875b575eb896d1fe4ed0a27931",
+      "url": "https://codeload.github.com/kleisauke/wasm-vips/tar.gz/dca91909178800875b575eb896d1fe4ed0a27931",
+      "filename": "wasm-vips-build-dca91909178800875b575eb896d1fe4ed0a27931.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "37e18bb8d1a7469587a645d1418bfb7f9b9590516f8e04e629a7ea3ec748cac5",
+      "bytes": 7715177
+    },
+    {
+      "component": "wasm-glib-patched",
+      "version": "2.90.0",
+      "url": "https://codeload.github.com/kleisauke/glib/tar.gz/1180af32b6d401f79017156a260945483404edd0",
+      "filename": "wasm-glib-patched-2.90.0.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "c0e040e4781776a48b9f2cc8a15413575ef1aa5547268e8565e29b931d0d4b91",
+      "bytes": 10165467
+    },
+    {
+      "component": "wasm-libvips-patched",
+      "version": "8.18.7",
+      "url": "https://codeload.github.com/kleisauke/libvips/tar.gz/e9ac3e5c29fed4e3c8678595564e4974f1ef05c1",
+      "filename": "wasm-libvips-patched-8.18.7.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "b8c9cdf2f18f7d815a5ae05f3b1bffbc74cda44698c7de861c6583d9b83e9de6",
+      "bytes": 27957277
+    },
+    {
+      "component": "windows-mxe-build",
+      "version": "20260924",
+      "url": "https://codeload.github.com/kleisauke/mxe/tar.gz/c36160b231e66e1cbe032ed54aef7617e8b259da",
+      "filename": "windows-mxe-build-20260924.tar.gz",
+      "platforms": [
+        "windows-x64"
+      ],
+      "sha256": "b71d435d977b64f56b048c948a7649892fc36a1977ecd30ca0e7fe3c21b2f607",
+      "bytes": 2666414
+    },
+    {
+      "component": "aom",
+      "version": "3.15.1",
+      "url": "https://storage.googleapis.com/aom-releases/libaom-3.15.1.tar.gz",
+      "filename": "aom-3.15.1.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "8ca0c52746174603500f0adb6f2a215d69c9ca2aab2acb3caa06fb791d8d01bf",
+      "bytes": 6623477
+    },
+    {
+      "component": "archive",
+      "version": "3.8.9",
+      "url": "https://codeload.github.com/libarchive/libarchive/tar.gz/refs/tags/v3.8.9",
+      "filename": "archive-3.8.9.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "744346f6bca195c8f894f847bb32a16e9bcae6002624a58fadc81e80f595b3cb",
+      "bytes": 6653692
+    },
+    {
+      "component": "cairo",
+      "version": "1.18.6",
+      "url": "https://cairographics.org/releases/cairo-1.18.6.tar.xz",
+      "filename": "cairo-1.18.6.tar.xz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "1c767308174337a74694da0f3ec069c271452163a1ef4540964c50c301f157d4",
+      "bytes": 32725456
+    },
+    {
+      "component": "cgif",
+      "version": "0.5.4",
+      "url": "https://codeload.github.com/dloebl/cgif/tar.gz/refs/tags/v0.5.4",
+      "filename": "cgif-0.5.4.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "83a70a15bc2da41f081a44ebc58ee48e2e1d524a6d3fdb4a24064afa08d5ad4d",
+      "bytes": 40028
+    },
+    {
+      "component": "exif",
+      "version": "0.6.26",
+      "url": "https://codeload.github.com/libexif/libexif/tar.gz/refs/tags/v0.6.26",
+      "filename": "exif-0.6.26.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "32e591455339504b7d02f3e9b0a48f16f5455462a9059a7f47639980e82e4bc1",
+      "bytes": 1314654
+    },
+    {
+      "component": "expat",
+      "version": "2.8.5",
+      "url": "https://codeload.github.com/libexpat/libexpat/tar.gz/refs/tags/R_2_8_5",
+      "filename": "expat-2.8.5.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "fd022c541a189bd5bee042a22188351b31e39b9389c2525fa98c28bd05c9ef21",
+      "bytes": 8474242
+    },
+    {
+      "component": "ffi",
+      "version": "3.8.0",
+      "url": "https://codeload.github.com/libffi/libffi/tar.gz/refs/tags/v3.8.0",
+      "filename": "ffi-3.8.0.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "bf40d752d8f5fd4505bcd1c7d4208ea87fd12c91f087e359651c776748352dc0",
+      "bytes": 662493
+    },
+    {
+      "component": "fontconfig",
+      "version": "2.18.3",
+      "url": "https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/2.18.3/fontconfig-2.18.3.tar.gz",
+      "filename": "fontconfig-2.18.3.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "9ae01e1d53acdef56010c5451cd34aa41d325b2faccd8606448d8fa01b2496b3",
+      "bytes": 666753
+    },
+    {
+      "component": "freetype",
+      "version": "2.14.3",
+      "url": "https://codeload.github.com/freetype/freetype/tar.gz/refs/tags/VER-2-14-3",
+      "filename": "freetype-2.14.3.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "dc49de6b01a266eef4876a4dd34d9842c475d3e28ff2eff63bd2fb760ab56261",
+      "bytes": 2515533
+    },
+    {
+      "component": "fribidi",
+      "version": "1.0.17",
+      "url": "https://codeload.github.com/fribidi/fribidi/tar.gz/refs/tags/v1.0.17",
+      "filename": "fribidi-1.0.17.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "ab015bb040b2ff4bf815813c21948947dad1e0186473359e99a8881c79878d5d",
+      "bytes": 2161145
+    },
+    {
+      "component": "glib",
+      "version": "2.90.0",
+      "url": "https://codeload.github.com/GNOME/glib/tar.gz/refs/tags/2.90.0",
+      "filename": "glib-2.90.0.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "b67a1cf3630088638ac8d3d9f0129625e3df2eae7600181c45629d7c9b2d43b6",
+      "bytes": 10154360
+    },
+    {
+      "component": "harfbuzz",
+      "version": "14.5.0",
+      "url": "https://codeload.github.com/harfbuzz/harfbuzz/tar.gz/refs/tags/14.5.0",
+      "filename": "harfbuzz-14.5.0.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "97ec7488a46b974e18e08ee774af93173e7e1dbf738424796eb315ebcb735ec5",
+      "bytes": 38777964
+    },
+    {
+      "component": "heif",
+      "version": "1.23.5",
+      "url": "https://codeload.github.com/strukturag/libheif/tar.gz/refs/tags/v1.23.5",
+      "filename": "heif-1.23.5.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "3be49950c75d3fd9318ba775e8253248dd9e08c61ea955fca81b6b89c02d6b2b",
+      "bytes": 2220699
+    },
+    {
+      "component": "highway",
+      "version": "1.4.0",
+      "url": "https://codeload.github.com/google/highway/tar.gz/refs/tags/1.4.0",
+      "filename": "highway-1.4.0.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "e72241ac9524bb653ae52ced768b508045d4438726a303f10181a38f764a453c",
+      "bytes": 3691240
+    },
+    {
+      "component": "imagequant",
+      "version": "2.4.1",
+      "url": "https://codeload.github.com/lovell/libimagequant/tar.gz/refs/tags/v2.4.1",
+      "filename": "imagequant-2.4.1.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "47d2a84b7b1052975c9d50a3d4e3cacbf57b43d84a4c3131210848ead9964dfb",
+      "bytes": 45792
+    },
+    {
+      "component": "lcms",
+      "version": "2.19.1",
+      "url": "https://codeload.github.com/mm2/Little-CMS/tar.gz/refs/tags/lcms2.19.1",
+      "filename": "lcms-2.19.1.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "267705e278e2f7c2fb886c259dadcbaeb2be52748bcbc71c79f08aacacb7a709",
+      "bytes": 5731108
+    },
+    {
+      "component": "mozjpeg",
+      "version": "0826579",
+      "url": "https://codeload.github.com/mozilla/mozjpeg/tar.gz/0826579",
+      "filename": "mozjpeg-0826579.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "1dc1e510d1f0a550f5dfc6f6924ba01143cbb427a02d17f102701d4d427d135d",
+      "bytes": 2442053
+    },
+    {
+      "component": "pango",
+      "version": "1.58.2",
+      "url": "https://codeload.github.com/GNOME/pango/tar.gz/refs/tags/1.58.2",
+      "filename": "pango-1.58.2.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "67b20e56a51aad6673261d2b7d41ced3687e59b82fe8c10a40ea43baf304cf0e",
+      "bytes": 2576482
+    },
+    {
+      "component": "pixman",
+      "version": "0.46.4",
+      "url": "https://cairographics.org/releases/pixman-0.46.4.tar.gz",
+      "filename": "pixman-0.46.4.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "d09c44ebc3bd5bee7021c79f922fe8fb2fb57f7320f55e97ff9914d2346a591c",
+      "bytes": 827198
+    },
+    {
+      "component": "png",
+      "version": "1.6.58",
+      "url": "https://codeload.github.com/pnggroup/libpng/tar.gz/refs/tags/v1.6.58",
+      "filename": "png-1.6.58.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "a9d4df463d36a6e5f9c29bd6f4967312d17e996c1854f3511f833924eb1993cf",
+      "bytes": 1592190
+    },
+    {
+      "component": "proxy-libintl",
+      "version": "0.5",
+      "url": "https://codeload.github.com/frida/proxy-libintl/tar.gz/refs/tags/0.5",
+      "filename": "proxy-libintl-0.5.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "f7a1cbd7579baaf575c66f9d99fb6295e9b0684a28b095967cfda17857595303",
+      "bytes": 13056
+    },
+    {
+      "component": "rsvg",
+      "version": "2.63.2",
+      "url": "https://codeload.github.com/GNOME/librsvg/tar.gz/refs/tags/2.63.2",
+      "filename": "rsvg-2.63.2.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "39fd9027fe7d78fd404dec9350f845e6215d7879b8a1c46733e01ea6143ec3a6",
+      "bytes": 7907307
+    },
+    {
+      "component": "resvg",
+      "version": "0.48.1",
+      "url": "https://codeload.github.com/linebender/resvg/tar.gz/refs/tags/v0.48.1",
+      "filename": "resvg-0.48.1.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "40dafea6b4b9d01e9d28b6d49f1e912daf3e9055676ad9179a5a2db6e7386945",
+      "bytes": 8763695
+    },
+    {
+      "component": "tiff",
+      "version": "4.7.2",
+      "url": "https://download.osgeo.org/libtiff/tiff-4.7.2.tar.xz",
+      "filename": "tiff-4.7.2.tar.xz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "4996f0c4f93094719b1ca5c6279b20e588773ba8a247533e486416fb662ddb88",
+      "bytes": 2409652
+    },
+    {
+      "component": "uhdr",
+      "version": "2.0.2",
+      "url": "https://codeload.github.com/google/libultrahdr/tar.gz/refs/tags/v2.0.2",
+      "filename": "uhdr-2.0.2.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "aa8d193bb887c348c419780511dd03b374f4e07af8812b6d3f80c8537cf1ef2c",
+      "bytes": 1518872
+    },
+    {
+      "component": "vips",
+      "version": "8.18.7",
+      "url": "https://codeload.github.com/libvips/libvips/tar.gz/refs/tags/v8.18.7",
+      "filename": "vips-8.18.7.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "5024b4b36f20e722c267f4a9bfbdbbafb3b37d48d7125cf425c55bbf76cc9286",
+      "bytes": 27965360
+    },
+    {
+      "component": "webp",
+      "version": "1.6.0",
+      "url": "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0.tar.gz",
+      "filename": "webp-1.6.0.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564",
+      "bytes": 4296070
+    },
+    {
+      "component": "xml2",
+      "version": "2.15.4",
+      "url": "https://codeload.github.com/GNOME/libxml2/tar.gz/refs/tags/v2.15.4",
+      "filename": "xml2-2.15.4.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "bb01bd9ac9a7403f9706816fd6d3e7888041d32b0211075feb20e755d2a9f29d",
+      "bytes": 2964924
+    },
+    {
+      "component": "zlib-ng",
+      "version": "2.3.3",
+      "url": "https://codeload.github.com/zlib-ng/zlib-ng/tar.gz/refs/tags/2.3.3",
+      "filename": "zlib-ng-2.3.3.tar.gz",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "f9c65aa9c852eb8255b636fd9f07ce1c406f061ec19a2e7d508b318ca0c907d1",
+      "bytes": 2447397
+    },
+    {
+      "component": "LGPL-3.0",
+      "version": "3",
+      "url": "https://raw.githubusercontent.com/psycopg/psycopg/3.3.6/LICENSE.txt",
+      "filename": "LGPL-3.0-3.txt",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118",
+      "bytes": 7652
+    },
+    {
+      "component": "GPL-3.0",
+      "version": "3",
+      "url": "https://raw.githubusercontent.com/gcc-mirror/gcc/master/COPYING3",
+      "filename": "GPL-3.0-3.txt",
+      "platforms": [
+        "windows-x64",
+        "linux-x64"
+      ],
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "bytes": 35147
+    },
+    {
+      "component": "glib-without-gregex-patch",
+      "version": "bdad5489",
+      "url": "https://gist.githubusercontent.com/kleisauke/284d685efa00908da99ea6afbaaf39ae/raw/bdad5489a61c217850631571caf57f5db6ea8b2c/glib-without-gregex.patch",
+      "filename": "glib-without-gregex-patch-bdad5489.patch",
+      "platforms": [
+        "linux-x64"
+      ],
+      "sha256": "b1f2930a11292e529de137c7eb723850e0cc0969b1a2b0358196389312acd272",
+      "bytes": 7759
+    },
+    {
+      "component": "mozjpeg-patch",
+      "version": "f90668e0",
+      "url": "https://github.com/mozilla/mozjpeg/commit/f90668e0e4fb79c81e1f24a0ccc0e2090af761bf.patch",
+      "filename": "mozjpeg-patch-f90668e0.patch",
+      "platforms": [
+        "linux-x64"
+      ],
+      "sha256": "a65f87cadf3a6052e44d6314c906f6e2891352f82646b8a6f0b8fcf2c1891e7c",
+      "bytes": 8103
+    },
+    {
+      "component": "librsvg-patch",
+      "version": "9106011d",
+      "url": "https://github.com/GNOME/librsvg/commit/9106011db93d701728ac2c9da50c9ab2c1bb5dc6.patch",
+      "filename": "librsvg-patch-9106011d.patch",
+      "platforms": [
+        "linux-x64"
+      ],
+      "sha256": "8b841d2ec8feb964fa76859075e0e0c41b69136ba143cf0d26469d9bebc19231",
+      "bytes": 5111
+    },
+    {
+      "component": "libultrahdr-patch",
+      "version": "383",
+      "url": "https://patch-diff.githubusercontent.com/raw/google/libultrahdr/pull/383.patch",
+      "filename": "libultrahdr-patch-383.patch",
+      "platforms": [
+        "linux-x64"
+      ],
+      "sha256": "57658db2a11ae964755e513b01db21bcfa408c350b11b3a6ef9bc8576fb749ba",
+      "bytes": 7567
+    },
+    {
+      "component": "libvips-cpp-soversion-patch",
+      "version": "3988223c",
+      "url": "https://gist.githubusercontent.com/lovell/313a6901e9db1bf285f2a1f1180499e4/raw/3988223c7dfa4d22745d9392034b0117abef1446/libvips-cpp-soversion.patch",
+      "filename": "libvips-cpp-soversion-patch-3988223c.patch",
+      "platforms": [
+        "linux-x64"
+      ],
+      "sha256": "256b7d6f8c973bb53b20cff5171c7117d6b35d3aa4e72d22cb906f4fe1e2c890",
+      "bytes": 514
+    }
+  ]
+}

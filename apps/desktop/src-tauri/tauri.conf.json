@@ -47,7 +47,7 @@
       "icons/icon.ico"
     ],
     "windows": {
-      "webviewInstallMode": { "type": "embedBootstrapper", "silent": true },
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": false },
       "nsis": {
         "installMode": "currentUser",
         "languages": ["English"],

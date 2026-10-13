@@ -129,7 +129,7 @@ def generate(job, sources, instructions, api_key, output_type):
         value = json.loads(content)
         output, usage = parse_response(job.provider, value)
         reported = value.get("model") or value.get("modelVersion")
-        if isinstance(reported, str) and reported != api_key and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}", reported) and not reported.startswith(("sk-", "AIza", "xai-")):
+        if isinstance(reported, str) and api_key not in reported and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}", reported) and not reported.startswith(("sk-", "AIza", "xai-")):
             usage["response_model"] = reported
         return output_type.model_validate(output), {**usage, "provider": job.provider, "input_bytes": len(encoded), "max_output_tokens": MAX_OUTPUT_TOKENS, "cost_estimate": None, "cost_status": "Provider account pricing and reported usage apply; no monetary estimate or spend guarantee was calculated."}
     except HTTPException:
