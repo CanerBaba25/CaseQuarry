@@ -42,6 +42,13 @@ export function useResource<T>(path: string | null) {
           (!prefix || !(path === prefix || path.startsWith(`${prefix}/`))))
       )
         return;
+      // Clearing a scope must invalidate reads synchronously: an already queued
+      // response can otherwise restore stale data before effect cleanup runs.
+      const request = activeRequest.current;
+      if (request?.path === path) {
+        request.controller.abort();
+        activeRequest.current = null;
+      }
       if (scope.clear) {
         setData(null);
         setDataPath(null);

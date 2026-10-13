@@ -1,5 +1,70 @@
 # Release notes
 
+## 0.5.0 — October 13, 2026
+
+Daily review improvements with task details, conflict-safe team edits and lighter
+evidence listings. Includes the website/server packages and Windows, universal Mac
+and Ubuntu 24.04 x64 desktop installers.
+
+### Tasks and evidence navigation
+
+- Open task details from My work or a matter's task list. Edit title, description,
+  status, assignee and due date with current membership checks and audit history.
+- Read full task details and the current version with `cq task show`; CLI edits
+  forward the explicitly supplied version and preserve conflict errors without retry.
+- Filter My work by open/in-progress status as well as deadline. Counts cover the
+  full authorized scope. Saves carry a task version; conflicting saves keep the
+  draft and require an explicit reload or comparison/rebase.
+- Task ordering revisions detect delayed creation commits and status-filter changes.
+  A changed paged worklist restarts instead of silently skipping tasks.
+- Previous/next evidence buttons follow the visible page's order and stop at its
+  boundaries. Unsaved tag/note drafts block those buttons until saved or cleared.
+- Copy a source link for an exact extraction version and text anchor. Links require
+  existing matter permission and open cited versions read-only.
+
+### Performance and consistency
+
+- Evidence listing queries select display fields and compute 300-character snippets
+  in SQL. Full source text and extraction/email metadata are read when opening details.
+  In a synthetic 1,000-record PostgreSQL comparison, a 50-item page avoided about
+  5.7 MB of unused text/metadata loading; median whole-search time over seven warmed
+  samples changed from 29.4 ms to 9.2 ms. All 39 comparison responses matched, and
+  the query count stayed at seven. This is a scoped measurement, not a scale claim.
+- Evidence rows now refresh after committed changes from another connected client.
+  Scope-clearing events and denied reads remove cached results; expired sessions
+  clear private views and return to login.
+- Matching refresh/clear events synchronously abort pending resource reads, preventing
+  queued older responses from restoring cached data before effect cleanup.
+- Initial and changing evidence routes use their actual URL query directly, avoiding
+  a search with old or default filters before the requested scope is ready.
+
+### Validation
+
+The complete local backend suite passed 424 tests with PostgreSQL checks enabled
+and no skips. Thirteen new task/evidence browser workflows and all 25 existing
+browser workflows passed without runtime errors. Checks include actual concurrent
+edits, held response barriers, cross-client review refresh, source-linked read-only
+views and account isolation. Web typechecking and production builds passed; the
+Rust core and Windows desktop passed five and eight tests respectively. The local
+Windows installer passed three isolated install/launch/uninstall checks with
+existing account data and registry state preserved.
+
+The release workflow builds and verifies every native platform and both server
+packages before publication. Installed PostgreSQL server checks and Intel/Apple
+Silicon/Ubuntu system WebView checks remain release gates.
+
+### Upgrade and limits
+
+Stop the server, preserve a verified database/evidence backup, upgrade dependencies
+and run `uv run python scripts/tasks.py migrate`. Migration `0007_task_versions`
+backfills existing tasks without changing their titles, assignments or due dates.
+Reload open browser/desktop workspaces after upgrading: task PATCH requests require
+`expected_version`. See [the task API](docs/TASK_API.md).
+
+Windows remains unsigned and Mac remains non-notarized. Clients require a reachable
+firm server. Production scale, live provider accounts and offline editing retain
+the limitations documented in 0.4.0.
+
 ## 0.4.0 — October 13, 2026
 
 Installable web and desktop release with a redesigned daily workspace, personal

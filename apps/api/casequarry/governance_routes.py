@@ -15,14 +15,16 @@ from .production_models import IssueReview
 from .schemas import DateOnly, HoldInput, Input, IssueInput, IssueLinkInput, Reason, TaskInput
 from .search import cursor_decode, cursor_encode
 from .security import PERMISSIONS, Actor, authorize_case, current_actor, fail, get_db, utc
-from .task_order import bump_visible
+from .task_order import bump_created, bump_visible, creation_revision
 from .time_zones import local_today
 
 router = APIRouter(prefix="/api/v1")
 
 
 class TaskPatch(Input):
+    expected_version: int | None = Field(default=None, ge=1, strict=True)
     title: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = Field(default=None, max_length=10000)
     state: Literal["open", "in_progress", "done", "cancelled"] | None = None
     assigned_to: str | None = None
     due_date: DateOnly | None = None
@@ -178,8 +180,30 @@ def add_issue_evidence(case_id: str, issue_id: str, body: IssueLinkInput, reques
     return {"id": row.id, "issue_id": issue_id, "evidence_id": row.evidence_id, "side": row.side, "note": row.note}
 
 
-def task_json(row):
-    return {"id": row.id, "title": row.title, "state": row.state, "assigned_to": row.assigned_to, "created_by": row.created_by, "created_at": utc(row.created_at).isoformat(), "due_date": row.due_date.isoformat() if row.due_date else None}
+def task_json(row, *, detail=False):
+    value = {"id": row.id, "case_id": row.case_id, "title": row.title, "state": row.state, "assigned_to": row.assigned_to, "created_by": row.created_by, "created_at": utc(row.created_at).isoformat(), "updated_at": utc(row.updated_at).isoformat(), "version": row.version, "due_date": row.due_date.isoformat() if row.due_date else None}
+    if detail:
+        value["description"] = row.description
+    return value
+
+
+def task_detail_json(row, user):
+    return {**task_json(row, detail=True), "server_today": local_today(user.time_zone, now()).isoformat(), "time_zone": user.time_zone}
+
+
+def _visible_task_cases(user, case_id):
+    # Membership and account authority must remain true in the data statement,
+    # including when they change after the preliminary authorize_case call.
+    return select(Case.id).join(Member, and_(Member.case_id == Case.id, Member.tenant_id == Case.tenant_id, Member.user_id == user.id)).join(User, and_(User.id == Member.user_id, User.tenant_id == Member.tenant_id)).where(
+        Case.id == case_id,
+        Case.tenant_id == user.tenant_id, Member.tenant_id == user.tenant_id, User.tenant_id == user.tenant_id,
+        User.active.is_(True), Member.role.in_(PERMISSIONS["view"]),
+    )
+
+
+def _visible_tasks(user, case_id):
+    authorized = _visible_task_cases(user, case_id).cte("authorized_task_case")
+    return select(Task).join(authorized, authorized.c.id == Task.case_id).where(Task.tenant_id == user.tenant_id, Task.case_id == case_id)
 
 
 def _assignee(db, user, case_id, user_id):
@@ -193,9 +217,10 @@ def _assignee(db, user, case_id, user_id):
 @router.get("/cases/{case_id}/tasks")
 def list_tasks(case_id: str, request: Request, limit: int = Query(50, ge=1, le=200), cursor: str | None = Query(None, max_length=4096), actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
     authorize_case(db, actor.user, case_id)
-    snapshot, after = now(), None
+    current, after, expected_revision = now(), None, None
+    snapshot = current
     today = local_today(actor.user.time_zone, snapshot)
-    scope = {"kind": "matter-tasks-v2", "tenant_id": actor.user.tenant_id, "user_id": actor.user.id, "case_id": case_id, "time_zone": actor.user.time_zone, "today": today.isoformat()}
+    scope = {"kind": "matter-tasks-v3", "tenant_id": actor.user.tenant_id, "user_id": actor.user.id, "case_id": case_id, "time_zone": actor.user.time_zone, "today": today.isoformat()}
     if cursor:
         payload = cursor_decode(cursor, request.app.state.cursor_secret)
         try:
@@ -203,54 +228,75 @@ def list_tasks(case_id: str, request: Request, limit: int = Query(50, ge=1, le=2
                 raise ValueError()
             snapshot = utc(datetime.fromisoformat(payload["snapshot"]))
             after = payload["after"]
-            if not isinstance(after, str) or not 1 <= len(after) <= 36:
+            expected_revision = payload["revision"]
+            if not isinstance(after, str) or not 1 <= len(after) <= 36 or snapshot > current or not isinstance(expected_revision, int) or isinstance(expected_revision, bool) or expected_revision < 0:
                 raise ValueError()
         except (KeyError, ValueError, TypeError):
             fail(422, "TASK_CURSOR_INVALID", "Start the task list again; this cursor belongs to another scope.")
-    # Recheck current membership/account authority in the data statement itself:
-    # either can be revoked after the earlier matter authorization returns.
-    query = select(Task).join(Case, and_(Case.id == Task.case_id, Case.tenant_id == Task.tenant_id)).join(Member, and_(Member.case_id == Case.id, Member.tenant_id == Case.tenant_id, Member.user_id == actor.user.id)).join(User, and_(User.id == Member.user_id, User.tenant_id == Member.tenant_id)).where(
-        Task.tenant_id == actor.user.tenant_id, Task.case_id == case_id, Task.created_at <= snapshot,
-        Case.tenant_id == actor.user.tenant_id, Member.tenant_id == actor.user.tenant_id, User.tenant_id == actor.user.tenant_id,
-        User.active.is_(True), Member.role.in_(PERMISSIONS["view"]),
-    )
+    authorized = _visible_task_cases(actor.user, case_id).cte("authorized_task_case")
+    query = select(Task.id, Task.case_id, Task.title, Task.state, Task.assigned_to, Task.created_by, Task.created_at, Task.updated_at, Task.version, Task.due_date).join(authorized, authorized.c.id == Task.case_id).where(Task.tenant_id == actor.user.tenant_id, Task.case_id == case_id, Task.created_at <= snapshot)
     if after:
         query = query.where(Task.id > after)
-    rows = list(db.scalars(query.order_by(Task.id).limit(limit + 1)))
-    next_cursor = cursor_encode({"scope": scope, "snapshot": snapshot.isoformat(), "after": rows[limit - 1].id}, request.app.state.cursor_secret) if len(rows) > limit else None
-    return {"items": [task_json(row) for row in rows[:limit]], "next_cursor": next_cursor, "server_today": today.isoformat(), "time_zone": actor.user.time_zone}
+    page = query.order_by(Task.id).limit(limit + 1).cte("task_page")
+    rows = db.execute(select(page, creation_revision(actor.user.tenant_id, case_id).label("creation_revision")).select_from(authorized.outerjoin(page, page.c.case_id == authorized.c.id)).order_by(page.c.id)).all()
+    if cursor and rows and rows[0].creation_revision != expected_revision:
+        fail(409, "TASK_LIST_CHANGED", "A task was created while paging. Restart the matter task list to include every task.")
+    page_rows = [row for row in rows if row.id is not None]
+    next_cursor = cursor_encode({"scope": scope, "snapshot": snapshot.isoformat(), "revision": rows[0].creation_revision, "after": page_rows[limit - 1].id}, request.app.state.cursor_secret) if len(page_rows) > limit else None
+    return {"items": [task_json(row) for row in page_rows[:limit]], "next_cursor": next_cursor, "server_today": today.isoformat(), "time_zone": actor.user.time_zone}
+
+
+@router.get("/cases/{case_id}/tasks/{task_id}")
+def get_task(case_id: str, task_id: str, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
+    authorize_case(db, actor.user, case_id)
+    row = db.scalar(_visible_tasks(actor.user, case_id).where(Task.id == task_id))
+    if row is None:
+        fail(404, "NOT_FOUND", "The matter task is unavailable.")
+    return task_detail_json(row, actor.user)
 
 
 @router.post("/cases/{case_id}/tasks", status_code=201)
 def create_task(case_id: str, body: TaskInput, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
     lock_case_action(db, actor.user, case_id, "review", (body.assigned_to,))
     _assignee(db, actor.user, case_id, body.assigned_to)
-    row = Task(tenant_id=actor.user.tenant_id, case_id=case_id, title=body.title.strip(), assigned_to=body.assigned_to, created_by=actor.user.id, due_date=body.due_date)
+    created_at = now()
+    row = Task(tenant_id=actor.user.tenant_id, case_id=case_id, title=body.title.strip(), description=body.description, assigned_to=body.assigned_to, created_by=actor.user.id, due_date=body.due_date, created_at=created_at, updated_at=created_at)
     if not row.title:
         fail(422, "TASK_TITLE_REQUIRED", "Provide a task title.")
     db.add(row)
     db.flush()
-    _record(db, actor, request, case_id, "task.created", "task", row, {"assigned_to": row.assigned_to, "due_date": row.due_date.isoformat() if row.due_date else None})
-    return task_json(row)
+    bump_created(db, actor.user.tenant_id, case_id)
+    bump_visible(db, actor.user.tenant_id, case_id, {row.assigned_to})
+    _record(db, actor, request, case_id, "task.created", "task", row, {"assigned_to": row.assigned_to, "due_date": row.due_date.isoformat() if row.due_date else None, "version": row.version})
+    return task_detail_json(row, actor.user)
 
 
 @router.patch("/cases/{case_id}/tasks/{task_id}")
 def update_task(case_id: str, task_id: str, body: TaskPatch, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
     lock_case_action(db, actor.user, case_id, "review", (body.assigned_to,))
     row = _scoped(db, Task, actor.user, case_id, task_id)
-    changes = body.model_dump(exclude_unset=True)
+    if body.expected_version is None:
+        fail(409, "TASK_VERSION_REQUIRED", "Reload the task and send its expected_version before editing.")
+    if body.expected_version != row.version:
+        fail(409, "TASK_VERSION_CONFLICT", "This task changed. Reload its current version before applying your draft.")
+    changes = body.model_dump(exclude_unset=True, exclude={"expected_version"})
+    if not changes:
+        fail(422, "TASK_CHANGE_REQUIRED", "Choose at least one task field to update.")
     before = {key: getattr(row, key) for key in changes}
-    old_assignee, old_state = row.assigned_to, row.state
+    old_assignee, old_state, old_version = row.assigned_to, row.state, row.version
     if "assigned_to" in changes:
         _assignee(db, actor.user, case_id, changes["assigned_to"])
     for key, value in changes.items():
-        if key in {"title", "state"} and value is None:
-            fail(422, "TASK_VALUE_INVALID", "Task title and state cannot be empty.")
+        if key in {"title", "state", "description"} and value is None:
+            fail(422, "TASK_VALUE_INVALID", "Task title, state and description cannot be null.")
         if key == "title":
             value = value.strip()
             if not value:
                 fail(422, "TASK_TITLE_REQUIRED", "Provide a task title.")
-        setattr(row, key, value)
+        changes[key] = value
+    if not db.execute(update(Task).where(Task.id == task_id, Task.tenant_id == actor.user.tenant_id, Task.case_id == case_id, Task.version == body.expected_version).values(**changes, version=old_version + 1, updated_at=now())).rowcount:
+        fail(409, "TASK_VERSION_CONFLICT", "This task changed. Reload its current version before applying your draft.")
+    db.refresh(row)
     def audit_value(value):
         return value.isoformat() if hasattr(value, "isoformat") else value
 
@@ -259,8 +305,10 @@ def update_task(case_id: str, task_id: str, body: TaskPatch, request: Request, a
     entered_open_work = old_state not in {"open", "in_progress"} and row.state in {"open", "in_progress"}
     if (due_changed or old_assignee != row.assigned_to or entered_open_work) and (old_state in {"open", "in_progress"} or row.state in {"open", "in_progress"}):
         bump_visible(db, actor.user.tenant_id, case_id, {old_assignee, row.assigned_to})
-    _record(db, actor, request, case_id, "task.updated", "task", row, {"fields": sorted(changes), "before": {key: audit_value(value) for key, value in before.items()}, "after": after, "due_date_changed": due_changed})
-    return task_json(row)
+    elif old_state != row.state and (old_state in {"open", "in_progress"} or row.state in {"open", "in_progress"}):
+        bump_visible(db, actor.user.tenant_id, case_id, {old_assignee, row.assigned_to}, state_only=True)
+    _record(db, actor, request, case_id, "task.updated", "task", row, {"fields": sorted(changes), "before": {key: audit_value(value) for key, value in before.items()}, "after": after, "due_date_changed": due_changed, "previous_version": old_version, "version": row.version})
+    return task_detail_json(row, actor.user)
 
 
 @router.post("/cases/{case_id}/issues/{issue_id}/review")

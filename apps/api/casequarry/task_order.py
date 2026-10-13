@@ -9,18 +9,33 @@ from .security import PERMISSIONS
 from .sync_models import FirmSyncRevision
 
 
-def key(tenant_id, user_id):
-    return f"worklist:{tenant_id}:{user_id}"
+def key(tenant_id, user_id, state_filtered=False):
+    prefix = "worklist-state" if state_filtered else "worklist"
+    return f"{prefix}:{tenant_id}:{user_id}"
 
 
-def revision_expression(tenant_id, user_id):
+def revision_expression(tenant_id, user_id, state_filtered=False):
     return func.coalesce(select(FirmSyncRevision.revision).where(
-        FirmSyncRevision.scope_key == key(tenant_id, user_id),
+        FirmSyncRevision.scope_key == key(tenant_id, user_id, state_filtered),
         FirmSyncRevision.tenant_id == tenant_id, FirmSyncRevision.case_id.is_(None),
     ).scalar_subquery(), 0)
 
 
-def bump_visible(db, tenant_id, case_id, user_ids):
+def creation_revision(tenant_id, case_id):
+    return func.coalesce(select(FirmSyncRevision.revision).where(
+        FirmSyncRevision.scope_key == f"task-list:{tenant_id}:{case_id}",
+        FirmSyncRevision.tenant_id == tenant_id, FirmSyncRevision.case_id == case_id,
+    ).scalar_subquery(), 0)
+
+
+def bump_created(db, tenant_id, case_id):
+    """Fence UUID-seek matter pages when creation commits after their snapshot."""
+    insert = sqlite_insert if db.bind.dialect.name == "sqlite" else pg_insert
+    row = insert(FirmSyncRevision).values(scope_key=f"task-list:{tenant_id}:{case_id}", tenant_id=tenant_id, case_id=case_id, revision=1, updated_at=now())
+    db.execute(row.on_conflict_do_update(index_elements=["scope_key"], set_={"revision": FirmSyncRevision.revision + 1, "updated_at": now()}))
+
+
+def bump_visible(db, tenant_id, case_id, user_ids, *, state_only=False):
     """Only an active user's currently visible matter can invalidate their cursor."""
     identifiers = {value for value in user_ids if value}
     if not identifiers:
@@ -31,5 +46,8 @@ def bump_visible(db, tenant_id, case_id, user_ids):
     ).order_by(User.id)).all()
     insert = sqlite_insert if db.bind.dialect.name == "sqlite" else pg_insert
     for user_id in visible:
-        row = insert(FirmSyncRevision).values(scope_key=key(tenant_id, user_id), tenant_id=tenant_id, case_id=None, revision=1, updated_at=now())
-        db.execute(row.on_conflict_do_update(index_elements=["scope_key"], set_={"revision": FirmSyncRevision.revision + 1, "updated_at": now()}))
+        # Every ordering/access change fences both cursor scopes. Ordinary state
+        # changes fence filtered pages without breaking all-active completion.
+        for filtered in (True,) if state_only else (False, True):
+            row = insert(FirmSyncRevision).values(scope_key=key(tenant_id, user_id, filtered), tenant_id=tenant_id, case_id=None, revision=1, updated_at=now())
+            db.execute(row.on_conflict_do_update(index_elements=["scope_key"], set_={"revision": FirmSyncRevision.revision + 1, "updated_at": now()}))

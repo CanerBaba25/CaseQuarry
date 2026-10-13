@@ -1,6 +1,6 @@
 # Reviewer guide
 
-This guide describes the implemented 0.2 workflows. Start with a synthetic evaluation matter. Your matter role controls the available actions; being a firm administrator does not grant access to every matter.
+This guide describes the implemented 0.5 workflows. Start with a synthetic evaluation matter. Your matter role controls the available actions; being a firm administrator does not grant access to every matter.
 
 ## Find and inspect evidence
 
@@ -10,6 +10,30 @@ This guide describes the implemented 0.2 workflows. Start with a synthetic evalu
 4. Inspect OCR warnings and page-level confidence when present. OCR confidence is an engine estimate, and recognized text needs human verification. Use the authenticated PDF raster preview to inspect a visible page without executing the original PDF in the browser.
 
 Original downloads preserve their bytes. Extracted text, OCR, redacted previews and production documents are separate derivatives. Dates without a reliable timezone must retain that uncertainty.
+
+Use **Previous item** and **Next item** in the inspector to move through the current
+result page in its displayed order. The buttons stop at page boundaries and while
+tags or a note have unsaved changes. Save or clear those drafts before moving.
+**Copy source link** points to that span in its exact extraction version, which opens
+as a read-only view. Sharing a link does not grant access to the matter. Evidence rows
+refresh after another workstation saves a review; a version conflict still requires
+you to inspect the latest decision before saving.
+
+## Plan and track tasks
+
+The dashboard's **My work** lists your open and in-progress assignments across
+accessible active matters. Filter by status and deadline; counts cover the authorized
+scope rather than just the current page. Click a task title to inspect its full
+description and, with review permission, edit its title, description, status,
+assignee and due date. Matter task lists use the same editor.
+
+Task saves carry the version you opened. If another person changes the task first,
+your draft stays available while you compare the latest record. Reload or explicitly
+rebase the fields you changed, then save again; the app does not silently retry the
+conflicting edit. Deadline and assignment changes can restart a paged worklist to
+avoid skipping tasks. Choose your account timezone in Settings; entered due dates
+remain calendar dates. These plans are entered by the team and are not calculated
+court deadlines. See the [task API and conflict behavior](TASK_API.md).
 
 ## Record review and use assignments
 

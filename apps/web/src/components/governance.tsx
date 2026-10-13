@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { api, date, label, number, post } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { api, ApiError, date, label, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import type { Matter, Member } from "@/lib/types";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { PageHeading, Pagination } from "./matter-pages";
 import { TaskDeadline } from "./task-deadline";
+import TaskDetails from "./task-details";
+import type { TaskDetail } from "./task-types";
 import deadlineStyles from "./task-deadline.module.css";
 
 type Hold = {
@@ -42,6 +44,8 @@ type Task = {
   due_date: string | null;
   created_by: string;
   created_at: string;
+  updated_at: string;
+  version: number;
 };
 type IssueEvidence = {
   id: string;
@@ -62,22 +66,44 @@ export function GovernancePage({
 }) {
   const [cursor, setCursor] = useState<string | null>(null),
     [history, setHistory] = useState<(string | null)[]>([]);
-  const resource = useResource<{
+  const rawResource = useResource<{
     items: (Hold & Issue & Task)[];
     next_cursor: string | null;
     server_today?: string;
     time_zone?: string;
   }>(
-    `/cases/${matter.id}/${kind}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+    `/cases/${matter.id}/${kind}${kind === "tasks" ? "?limit=20" : ""}` +
+      (cursor
+        ? `${kind === "tasks" ? "&" : "?"}cursor=${encodeURIComponent(cursor)}`
+        : ""),
   );
+  const invalidTaskPage =
+    kind === "tasks" &&
+    rawResource.error instanceof ApiError &&
+    ["TASK_LIST_CHANGED", "TASK_CURSOR_INVALID"].includes(
+      rawResource.error.code,
+    );
+  const resource = {
+    ...rawResource,
+    data: invalidTaskPage ? null : rawResource.data,
+    refresh: () => {
+      if (invalidTaskPage) {
+        setCursor(null);
+        setHistory([]);
+      }
+      rawResource.refresh();
+    },
+  };
   const [create, setCreate] = useState(false),
     [release, setRelease] = useState<Hold | null>(null),
     [issue, setIssue] = useState<Issue | null>(null),
     [deadlineTask, setDeadlineTask] = useState<Task | null>(null),
+    [taskDetailsId, setTaskDetailsId] = useState<string | null>(null),
     [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false);
   const canManage = can(matter.role, "hold"),
     canReview = can(matter.role, "review");
+  const canEditTask = canReview && !matter.archived_at;
   const members = useResource<{ items: Member[] }>(
     kind === "tasks" ? `/cases/${matter.id}/members` : null,
   );
@@ -88,6 +114,7 @@ export function GovernancePage({
     setRelease(null);
     setIssue(null);
     setDeadlineTask(null);
+    setTaskDetailsId(null);
     setError(null);
   }, [matter.id, kind]);
   const copy = {
@@ -122,32 +149,57 @@ export function GovernancePage({
       icon: "review",
     },
   }[kind];
-  async function taskState(id: string, state: string) {
+  function taskUpdated(updated: TaskDetail) {
+    resource.setData((current) =>
+      current
+        ? {
+            ...current,
+            items: current.items.map((item) =>
+              item.id === updated.id && item.version <= updated.version
+                ? { ...item, ...updated }
+                : item,
+            ),
+          }
+        : current,
+    );
+    setCursor(null);
+    setHistory([]);
+    resource.refresh();
+  }
+  async function taskState(task: Task, state: string) {
     setBusy(true);
     setError(null);
     try {
-      await api(`/cases/${matter.id}/tasks/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ state }),
-      });
-      resource.refresh();
+      const updated = await api<TaskDetail>(
+        `/cases/${matter.id}/tasks/${task.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ state, expected_version: task.version }),
+        },
+      );
+      taskUpdated(updated);
     } catch (error) {
       setError(error);
+      resource.refresh();
     } finally {
       setBusy(false);
     }
   }
-  async function taskAssignee(id: string, assigned_to: string | null) {
+  async function taskAssignee(task: Task, assigned_to: string | null) {
     setBusy(true);
     setError(null);
     try {
-      await api(`/cases/${matter.id}/tasks/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ assigned_to }),
-      });
-      resource.refresh();
+      const updated = await api<TaskDetail>(
+        `/cases/${matter.id}/tasks/${task.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ assigned_to, expected_version: task.version }),
+        },
+      );
+      taskUpdated(updated);
     } catch (error) {
       setError(error);
+      resource.refresh();
     } finally {
       setBusy(false);
     }
@@ -158,7 +210,13 @@ export function GovernancePage({
         <button
           className="button primary"
           onClick={() => setCreate(true)}
-          disabled={kind === "holds" ? !canManage : !canReview}
+          disabled={
+            kind === "holds"
+              ? !canManage
+              : kind === "tasks"
+                ? !canEditTask
+                : !canReview
+          }
         >
           <Icon name="plus" size={17} />
           {copy.add}
@@ -230,7 +288,20 @@ export function GovernancePage({
               {resource.data.items.map((item) => (
                 <tr key={item.id}>
                   <td>
-                    <strong>{kind === "holds" ? item.name : item.title}</strong>
+                    {kind === "tasks" ? (
+                      <button
+                        type="button"
+                        className="text-link"
+                        aria-label={`Open task details: ${item.title}`}
+                        onClick={() => setTaskDetailsId(item.id)}
+                      >
+                        <strong>{item.title}</strong>
+                      </button>
+                    ) : (
+                      <strong>
+                        {kind === "holds" ? item.name : item.title}
+                      </strong>
+                    )}
                     {kind === "holds" && (
                       <p className="table-description">{item.reason}</p>
                     )}
@@ -253,9 +324,14 @@ export function GovernancePage({
                       <select
                         aria-label={`Assigned to for ${item.title}`}
                         value={item.assigned_to || ""}
-                        disabled={busy || !canReview || members.loading}
+                        disabled={
+                          busy ||
+                          !canEditTask ||
+                          members.loading ||
+                          resource.loading
+                        }
                         onChange={(event) =>
-                          void taskAssignee(item.id, event.target.value || null)
+                          void taskAssignee(item, event.target.value || null)
                         }
                       >
                         <option value="">Unassigned</option>
@@ -293,12 +369,12 @@ export function GovernancePage({
                             !["open", "in_progress"].includes(item.state)
                           }
                         />
-                        {canReview && (
+                        {canEditTask && (
                           <button
                             type="button"
                             className="text-link"
                             aria-label={`Edit due date for ${item.title}`}
-                            disabled={busy}
+                            disabled={busy || resource.loading}
                             onClick={() => setDeadlineTask(item)}
                           >
                             {item.due_date ? "Change date" : "Set date"}
@@ -322,10 +398,10 @@ export function GovernancePage({
                       <select
                         className="task-state"
                         aria-label={`Status for ${item.title}`}
-                        disabled={busy || !canReview}
+                        disabled={busy || !canEditTask || resource.loading}
                         value={item.state}
                         onChange={(event) =>
-                          void taskState(item.id, event.target.value)
+                          void taskState(item, event.target.value)
                         }
                       >
                         <option value="open">Open</option>
@@ -348,7 +424,7 @@ export function GovernancePage({
             : undefined
         }
         previous={
-          history.length
+          !invalidTaskPage && history.length
             ? () => {
                 const pages = [...history];
                 setCursor(pages.pop() || null);
@@ -357,7 +433,7 @@ export function GovernancePage({
             : undefined
         }
         next={
-          resource.data?.next_cursor
+          !invalidTaskPage && resource.data?.next_cursor
             ? () => {
                 setHistory([...history, cursor]);
                 setCursor(resource.data!.next_cursor);
@@ -372,6 +448,8 @@ export function GovernancePage({
           close={() => setCreate(false)}
           done={() => {
             setCreate(false);
+            setCursor(null);
+            setHistory([]);
             resource.refresh();
           }}
         />
@@ -387,15 +465,25 @@ export function GovernancePage({
           }}
         />
       )}
-      {deadlineTask && (
+      {deadlineTask && canEditTask && (
         <EditTaskDeadline
           matter={matter}
           task={deadlineTask}
           close={() => setDeadlineTask(null)}
           done={() => {
             setDeadlineTask(null);
+            setCursor(null);
+            setHistory([]);
             resource.refresh();
           }}
+        />
+      )}
+      {taskDetailsId && (
+        <TaskDetails
+          matter={matter}
+          taskId={taskDetailsId}
+          close={() => setTaskDetailsId(null)}
+          changed={taskUpdated}
         />
       )}
       {issue && (
@@ -426,6 +514,13 @@ function CreateGovernance({
 }) {
   const [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false);
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
   const members = useResource<{ items: Member[] }>(
     kind === "tasks" ? `/cases/${matter.id}/members` : null,
   );
@@ -458,11 +553,11 @@ function CreateGovernance({
                   }
                 : {}),
             });
-            done();
+            if (live.current) done();
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >
@@ -507,6 +602,15 @@ function CreateGovernance({
           </label>
         ) : (
           <>
+            <label>
+              Task description
+              <textarea
+                name="description"
+                rows={4}
+                maxLength={10000}
+                placeholder="Describe the next step, context or expected outcome"
+              />
+            </label>
             <label>
               Due date
               <input
@@ -574,6 +678,22 @@ function EditTaskDeadline({
   const [value, setValue] = useState(task.due_date || "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const detail = useResource<TaskDetail>(
+    `/cases/${matter.id}/tasks/${task.id}`,
+  );
+  const [expectedVersion, setExpectedVersion] = useState(task.version);
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
+  const changed = Boolean(
+    detail.data && detail.data.version !== expectedVersion,
+  );
+  const denied =
+    error instanceof ApiError && [401, 403, 404].includes(error.status);
   return (
     <Modal title="Update task deadline" close={close}>
       <form
@@ -584,18 +704,47 @@ function EditTaskDeadline({
           try {
             await api(`/cases/${matter.id}/tasks/${task.id}`, {
               method: "PATCH",
-              body: JSON.stringify({ due_date: value || null }),
+              body: JSON.stringify({
+                due_date: value || null,
+                expected_version: expectedVersion,
+              }),
             });
-            done();
+            if (live.current) done();
           } catch (error) {
-            setError(error);
+            if (live.current) {
+              setError(error);
+              detail.refresh();
+            }
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >
         <p className={deadlineStyles.title}>{task.title}</p>
         <ErrorBox error={error} />
+        <ErrorBox error={detail.error} retry={detail.refresh} />
+        {changed && (
+          <div className="notice amber">
+            <span>
+              This task changed while the dialog was open. Your date is
+              preserved. Current deadline:{" "}
+              {detail.data!.due_date
+                ? date(detail.data!.due_date)
+                : "No due date"}
+              .
+            </span>
+            <button
+              type="button"
+              className="button secondary compact"
+              onClick={() => {
+                setExpectedVersion(detail.data!.version);
+                setError(null);
+              }}
+            >
+              Keep date with current version
+            </button>
+          </div>
+        )}
         <label>
           Due date
           <input
@@ -621,7 +770,13 @@ function EditTaskDeadline({
           >
             Cancel
           </button>
-          <button type="submit" className="button primary" disabled={busy}>
+          <button
+            type="submit"
+            className="button primary"
+            disabled={
+              busy || detail.loading || !detail.data || changed || denied
+            }
+          >
             {busy ? "Saving…" : "Save deadline"}
           </button>
         </div>

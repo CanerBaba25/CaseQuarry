@@ -1,0 +1,140 @@
+.context {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.matter {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.matter strong {
+  display: block;
+  color: var(--ink);
+  font-size: 15px;
+}
+.badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.8;
+  margin: 16px 0;
+}
+.metadata {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px 0;
+  margin: 16px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+}
+.metadata dt {
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.metadata dd {
+  margin: 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+}
+.fields label {
+  min-width: 0;
+}
+.help {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+  font-weight: 400;
+}
+.conflict {
+  border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--border));
+  border-radius: 11px;
+  background: var(--amber-light);
+  padding: 18px;
+  margin: 20px 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.conflict h3 {
+  margin-bottom: 7px;
+}
+.comparison {
+  display: grid;
+  gap: 12px;
+  margin: 15px 0;
+}
+.comparison > div {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.comparison dt {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.comparison dd {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+}
+.comparison small {
+  display: block;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.comparison span {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+.message {
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 14px 0;
+}
+@media (max-width: 560px) {
+  .context {
+    flex-direction: column;
+  }
+  .badges {
+    justify-content: flex-start;
+  }
+  .fields,
+  .metadata,
+  .comparison dd {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .actions {
+    justify-content: stretch;
+  }
+  .actions button {
+    flex: 1 1 150px;
+    white-space: normal;
+  }
+}

@@ -7,6 +7,8 @@ import { api, ApiError, date, number } from "@/lib/api";
 import { can } from "@/lib/permissions";
 import { Badge, Empty, ErrorBox, Icon, Loading } from "./ui";
 import { TaskDeadline } from "./task-deadline";
+import TaskDetails from "./task-details";
+import type { TaskDetail } from "./task-types";
 import styles from "./task-worklist.module.css";
 
 type Task = {
@@ -15,6 +17,8 @@ type Task = {
   state: "open" | "in_progress";
   created_at: string;
   due_date: string | null;
+  version: number;
+  updated_at: string;
   matter: { id: string; title: string; matter_number: string; role: string };
 };
 type WorkPage = {
@@ -24,6 +28,8 @@ type WorkPage = {
   limit: number;
   server_today: string;
   time_zone: string;
+  state: "all" | "open" | "in_progress";
+  state_counts: { all: number; open: number; in_progress: number };
   summary: { total: number; overdue: number; upcoming: number; no_due: number };
 };
 type DueFilter = "all" | "overdue" | "upcoming" | "no_due";
@@ -67,10 +73,12 @@ function Worklist({ userId }: { userId: string }) {
   const [cursor, setCursor] = useState<string | null>(null);
   const [history, setHistory] = useState<(string | null)[]>([]);
   const [dueFilter, setDueFilter] = useState<DueFilter>("all");
+  const [stateFilter, setStateFilter] = useState<WorkPage["state"]>("all");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [completing, setCompleting] = useState<string | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
   const resource = useResource<WorkPage>(
-    `/worklist?limit=20&due=${dueFilter}` +
+    `/worklist?limit=20&due=${dueFilter}&state=${stateFilter}` +
       (cursor ? "&cursor=" + encodeURIComponent(cursor) : ""),
   );
   const invalidPage =
@@ -79,7 +87,11 @@ function Worklist({ userId }: { userId: string }) {
       resource.error.code,
     );
   const page =
-    !invalidPage && resource.data?.user_id === userId ? resource.data : null;
+    !invalidPage &&
+    resource.data?.user_id === userId &&
+    resource.data.state === stateFilter
+      ? resource.data
+      : null;
   const groups = useMemo(() => {
     const grouped: { matter: Task["matter"]; tasks: Task[] }[] = [];
     for (const task of page?.items || []) {
@@ -110,14 +122,32 @@ function Worklist({ userId }: { userId: string }) {
     try {
       await api(`/cases/${task.matter.id}/tasks/${task.id}`, {
         method: "PATCH",
-        body: JSON.stringify({ state: "done" }),
+        body: JSON.stringify({ state: "done", expected_version: task.version }),
       });
     } catch (error) {
       setActionError(error);
     } finally {
+      setCursor(null);
+      setHistory([]);
       resource.refresh();
       setCompleting(null);
     }
+  }
+  function taskChanged(_task: TaskDetail) {
+    setCursor(null);
+    setHistory([]);
+    setActionError(null);
+    resource.refresh();
+  }
+  function closeTask() {
+    const taskId = selectedTask?.id;
+    setSelectedTask(null);
+    requestAnimationFrame(() => {
+      const target =
+        document.getElementById(`my-work-task-${taskId}`) ||
+        document.getElementById("my-work-heading");
+      target?.focus();
+    });
   }
 
   return (
@@ -129,7 +159,9 @@ function Worklist({ userId }: { userId: string }) {
       <div className={styles.heading}>
         <div>
           <span className="eyebrow">ASSIGNED TO YOU</span>
-          <h2 id="my-work-heading">My work</h2>
+          <h2 id="my-work-heading" tabIndex={-1}>
+            My work
+          </h2>
           <p>
             Your open assignments, ordered by deadline, across active matters.
           </p>
@@ -149,6 +181,36 @@ function Worklist({ userId }: { userId: string }) {
           Refresh my work
         </button>
       </div>
+      <div className={styles.statusBar}>
+        <label>
+          Status
+          <select
+            aria-label="Task status filter"
+            value={stateFilter}
+            onChange={(event) => {
+              setStateFilter(event.target.value as WorkPage["state"]);
+              setCursor(null);
+              setHistory([]);
+              setActionError(null);
+            }}
+          >
+            <option value="all">
+              All open work{page ? ` (${number(page.state_counts.all)})` : ""}
+            </option>
+            <option value="open">
+              Open{page ? ` (${number(page.state_counts.open)})` : ""}
+            </option>
+            <option value="in_progress">
+              In progress
+              {page ? ` (${number(page.state_counts.in_progress)})` : ""}
+            </option>
+          </select>
+        </label>
+        <p>
+          Status counts include all your active assignments. Deadline counts
+          reflect the selected status.
+        </p>
+      </div>
       <div
         className={styles.filters}
         aria-label="Filter assigned tasks by deadline"
@@ -167,7 +229,13 @@ function Worklist({ userId }: { userId: string }) {
               setActionError(null);
             }}
           >
-            <span>{filter.label}</span>
+            <span>
+              {filter.value === "all" && stateFilter !== "all"
+                ? stateFilter === "open"
+                  ? "All open"
+                  : "All in progress"
+                : filter.label}
+            </span>
             <strong>{page ? number(page.summary[filter.count]) : "—"}</strong>
           </button>
         ))}
@@ -210,12 +278,15 @@ function Worklist({ userId }: { userId: string }) {
                 {tasks.map((task) => (
                   <li key={task.id}>
                     <div className={styles.taskContent}>
-                      <Link
-                        href={`/app/matters/${matter.id}/tasks`}
+                      <button
+                        type="button"
+                        id={`my-work-task-${task.id}`}
+                        aria-label={`Open task details: ${task.title}`}
+                        onClick={() => setSelectedTask(task)}
                         className={styles.taskTitle}
                       >
                         {task.title}
-                      </Link>
+                      </button>
                       <div className={styles.taskMeta}>
                         <Badge value={task.state} />
                         <TaskDeadline
@@ -255,8 +326,8 @@ function Worklist({ userId }: { userId: string }) {
                 cursor
                   ? "Shared work may have changed. Return to the first page to see the current list."
                   : dueFilter === "all"
-                    ? "Tasks assigned to you in active matters will appear here. Completed and cancelled tasks remain in their matter's task history."
-                    : "Choose All open to see your other assignments, or set a due date in the matter's task list."
+                    ? "Tasks assigned to you in active matters will appear here. Change the status filter to see other active assignments. Completed and cancelled tasks remain in their matter's task history."
+                    : "Choose another status or deadline filter to see your other assignments."
               }
             />
           )}
@@ -309,6 +380,14 @@ function Worklist({ userId }: { userId: string }) {
             </div>
           </div>
         </>
+      )}
+      {selectedTask && (
+        <TaskDetails
+          matter={selectedTask.matter}
+          taskId={selectedTask.id}
+          close={closeTask}
+          changed={taskChanged}
+        />
       )}
     </section>
   );

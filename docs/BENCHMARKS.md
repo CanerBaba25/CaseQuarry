@@ -2,6 +2,37 @@
 
 The multi-million-email capacity target has not been met or claimed. Generator support for 2,000,000 records is not proof of ingest/search capacity. Actual measurements, corpus mix, failures and hardware must be recorded before changing that claim.
 
+## Evidence listing comparison — October 13, 2026
+
+The 0.5 query change was compared against the 0.4 implementation using 1,000
+synthetic evidence records in an isolated PostgreSQL schema on the Windows
+development host. This measurement covers the search function's database reads,
+driver transfer and serialization; it is not an HTTP/browser latency benchmark or
+a production load test. Each default page returns 50 items and reads one additional
+row to determine whether a continuation cursor is needed.
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Median whole-search time, seven warmed samples | 29.43 ms | 9.24 ms |
+| SQL reads per default search | 7 | 7 |
+| Loaded full body and discarded extraction/email metadata | 5,666,304 bytes | 0 bytes |
+| Rows read for the page and continuation check | 51 | 51 |
+| Full response fixtures compared | 39 | 39 identical |
+
+Listings now select the displayed fields and a 300-character SQL snippet rather
+than materializing full document bodies and metadata. The zero above concerns
+those unused full fields; snippets and visible metadata are still transferred.
+Current and historical detail reads retain their full fields. The comparison
+includes keyset sorts, null dates, family/group filters and Unicode/blank snippets.
+Sixteen additional SQLite/PostgreSQL regression checks verify response behavior,
+detail fields and absence of per-row lazy reads.
+
+No index change was made. The recorded single page executor sample changed from
+1.44 ms to 1.80 ms, so the improvement is attributed to less transfer and ORM work,
+not faster server execution. These small-sample medians do not establish tail
+latency, ingestion speed or 100k/1m/2m capacity. The earlier development ingestion
+run below is a separate measurement.
+
 The local owner workspace has a streaming MBOX generator and private acceptance harness. These QA assets and test files are excluded from the public source distribution; the commands below apply only where those local assets are present:
 
 ```sh
@@ -39,4 +70,4 @@ All 100 mixed-document originals matched their deterministic golden SHA-256 and 
 
 Query percentiles use only 15 samples across three known phrase queries with sender grouping; they do not establish a production latency SLA. Run-directory bytes include database/derivative/log files at measurement and are not allocated physical disk usage. Generator/browser/system-wide resource peaks were outside the measured API process. The local report is `.data/benchmarks/20261012T215728-10000-8a2bc3/report.json`.
 
-An earlier local run exposed an XLSX path-handling failure and excessive status polling; both were corrected before the recorded run. The table above reflects the final completed run. PostgreSQL/Docker/OpenSearch and 100k/1m/2m capacity remain unvalidated.
+An earlier local run exposed an XLSX path-handling failure and excessive status polling; both were corrected before the recorded run. The table above reflects the final completed run. A comparable PostgreSQL ingestion run, Docker/OpenSearch operation and 100k/1m/2m capacity remain unvalidated.

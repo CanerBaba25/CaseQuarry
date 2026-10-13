@@ -159,7 +159,7 @@ def add_resource(group, resource):
         api = API(ctx.obj)
         display(api.request("POST", api.case_route(case, "/" + resource), json=document(body)), ctx.obj)
 
-    if resource in {"issues", "review-sets", "assignments", "upload-sessions"}:
+    if resource in {"tasks", "issues", "review-sets", "assignments", "upload-sessions"}:
         @group.command("show")
         def show(ctx: typer.Context, resource_id: str, case: str | None = None):
             api = API(ctx.obj)

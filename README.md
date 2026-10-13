@@ -22,8 +22,8 @@ TypeScript/React for the interface, Python for its API and document processing, 
 Rust for streaming integrity checks and the native desktop client. PostgreSQL stores
 the shared firm data; browsers and desktop clients connect to the same firm server.
 
-> **Release 0.4.0.** Installable Windows, macOS and Linux desktop clients and Windows/Linux web-server
-> packages, with PostgreSQL firm sync, task deadlines and optional provider connections.
+> **Release 0.5.0.** Installable Windows, macOS and Linux desktop clients and Windows/Linux web-server
+> packages, with PostgreSQL firm sync, conflict-safe task editing and optional provider connections.
 > Production capacity and the two-million-email scale target remain unvalidated.
 
 ![CaseQuarry workspace showing a real synthetic matter, evidence counts and review progress](docs/assets/workspace.png)
@@ -32,14 +32,14 @@ the shared firm data; browsers and desktop clients connect to the same firm serv
 
 ## What you can do
 
-| Workflow | Available in 0.4.0 |
+| Workflow | Available in 0.5.0 |
 |---|---|
 | Preserve | SHA-256 originals, source paths, MBOX offsets, duplicates and attachment families |
 | Import | Resumable uploads, bounded OCR, durable jobs and retries that preserve extraction history |
 | Search | Boolean/phrase/field/date search, exact sender/recipient filters, facets, grouping and pagination |
 | Investigate | Email readers, scoped traffic charts, communication maps, threads, timelines and candidate comparisons |
 | Review | Versioned decisions, exclusive work assignments, review queues, tags, notes and saved scope snapshots |
-| Organize | Matters, members, custodians, sources, issues, task deadlines, personal worklists and legal holds |
+| Organize | Matters, members, custodians, sources, issues, task descriptions/deadlines, personal worklists and legal holds |
 | Disclose | Irreversible text/PDF redactions, independent approval, sequential Bates numbers and CSV/DAT/OPT loadfiles |
 | Export | Metadata and reviewed native ZIP packages, with fresh scope and hash verification |
 | Secure | Tenant/matter roles, password/session controls, administrator controls, MFA and audit chains |
@@ -53,12 +53,21 @@ The refreshed website uses grouped navigation, readable tables, responsive layou
 light/dark themes. Switch the matter dashboard between cards and a list, or use the
 keyboard command palette to find accessible matters across the server.
 
-**My work** puts your nearest deadlines first. Filter overdue, upcoming and undated
-assignments, then complete authorized tasks directly from the dashboard. Set, change
-or remove a manual due date in a matter’s task list. Counts cover your accessible active
+**My work** puts your nearest deadlines first. Filter open or in-progress work, then
+overdue, upcoming and undated assignments. Open a task to edit its title, description,
+status, assignee and due date, or complete authorized tasks directly from the dashboard.
+Concurrent saves retain your draft and require conflict resolution before another save.
+Counts cover your accessible active
 matters, not just the current page. Choose your timezone in account settings for
 timestamp displays and deadline classification; entered calendar dates stay intact.
 These are team-entered plans rather than calculated court deadlines.
+
+Move between evidence items with **Previous item** and **Next item**, preserving the
+visible page order. Unsaved tags or notes block these buttons until saved or cleared.
+**Copy source link** captures the exact extraction version and text location;
+the recipient still needs matter access. Evidence rows refresh when another connected
+workstation saves a review. Listing queries retrieve short snippets without loading
+each document's full extracted body and metadata.
 
 ### Supported inputs
 
@@ -86,9 +95,9 @@ Choose the assets on the [Releases page](https://github.com/CanerBaba25/CaseQuar
 
 | Download | Use it for |
 |---|---|
-| `CaseQuarry_0.4.0_x64-setup.exe` | Install the Windows desktop client on each workstation |
-| `CaseQuarry_0.4.0_universal.dmg` | Install on an Apple Silicon or Intel MacBook |
-| `CaseQuarry_0.4.0_amd64.deb` | Install the Linux client on Ubuntu 24.04 x64 |
+| `CaseQuarry_0.5.0_x64-setup.exe` | Install the Windows desktop client on each workstation |
+| `CaseQuarry_0.5.0_universal.dmg` | Install on an Apple Silicon or Intel MacBook |
+| `CaseQuarry_0.5.0_amd64.deb` | Install the Linux client on Ubuntu 24.04 x64 |
 | `casequarry-server-*-windows-x64.zip` | Install the shared web/API server on Windows |
 | `casequarry-server-*-linux-x64.zip` | Install the shared web/API server on Linux |
 | `*-source.zip` | Build, inspect or modify the application |
@@ -136,7 +145,9 @@ open its directory, and run the same commands starting with `uv sync --locked`.
 
 **Upgrading an existing installation:** stop the application, preserve a verified
 backup, run `uv sync --locked`, then `uv run python scripts/tasks.py migrate` before restarting.
-Version 0.4.0 adds `0005_task_due_dates` and `0006_user_time_zones`; startup refuses stale schemas.
+Version 0.5.0 adds `0007_task_versions` after the existing deadline/timezone migrations;
+startup refuses stale schemas. Reload open web/desktop workspaces after upgrading the
+server: task edits now require the current task version. See the [task API](docs/TASK_API.md).
 Existing SQLite installations require the documented guarded transfer to an empty
 PostgreSQL database. Keep the original database and a verified recovery backup.
 
@@ -194,9 +205,11 @@ the larger benchmark has not yet been repeated with the new extraction pipeline.
 Percentiles use 15 queries; these results are not a production SLA or a multi-million
 capacity claim. See [benchmark scope and method](docs/BENCHMARKS.md).
 
-The complete local Python suite passed **378 tests**, with ten skipped in that run.
-**89 focused checks** ran against actual PostgreSQL, covering deadline cursors,
+The complete local Python suite passed **424 tests**, with PostgreSQL checks enabled
+and no skipped tests. Coverage includes task conflicts and delayed commits,
 timezone boundaries, permission revocation, last-lead races, legal holds and upgrades.
+The evidence-query improvement preserved **39 complete comparison responses** and
+passed **16 focused projection/detail checks** across SQLite and PostgreSQL.
 The Rust integrity component passed **five tests**, and the native desktop client
 passed **eight Rust tests**, an actual WebView2 runtime diagnostic and three isolated
 install/launch/uninstall checks. Real-browser checks cover evidence import/search,
@@ -215,7 +228,7 @@ from the public source distribution.
 | Audience | Guides |
 |---|---|
 | Install | [Firm server](docs/SERVER_INSTALL.md), [Desktop client](docs/DESKTOP.md), [Windows](docs/INSTALL_WINDOWS.md), [macOS](docs/INSTALL_MACOS.md), [Linux](docs/INSTALL_LINUX.md) |
-| Review evidence | [Reviewer guide](docs/REVIEWER_GUIDE.md), [CLI reference](docs/CLI_REFERENCE.md) |
+| Review evidence | [Reviewer guide](docs/REVIEWER_GUIDE.md), [CLI reference](docs/CLI_REFERENCE.md), [Task API](docs/TASK_API.md) |
 | Acquire files and mail | [Supported adapters and limits](docs/ADAPTERS.md) |
 | Administer | [Administrator guide](docs/ADMIN_GUIDE.md), [Backup and recovery](docs/BACKUP_RECOVERY.md) |
 | Assess controls | [Threat model](docs/THREAT_MODEL.md), [Data handling](docs/DATA_HANDLING.md), [Evidence integrity](docs/EVIDENCE_INTEGRITY.md) |

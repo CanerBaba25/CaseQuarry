@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
+  ApiError,
   bytes,
   date,
   getDisplayTimeZone,
@@ -13,6 +14,7 @@ import {
   post,
 } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
+import type { RefreshScope } from "@/lib/sync";
 import { can } from "@/lib/permissions";
 import { bucketRange, filtersFromParams } from "@/lib/search-scope";
 import type {
@@ -30,6 +32,7 @@ import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { Pagination } from "./matter-pages";
 import ThreadView from "./thread-view";
 import SourceInvestigations from "./source-investigations";
+import navigationStyles from "./explorer-navigation.module.css";
 
 const statuses = ["unreviewed", "needs_review", "responsive", "non_responsive"];
 const types = [
@@ -52,6 +55,23 @@ const defaultSpec: SearchSpec = {
   cursor: null,
 };
 
+function searchFromRoute(
+  query: string,
+  reviewOnly: boolean,
+  emailOnly: boolean,
+): SearchSpec {
+  const params = new URLSearchParams(query);
+  return {
+    ...defaultSpec,
+    query: params.get("q") || "",
+    filters: {
+      ...(reviewOnly ? { review_status: ["unreviewed", "needs_review"] } : {}),
+      ...filtersFromParams(params),
+      ...(emailOnly ? { item_types: ["email"] } : {}),
+    },
+  };
+}
+
 export default function Explorer({
   matter,
   reviewOnly = false,
@@ -66,14 +86,20 @@ export default function Explorer({
   const router = useRouter(),
     params = useSearchParams(),
     routeQuery = params.toString();
-  const [spec, setSpec] = useState<SearchSpec>(() => ({
-    ...defaultSpec,
-    filters: {
-      ...(reviewOnly ? { review_status: ["unreviewed", "needs_review"] } : {}),
-      ...(emailOnly ? { item_types: ["email"] } : {}),
-    },
-  }));
-  const [draft, setDraft] = useState(""),
+  const [spec, setSpec] = useState<SearchSpec>(() =>
+    searchFromRoute(routeQuery, reviewOnly, emailOnly),
+  );
+  const routeScope = JSON.stringify([
+    matter.id,
+    reviewOnly,
+    emailOnly,
+    evidenceId,
+    routeQuery,
+  ]);
+  const appliedRoute = useRef(routeScope);
+  const routeChanged = appliedRoute.current !== routeScope;
+  const activeSearch = useRef<AbortController | null>(null);
+  const [draft, setDraft] = useState(() => params.get("q") || ""),
     [loadedResult, setLoadedResult] = useState<{
       key: string;
       value: SearchResult;
@@ -103,7 +129,12 @@ export default function Explorer({
     `/cases/${matter.id}/members`,
   );
   const requestKey = JSON.stringify([matter.id, spec]);
-  const result = loadedResult?.key === requestKey ? loadedResult.value : null;
+  const result =
+    !routeChanged && loadedResult?.key === requestKey
+      ? loadedResult.value
+      : null;
+  const selectedPosition =
+    result?.items.findIndex((item) => item.evidence_id === selectedId) ?? -1;
   const person = useResource<{ email: string; name: string }>(
     spec.filters.person_id
       ? `/cases/${matter.id}/people/${spec.filters.person_id}`
@@ -113,26 +144,36 @@ export default function Explorer({
   const canPrivilege = can(matter.role, "privilege");
   const canExport = can(matter.role, "export");
   useEffect(() => {
-    const params = new URLSearchParams(routeQuery);
-    const query = params.get("q") || "";
-    setDraft(query);
+    if (appliedRoute.current === routeScope) return;
+    appliedRoute.current = routeScope;
+    const next = searchFromRoute(routeQuery, reviewOnly, emailOnly);
+    setDraft(next.query);
     setHistory([]);
     setSelected([]);
     setSelectedId(evidenceId || null);
-    setSpec({
-      ...defaultSpec,
-      query,
-      filters: {
-        ...(reviewOnly
-          ? { review_status: ["unreviewed", "needs_review"] }
-          : {}),
-        ...filtersFromParams(params),
-        ...(emailOnly ? { item_types: ["email"] } : {}),
-      },
-    });
-  }, [matter.id, reviewOnly, emailOnly, evidenceId, routeQuery]);
+    setSpec(next);
+  }, [matter.id, reviewOnly, emailOnly, evidenceId, routeQuery, routeScope]);
   useEffect(() => {
+    function receive(event: Event) {
+      const scope = (event as CustomEvent<RefreshScope>).detail || {
+        system: true,
+      };
+      if (!scope.system && scope.caseId !== matter.id) return;
+      activeSearch.current?.abort();
+      if (scope.clear) {
+        setLoadedResult(null);
+        setSelected([]);
+        setSelectedId(null);
+      }
+      setVersion((value) => value + 1);
+    }
+    window.addEventListener("cq:refresh", receive);
+    return () => window.removeEventListener("cq:refresh", receive);
+  }, [matter.id]);
+  useEffect(() => {
+    if (routeChanged) return;
     const controller = new AbortController();
+    activeSearch.current = controller;
     setLoading(true);
     setError(null);
     post<SearchResult>(`/cases/${matter.id}/search`, spec, controller.signal)
@@ -141,13 +182,26 @@ export default function Explorer({
           setLoadedResult({ key: requestKey, value });
       })
       .catch((error) => {
-        if (!controller.signal.aborted) setError(error);
+        if (!controller.signal.aborted) {
+          if (
+            error instanceof ApiError &&
+            [401, 403, 404].includes(error.status)
+          ) {
+            setLoadedResult(null);
+            setSelected([]);
+            setSelectedId(null);
+          }
+          setError(error);
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
-    return () => controller.abort();
-  }, [matter.id, spec, version, requestKey]);
+    return () => {
+      controller.abort();
+      if (activeSearch.current === controller) activeSearch.current = null;
+    };
+  }, [matter.id, spec, version, requestKey, routeChanged]);
   function update(changes: Partial<SearchSpec>) {
     setSpec((current) => ({
       ...current,
@@ -994,6 +1048,18 @@ export default function Explorer({
             }}
             changed={() => setVersion((value) => value + 1)}
             open={setSelectedId}
+            navigation={
+              selectedPosition >= 0 && result
+                ? {
+                    position: selectedPosition + 1,
+                    count: result.items.length,
+                    previous:
+                      result.items[selectedPosition - 1]?.evidence_id || null,
+                    next:
+                      result.items[selectedPosition + 1]?.evidence_id || null,
+                  }
+                : undefined
+            }
           />
         ) : (
           <aside className="inspector-placeholder">
@@ -1057,6 +1123,7 @@ export function EvidenceInspector({
   close,
   changed,
   open,
+  navigation,
 }: {
   caseId: string;
   id: string;
@@ -1066,6 +1133,12 @@ export function EvidenceInspector({
   close: () => void;
   changed: () => void;
   open: (id: string) => void;
+  navigation?: {
+    position: number;
+    count: number;
+    previous: string | null;
+    next: string | null;
+  };
 }) {
   const path = usePathname(),
     params = useSearchParams(),
@@ -1220,6 +1293,9 @@ export function EvidenceInspector({
     }
     return "—";
   }
+  const unsaved = Boolean(
+    note.trim() || (tagDraft.current.dirty && tags !== data?.tags.join(", ")),
+  );
   return (
     <aside className="evidence-inspector" aria-label="Evidence inspector">
       <div className="inspector-top">
@@ -1232,6 +1308,38 @@ export function EvidenceInspector({
           <Icon name="close" size={18} />
         </button>
       </div>
+      {navigation && (
+        <nav
+          className={navigationStyles.navigation}
+          aria-label="Navigate visible evidence"
+        >
+          <button
+            className="button secondary compact"
+            type="button"
+            disabled={!navigation.previous || busy || unsaved}
+            onClick={() => navigation.previous && open(navigation.previous)}
+          >
+            <Icon name="back" size={14} /> Previous item
+          </button>
+          <span>
+            Item {navigation.position} of {navigation.count} on this page
+          </span>
+          <button
+            className="button secondary compact"
+            type="button"
+            disabled={!navigation.next || busy || unsaved}
+            onClick={() => navigation.next && open(navigation.next)}
+          >
+            Next item <Icon name="arrow" size={14} />
+          </button>
+          {unsaved && (
+            <small>
+              Save or clear your unsaved tags and note before moving to another
+              item.
+            </small>
+          )}
+        </nav>
+      )}
       <ErrorBox
         error={detail.error || historical.error}
         retry={() => {
@@ -1517,7 +1625,7 @@ export function EvidenceInspector({
                             onClick={async () => {
                               try {
                                 await navigator.clipboard.writeText(
-                                  `${data.evidence_id} · ${span.page ? `page ${span.page}` : `chars ${span.char_start}-${span.char_end}`} · ${span.span_id || span.id}`,
+                                  `${data.evidence_id} · extraction v${span.artifact_version} · ${span.page ? `page ${span.page}` : `chars ${span.char_start}-${span.char_end}`} · ${span.span_id || span.id}`,
                                 );
                                 setMessage("Source reference copied.");
                               } catch {
@@ -1529,6 +1637,25 @@ export function EvidenceInspector({
                           >
                             <Icon name="copy" size={12} />
                             Copy source reference
+                          </button>
+                          <button
+                            className="citation-copy"
+                            type="button"
+                            onClick={async () => {
+                              const sourceUrl = `${window.location.origin}/app/matters/${encodeURIComponent(caseId)}/evidence/${encodeURIComponent(id)}?version=${span.artifact_version}#span-${encodeURIComponent(span.span_id || span.id)}`;
+                              try {
+                                await navigator.clipboard.writeText(sourceUrl);
+                                setMessage(
+                                  "Version-specific source link copied. Access requires matter permission.",
+                                );
+                              } catch {
+                                setMessage(
+                                  `Copy this version-specific source link: ${sourceUrl}`,
+                                );
+                              }
+                            }}
+                          >
+                            <Icon name="copy" size={12} /> Copy source link
                           </button>
                           {canReview && (
                             <button
@@ -1912,12 +2039,13 @@ export function EvidenceInspector({
                     <label>
                       <span className="sr-only">Evidence review note</span>
                       <textarea
+                        aria-label="Evidence review note"
                         rows={3}
                         value={note}
                         onChange={(event) => setNote(event.target.value)}
                         placeholder="Add a note for your review team…"
                         required
-                        disabled={!canReview}
+                        disabled={busy || !canReview}
                       />
                     </label>
                     <button

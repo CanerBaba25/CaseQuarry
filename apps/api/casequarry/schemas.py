@@ -189,6 +189,7 @@ class IssueLinkInput(Input):
 
 class TaskInput(Input):
     title: str = Field(min_length=1, max_length=300)
+    description: str = Field(default="", max_length=10000)
     assigned_to: str | None = None
     due_date: DateOnly | None = None
 

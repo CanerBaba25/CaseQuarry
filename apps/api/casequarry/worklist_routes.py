@@ -37,13 +37,14 @@ def my_work(
     limit: int = Query(20, ge=1, le=100),
     cursor: str | None = Query(None, max_length=4096),
     due: Literal["all", "overdue", "upcoming", "no_due"] = "all",
+    state: Literal["all", "open", "in_progress"] = "all",
     actor: Actor = Depends(current_actor),
     db: Session = Depends(get_db),
 ):
     tenant_id, user_id = actor.user.tenant_id, actor.user.id
     current = now()
     today, snapshot = local_today(actor.user.time_zone, current), current
-    scope = {"kind": "my-work-v2", "tenant_id": tenant_id, "user_id": user_id, "due": due, "today": today.isoformat(), "time_zone": actor.user.time_zone, "order": "due-matter-id"}
+    scope = {"kind": "my-work-v3", "tenant_id": tenant_id, "user_id": user_id, "due": due, "state": state, "today": today.isoformat(), "time_zone": actor.user.time_zone, "order": "due-matter-id"}
     after = None
     expected_revision = None
     if cursor:
@@ -66,25 +67,34 @@ def my_work(
         except (KeyError, ValueError, TypeError):
             fail(422, "WORKLIST_CURSOR_INVALID", "Start your work list again; this page cursor belongs to another account, filter or date window.")
     # Summaries and page rows use one SQL snapshot of current authorization.
-    # Summaries include every currently visible open task, independent of page/filter.
+    # Materialize narrow keys, dates and status; retrieve large titles only for the
+    # bounded page, in this same authorized SQL snapshot. State totals ignore the
+    # selected filters; deadline totals use the selected state, ignoring due/page.
     visible = _visible(
         select(
-            Task.id, Task.title, Task.state, Task.created_at, Task.due_date,
-            Task.assigned_to, Task.created_by, Case.id.label("matter_id"),
-            Case.matter_number, Case.title.label("matter_title"), Member.role,
+            Task.id, Task.state, Task.created_at, Task.due_date,
+            Case.id.label("matter_id"), Member.role,
         ).select_from(Task), tenant_id, user_id,
     ).where(Task.state.in_(("open", "in_progress"))).cte("visible_work")
     upcoming_end = today + timedelta(days=7)
     overdue = visible.c.due_date < today
     upcoming = visible.c.due_date.between(today, upcoming_end)
     undated = visible.c.due_date.is_(None)
+    selected_state = true() if state == "all" else visible.c.state == state
+
+    def count_where(condition, name):
+        return func.coalesce(func.sum(case((condition, 1), else_=0)), 0).label(name)
+
     summary = select(
-        func.count().label("total"),
-        func.coalesce(func.sum(case((overdue, 1), else_=0)), 0).label("overdue"),
-        func.coalesce(func.sum(case((upcoming, 1), else_=0)), 0).label("upcoming"),
-        func.coalesce(func.sum(case((undated, 1), else_=0)), 0).label("no_due"),
+        count_where(selected_state, "total"),
+        count_where(and_(selected_state, overdue), "overdue"),
+        count_where(and_(selected_state, upcoming), "upcoming"),
+        count_where(and_(selected_state, undated), "no_due"),
+        func.count().label("state_all"),
+        count_where(visible.c.state == "open", "state_open"),
+        count_where(visible.c.state == "in_progress", "state_in_progress"),
     ).select_from(visible).cte("work_summary")
-    page_query = select(visible).where(visible.c.created_at <= snapshot)
+    page_query = select(visible).where(visible.c.created_at <= snapshot, selected_state)
     if due != "all":
         page_query = page_query.where({"overdue": overdue, "upcoming": upcoming, "no_due": undated}[due])
     if after:
@@ -97,17 +107,20 @@ def my_work(
     page = page_query.order_by(visible.c.due_date.asc().nulls_last(), visible.c.matter_id, visible.c.id).limit(limit + 1).cte("work_page")
     # A committed edit may have an earlier timestamp than page one. Capture its
     # transactional revision with the rows, rather than relying on wall-clock order.
-    statement = select(summary, page, revision_expression(tenant_id, user_id).label("order_revision")).select_from(summary.outerjoin(page, true()))
+    page_scope = summary.outerjoin(page, true()).outerjoin(Task, and_(Task.id == page.c.id, Task.case_id == page.c.matter_id, Task.tenant_id == tenant_id)).outerjoin(Case, and_(Case.id == page.c.matter_id, Case.tenant_id == tenant_id))
+    statement = select(summary, page, Task.title, Task.assigned_to, Task.created_by, Task.version, Task.updated_at, Case.matter_number, Case.title.label("matter_title"), revision_expression(tenant_id, user_id, state != "all").label("order_revision")).select_from(page_scope)
     statement = statement.order_by(page.c.due_date.asc().nulls_last(), page.c.matter_id, page.c.id)
     rows = db.execute(statement).mappings().all()
     if cursor and rows[0]["order_revision"] != expected_revision:
-        fail(409, "WORKLIST_CHANGED", "Task deadlines, assignments or access changed while paging. Refresh your work list to use the current order.")
+        fail(409, "WORKLIST_CHANGED", "Tasks, deadlines, assignments or access changed while paging. Refresh your work list to use the current order.")
     counts = {key: rows[0][key] for key in ("total", "overdue", "upcoming", "no_due")}
+    state_counts = {key: rows[0][f"state_{key}"] for key in ("all", "open", "in_progress")}
     page_rows = [row for row in rows if row["id"] is not None]
     items = [
         {
             "id": row["id"], "title": row["title"], "state": row["state"],
             "created_at": utc(row["created_at"]).isoformat(),
+            "version": row["version"], "updated_at": utc(row["updated_at"]).isoformat(),
             "due_date": row["due_date"].isoformat() if row["due_date"] else None,
             "assigned_to": row["assigned_to"], "created_by": row["created_by"],
             "matter": {"id": row["matter_id"], "matter_number": row["matter_number"], "title": row["matter_title"], "role": row["role"]},
@@ -121,4 +134,4 @@ def my_work(
             {"scope": scope, "snapshot": snapshot.isoformat(), "revision": rows[0]["order_revision"], "after": [row["due_date"].isoformat() if row["due_date"] else None, row["matter_id"], row["id"]]},
             request.app.state.cursor_secret,
         )
-    return {"user_id": user_id, "items": items, "next_cursor": next_cursor, "limit": limit, "due": due, "server_today": today.isoformat(), "time_zone": actor.user.time_zone, "summary": counts}
+    return {"user_id": user_id, "items": items, "next_cursor": next_cursor, "limit": limit, "due": due, "state": state, "server_today": today.isoformat(), "time_zone": actor.user.time_zone, "summary": counts, "state_counts": state_counts}

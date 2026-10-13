@@ -18,7 +18,7 @@ from . import ai_models, production_models, provider_models, sync_models, workfl
 from .config import Settings
 from .models import Base
 
-HEAD_REVISION = "0006_user_time_zones"
+HEAD_REVISION = "0007_task_versions"
 CORE_REVISION = "0001_core"
 _MIGRATION_LOCK = threading.RLock()
 _POSTGRES_LOCK_KEY = 0x4351534348454D41

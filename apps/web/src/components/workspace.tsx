@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { version as applicationVersion } from "../../package.json";
 import {
   ApiError,
   api,
@@ -384,7 +385,7 @@ export default function Workspace() {
                   : syncState === "unavailable"
                     ? "Matter unavailable"
                     : "Reconnecting"}
-              <small>CaseQuarry 0.4</small>
+              <small>CaseQuarry {applicationVersion}</small>
             </span>
             <Icon name="lock" size={15} />
           </div>
@@ -526,6 +527,7 @@ export default function Workspace() {
               <AuditPage matter={matter.data} />
             ) : ["holds", "issues", "tasks"].includes(section) ? (
               <GovernancePage
+                key={`${matter.data.id}:${section}`}
                 matter={matter.data}
                 kind={section as "holds" | "issues" | "tasks"}
               />
@@ -950,8 +952,8 @@ function MatterDashboard({
       <div className="workspace-footer">
         <Icon name="shield" size={16} />
         <span>
-          CaseQuarry 0.4 · Professional judgment and verified source records
-          remain essential.
+          CaseQuarry {applicationVersion} · Professional judgment and verified
+          source records remain essential.
         </span>
       </div>
     </>
