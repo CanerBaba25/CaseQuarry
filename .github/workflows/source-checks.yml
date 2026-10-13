@@ -121,7 +121,8 @@ jobs:
       - name: Identify hosted compiler image
         run: uv run --no-project python scripts/prepare_desktop_cache.py --identify
       - name: Reuse native dependency compiler objects
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: native-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cargo/registry
@@ -131,7 +132,6 @@ jobs:
           key: native-v1-${{ matrix.platform }}-${{ runner.os }}-${{ runner.arch }}-${{ env.CASEQUARRY_CACHE_IMAGE_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'apps/desktop/src-tauri/Cargo.lock', 'apps/desktop/src-tauri/Cargo.toml') }}-${{ github.sha }}
           restore-keys: |
             native-v1-${{ matrix.platform }}-${{ runner.os }}-${{ runner.arch }}-${{ env.CASEQUARRY_CACHE_IMAGE_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'apps/desktop/src-tauri/Cargo.lock', 'apps/desktop/src-tauri/Cargo.toml') }}-
-          save-always: true
       - name: Rebuild current application source and assets
         run: uv run --no-project python scripts/prepare_desktop_cache.py --clean ${{ matrix.platform }}
       - run: npm --prefix apps/desktop run build:ui
@@ -139,6 +139,16 @@ jobs:
       - run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings
       - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
       - run: npm --prefix apps/desktop run ${{ matrix.build }}
+      - name: Save successfully compiled native dependencies
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/desktop/src-tauri/target
+            !apps/desktop/src-tauri/target/**/bundle/**
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
       - name: Verify Windows system WebView runtime
         if: runner.os == 'Windows'
         run: uv run --no-project python scripts/verify_desktop.py --platform windows-x64

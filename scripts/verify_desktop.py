@@ -36,7 +36,8 @@ def command(*args: str, **kwargs) -> subprocess.CompletedProcess:
 def tool_context(process: subprocess.CompletedProcess) -> str:
     def decoded(value):
         return value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value or ""
-    return (decoded(process.stdout) + "\n" + decoded(process.stderr))[-3000:]
+    output = decoded(process.stdout) + "\n" + decoded(process.stderr)
+    return output if len(output) <= 3000 else output[:1500] + "\n[tool output middle omitted]\n" + output[-1500:]
 
 
 def reviewed_apache_prompt(output: str) -> bool:
@@ -45,22 +46,37 @@ def reviewed_apache_prompt(output: str) -> bool:
             and re.search(r"do you agree|\[y/n\]|\(y/n\)|type [\"']?y\b", normalized) is not None)
 
 
+def reviewed_license_cancellation(process: subprocess.CompletedProcess, license_text: str) -> bool:
+    # A noninteractive hdiutil can display the full EULA and cancel without
+    # printing a Y/N prompt. The whole reviewed license, not its heading alone,
+    # must be present before this alternative permits one confirmation retry.
+    output = ((process.stdout or b"") + (process.stderr or b"")).decode("utf-8", errors="replace")
+    normalized_license = " ".join(license_text.split())
+    return (process.returncode == 1 and bool(normalized_license)
+            and normalized_license in " ".join(output.split())
+            and "hdiutil: attach canceled" in output.splitlines())
+
+
 def attach_image(bundle: Path, mount: Path) -> bool:
     arguments = ["hdiutil", "attach", "-readonly", "-nobrowse", "-mountpoint", str(mount), str(bundle)]
     process = captured(arguments, input=b"\n")
     if process.returncode == 0:
         return False
     # Tauri embeds bundle.licenseFile as a DMG EULA. Accept only our reviewed
-    # Apache image license after the actual tool output identifies its prompt.
+    # Apache image license after the actual tool output identifies its prompt
+    # or displays the entire reviewed text followed by the known cancellation.
     output = ((process.stdout or b"") + (process.stderr or b"")).decode("utf-8", errors="replace")
     root = Path(__file__).resolve().parents[1]
     configuration = json.loads((root / "apps/desktop/src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
     license_file = (root / "apps/desktop/src-tauri" / configuration["bundle"]["licenseFile"]).resolve()
     license_text = license_file.read_text(encoding="utf-8")
-    if license_file != root / "LICENSE" or "Apache License" not in license_text or "Version 2.0" not in license_text or not reviewed_apache_prompt(output):
+    prompt_confirmed = reviewed_apache_prompt(output)
+    cancellation_confirmed = reviewed_license_cancellation(process, license_text)
+    if license_file != root / "LICENSE" or "Apache License" not in license_text or "Version 2.0" not in license_text or not (prompt_confirmed or cancellation_confirmed):
         raise RuntimeError(f"hdiutil attach failed ({process.returncode}): {tool_context(process)}")
     prompt = [line.strip() for line in output.splitlines() if re.search(r"do you agree|\[y/n\]|\(y/n\)", line, re.IGNORECASE)]
-    print("DMG displayed the reviewed Apache2.0 agreement prompt: " + " ".join(prompt)[-600:])
+    confirmation = "agreement prompt: " + " ".join(prompt)[-600:] if prompt_confirmed else "complete license and exact attach-canceled marker"
+    print("DMG displayed the reviewed Apache2.0 " + confirmation)
     command(*arguments, input=b"Y\n")
     return True
 
