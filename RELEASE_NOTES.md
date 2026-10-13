@@ -1,5 +1,71 @@
 # Release notes
 
+## 0.3.0 — October 12, 2026
+
+Web and Windows desktop development preview with a shared PostgreSQL firm server.
+
+### Desktop and collaboration
+
+- Installable Rust/Tauri Windows x64 client with a firm connection screen, strict
+  HTTPS origin checks and a separate restricted workspace WebView. Connection
+  preferences contain only the server URL and are protected with Windows DPAPI.
+- Browser and desktop clients use the same server, PostgreSQL database, evidence
+  storage and account/matter permissions. Connected matter views refresh on committed
+  changes and import progress. Revoked access clears the mounted matter.
+- A personal My work dashboard lists open assigned tasks across accessible active
+  matters with stable pagination and automatic refresh. Completed tasks remain in
+  their matter history.
+- Matter navigation now supports signed, account-scoped pagination and server-side
+  title/client/number search, avoiding the previous first-100-matters limit.
+
+### Optional provider connections
+
+- User-owned OpenAI, Google Gemini, xAI Grok and Anthropic Claude API keys with
+  encrypted, scope-bound storage, masked readback, versioned edits and revocation.
+- External processing requires active firm approval, current matter-lead consent,
+  the requester’s own connection and confirmation with a purpose for every job.
+  Saving keys or importing evidence makes no provider request.
+- Bounded official HTTPS transports, safe provider errors and verified exact source
+  quotations. Workers recheck keys, policies, permissions, privilege and source
+  integrity before transmission and publication. No automatic paid retries.
+
+### PostgreSQL and distribution
+
+- PostgreSQL is the default database, with managed local setup, explicit schema
+  migration and a guarded SQLite transfer that preserves the source and verifies
+  copied rows and evidence before enabling the target.
+- Fixed PostgreSQL Decimal quota totals that could break import failure reporting,
+  and fixed preview reads incorrectly triggering shared-client refreshes.
+- Release assets include the Windows desktop installer, built Windows/Linux web
+  server packages, source ZIP and SHA-256 sidecars. Packages carry the project and
+  applicable third-party license notices.
+
+### Validation and limits
+
+The complete local Python suite passed 316 tests. Real PostgreSQL acceptance covered imports, queued/concurrent quotas and immutable
+reprocessing. The complete browser run passed 25 workflows, including provider key
+handling, shared task refresh, review, productions, mobile views and account isolation.
+Six focused browser checks additionally verify firm/matter/per-job consent, mobile
+provider settings, shared worklists, live membership revocation and matter search.
+Native Windows verification passed seven Rust tests and 12 actual WebView2/installer
+checks, including PostgreSQL-backed login, remote IPC denial, install and uninstall.
+Cloud/local adapter checks passed 82 focused tests, with two actual API checks also
+run on PostgreSQL. These use controlled provider HTTP responses; no paid vendor
+request or real account/model compatibility claim is made.
+
+This remains a development preview. The Windows installer is unsigned. Clients
+require a reachable firm server; offline editing is unavailable. Production recovery,
+Docker runtime operation, recipient loadfile import, real-model quality and
+100k/1m/2m capacity remain unvalidated. The earlier SQLite 10k benchmark is unchanged.
+
+### Upgrade
+
+Stop the application and keep a verified database/evidence backup. Upgrade dependencies
+and run migration `0004_firm_sync_providers` through the documented migration command.
+For older SQLite installations, use the guarded transfer before changing the database
+URL; do not replace or discard the legacy database. Preserve the provider encryption
+key privately with recovery material. See the installation and provider guides.
+
 ## 0.2.0 — October 12, 2026
 
 Expanded development preview for synthetic evidence and evaluation.

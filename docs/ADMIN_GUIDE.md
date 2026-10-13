@@ -1,10 +1,10 @@
 # Administrator guide
 
-This guide covers the implemented 0.2 controls. The tested runtime is local Python/Node with SQLite. PostgreSQL migration SQL is validated without a live server; Docker and PostgreSQL deployment acceptance remain unexecuted on the current validation host. Use a synthetic evaluation corpus until the host, access policy, preservation and reviewer workflow are independently approved.
+This guide covers the implemented 0.3 controls. PostgreSQL is the shared database for browser and desktop clients. Real PostgreSQL migrations, import workflows and separate-client updates have been exercised; Docker runtime operation and production recovery remain unvalidated. Use a synthetic evaluation corpus until the host, access policy, preservation and reviewer workflow are approved for the intended deployment.
 
 ## Install and bootstrap
 
-Follow the [Windows](INSTALL_WINDOWS.md) or [Linux](INSTALL_LINUX.md) installation guide. Keep `.env` and evidence storage private, owner-restricted and outside source control. The one-time local setup token expires; setup creates the first firm administrator and requires a new password. Replacing an expired setup token does not require deleting an existing database.
+Follow the [firm server](SERVER_INSTALL.md), [Windows](INSTALL_WINDOWS.md) or [Linux](INSTALL_LINUX.md) installation guide. Install [desktop clients](DESKTOP.md) on workstations as needed and give them the same trusted HTTPS firm URL. Keep `.env` and evidence storage private, owner-restricted and outside source control. The one-time setup token expires; setup creates the first firm administrator and requires a new password. Replacing an expired token does not require deleting an existing database.
 
 Use an encrypted host and storage location that matches the matter's data policy. A local application process does not prevent a cloud-sync client from uploading its files. Configure `CASEQUARRY_STORAGE_ROOT` to a protected location when `.data` is inappropriate.
 

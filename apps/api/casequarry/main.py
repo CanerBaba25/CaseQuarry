@@ -28,7 +28,10 @@ from . import (
     investigation_routes,
     mfa_routes,
     production_routes,
+    provider_routes,
+    sync_routes,
     workflow_routes,
+    worklist_routes,
 )
 from .config import Settings
 from .database import Database
@@ -271,7 +274,10 @@ def create_app(settings: Settings | None = None):
         ai_routes.router,
         account_routes.router,
         workflow_routes.router,
+        worklist_routes.router,
         production_routes.router,
+        provider_routes.router,
+        sync_routes.router,
         candidate_routes.router,
     ):
         application.include_router(router)
@@ -284,11 +290,13 @@ def create_app(settings: Settings | None = None):
             "status": "ok",
             "version": __version__,
             "database": "ok",
+            "database_engine": database.engine.dialect.name,
             "storage": "local",
             "search": "scoped-sql",
             "queue": settings.worker_mode,
             "ai_enabled": settings.ai_enabled,
-            "remote_ai_enabled": False,
+            "remote_ai_capable": settings.allow_remote_ai,
+            "remote_ai_enabled": False,  # Firm and matter approval are not public health metadata.
             "production_ready": False,
         }
 

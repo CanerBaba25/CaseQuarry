@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api, date, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
+import { useFirmSync } from "@/lib/sync";
 import type { Matter, Stats, User } from "@/lib/types";
 import { Badge, Empty, ErrorBox, Icon, Loading, Logo, Modal } from "./ui";
 import {
@@ -25,6 +26,9 @@ import CommunicationAnalytics from "./communication-analytics";
 import FirmAdministration from "./firm-admin";
 import ReviewQueue from "./review-queue";
 import ProductionsPage from "./productions";
+import MyWork from "./task-worklist";
+
+type MatterPage = {items: Matter[]; next_cursor: string | null; total: number};
 
 const matterNavigation = [
   ["overview", "Overview", "grid"],
@@ -57,6 +61,14 @@ export default function Workspace() {
     [navOpen, setNavOpen] = useState(false),
     [dark, setDark] = useState(false);
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [matterFilter, setMatterFilter] = useState("");
+  const [caseSearch, setCaseSearch] = useState("");
+  const [caseCursors, setCaseCursors] = useState<(string | null)[]>([null]);
+  useEffect(() => {
+    const timer = setTimeout(() => {setCaseSearch(matterFilter.trim()); setCaseCursors([null]);}, 250);
+    return () => clearTimeout(timer);
+  }, [matterFilter]);
+  useEffect(() => {setCaseCursors([null]);}, [includeArchived, user?.id]);
   const pieces = pathname.split("/").filter(Boolean),
     caseId =
       pieces[0] === "app" && pieces[1] === "matters" && pieces[2] !== "new"
@@ -70,9 +82,15 @@ export default function Workspace() {
   const matter = useResource<Matter>(
     user && caseId ? `/cases/${caseId}` : null,
   );
-  const cases = useResource<{ items: Matter[]; next_cursor: string | null }>(
-    user ? `/cases${includeArchived ? "?archived=true" : ""}` : null,
+  const cases = useResource<MatterPage>(
+    user ? `/cases?archived=${includeArchived}&q=${encodeURIComponent(caseSearch)}${caseCursors.at(-1) ? `&cursor=${encodeURIComponent(caseCursors.at(-1)!)}` : ""}` : null,
   );
+  const refreshUser = useCallback(() => {
+    void api<User>("/me").then((me) => {
+      setUser((current) => current?.id === me.id && current.tenant_id === me.tenant_id ? me : current);
+    }).catch(() => {});
+  }, []);
+  const syncState = useFirmSync(user?.id ?? null, caseId, refreshUser);
 
   const boot = useCallback(async () => {
     setBooting(true);
@@ -310,11 +328,12 @@ export default function Workspace() {
           </>
         )}
         <div className="sidebar-bottom">
-          <div className="preview-label">PREVIEW 0.2</div>
+          <div className="preview-label">PREVIEW 0.3</div>
           <div className="privacy-status">
             <span className="status-dot" />
             <span>
-              Private workspace<small>No external AI by default</small>
+              {syncState === "connected" ? "Connected to firm server" : syncState === "checking" ? "Checking connection" : syncState === "unavailable" ? "Matter unavailable" : "Reconnecting"}
+              <small>External AI requires consent</small>
             </span>
             <Icon name="lock" size={15} />
           </div>
@@ -474,6 +493,12 @@ export default function Workspace() {
               cases={cases}
               includeArchived={includeArchived}
               toggleArchived={setIncludeArchived}
+              userId={user.id}
+              filter={matterFilter}
+              setFilter={setMatterFilter}
+              hasPrevious={caseCursors.length > 1}
+              previous={() => setCaseCursors((current) => current.slice(0, -1))}
+              next={() => {if(cases.data?.next_cursor) setCaseCursors((current) => [...current, cases.data!.next_cursor]);}}
             />
           )}
         </main>
@@ -640,20 +665,26 @@ function MatterDashboard({
   cases,
   includeArchived,
   toggleArchived,
+  userId,
+  filter,
+  setFilter,
+  hasPrevious,
+  previous,
+  next,
 }: {
   cases: ReturnType<
-    typeof useResource<{ items: Matter[]; next_cursor: string | null }>
+    typeof useResource<MatterPage>
   >;
   includeArchived: boolean;
   toggleArchived: (value: boolean) => void;
+  userId: string;
+  filter: string;
+  setFilter: (value: string) => void;
+  hasPrevious: boolean;
+  previous: () => void;
+  next: () => void;
 }) {
-  const [filter, setFilter] = useState("");
-  const rows =
-    cases.data?.items.filter((item) =>
-      `${item.title} ${item.matter_number} ${item.client}`
-        .toLowerCase()
-        .includes(filter.toLowerCase()),
-    ) || [];
+  const rows = cases.data?.items || [];
   return (
     <>
       <div className="page-heading">
@@ -683,12 +714,13 @@ function MatterDashboard({
           PRIVATE BY DEFAULT
         </span>
       </div>
+      <MyWork userId={userId} />
       <section className="section">
         <div className="section-heading">
           <h2>
             Your matters{" "}
             <span className="count-chip">
-              {number(cases.data?.items.length)}
+              {number(cases.data?.total)}
             </span>
           </h2>
           <label className="archived-toggle">
@@ -705,6 +737,7 @@ function MatterDashboard({
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
               placeholder="Find a matter…"
+              maxLength={200}
               aria-label="Find a matter"
             />
           </label>
@@ -736,6 +769,10 @@ function MatterDashboard({
             ))}
           </div>
         )}
+        {(hasPrevious || cases.data?.next_cursor) && <div className="button-row">
+          <button className="button secondary compact" disabled={!hasPrevious || cases.loading} onClick={previous}>Previous matters</button>
+          <button className="button secondary compact" disabled={!cases.data?.next_cursor || cases.loading} onClick={next}>Next matters</button>
+        </div>}
       </section>
       <div className="workspace-footer">
         <Icon name="shield" size={16} />

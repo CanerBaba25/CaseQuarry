@@ -164,4 +164,6 @@ CaseQuarry uses Apache-2.0. Third-party rights remain independent. See [the mach
 | [version_check](https://crates.io/crates/version_check/0.9.5) | 0.9.5 | MIT/Apache-2.0 |
 | [zmij](https://crates.io/crates/zmij/1.0.23) | 1.0.23 | MIT |
 
-Container base images and PostgreSQL are deployed as separate components. Their own distributions contain notices for bundled operating-system packages. This repository does not claim to have completed a container image license/security audit.
+The Windows desktop binary includes its own exact dependency inventory and full license texts. See [desktop inventory](apps/desktop/DEPENDENCY_INVENTORY.json), [desktop notices](apps/desktop/THIRD_PARTY_NOTICES.txt) and [source provenance](apps/desktop/licenses/SOURCES.json). These materials are also packaged with the installer.
+
+Server standalone packages contain runtime dependency code and their own bundled notices. Container base images and PostgreSQL are deployed as separate components. Their distributions contain notices for bundled operating-system packages. This repository does not claim to have completed a container image license/security audit.

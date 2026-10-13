@@ -1,0 +1,24 @@
+{
+  "name": "@casequarry/desktop",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build:ui": "tsc --noEmit && vite build",
+    "build": "tauri build --bundles nsis --target x86_64-pc-windows-msvc -- --locked",
+    "tauri": "tauri",
+    "licenses": "node scripts/notices.mjs",
+    "typecheck": "tsc --noEmit",
+    "format:check": "prettier --check src scripts public index.html package.json tsconfig.json src-tauri/*.json src-tauri/capabilities/*.json"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.11.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.2",
+    "typescript": "5.9.3",
+    "vite": "8.3.4",
+    "prettier": "3.9.10"
+  }
+}

@@ -1,8 +1,8 @@
-# Run on Windows
+# Install on Windows
 
-This 0.1 development release is for synthetic evidence and evaluation. It is not cleared for confidential client matters. Use a private checkout on an encrypted disk and keep `.env` and `.data` out of source control.
+The GitHub Release provides a Windows desktop installer and `casequarry-server-VERSION-windows-x64.zip`. The desktop is a client of the shared firm server, with no separate evidence database. [Server installation](SERVER_INSTALL.md) covers prerequisites, private storage, HTTPS, multiple computers and upgrades.
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and Node.js 24. Python 3.12 is selected by `.python-version`; uv can install it if necessary.
+For source development, install [uv](https://docs.astral.sh/uv/getting-started/installation/), Node24 and PostgreSQL16 or newer. PostgreSQL's [Windows page](https://www.postgresql.org/download/windows/) links the EDB installer and portable binary archive. Tools must include `pg_ctl`, `initdb`, `pg_dump` and `pg_restore`; standard locations are detected, or pass `--postgres-bin PATH` to setup.
 
 ```powershell
 uv sync --locked
@@ -10,49 +10,12 @@ uv run python scripts/tasks.py setup
 uv run python scripts/tasks.py dev
 ```
 
-Open `http://127.0.0.1:3000/setup`. Read the generated `CASEQUARRY_SETUP_TOKEN` from your local `.env`, enter it on the setup page and choose your administrator password. Setup tokens are one-time and expire; login does not bypass authentication on localhost. If setup has expired before completion, stop the API, replace the local token with a newly generated secret, and restart; do not delete a populated evidence database.
+New setup generates protected private `.env` secrets and defaults to PostgreSQL. Its owned loopback cluster uses SCRAM authentication and a non-superuser application role; data lives under `%LOCALAPPDATA%/CaseQuarry/postgres`, outside the synchronized checkout. Windows new-init URLs normally use port55432. Existing configuration is preserved; populated SQLite installations require [verified legacy cutover](SERVER_INSTALL.md#existing-sqlite-installations).
 
-The API listens on `127.0.0.1:8000`; the web app proxies `/api` to it. This mode uses SQLite and an embedded durable worker. Ctrl+C stops the development processes. Data persists in `.data`; restarting does not erase it. If a port is occupied, stop the existing process or explicitly configure both the API address and frontend proxy.
+For local development, open `http://127.0.0.1:3000/setup` and enter the one-time `CASEQUARRY_SETUP_TOKEN` from private `.env`. Setup and provider-encryption secrets are never printed. The API binds loopback8000 and the web app proxies requests to it. `dev` starts the exact configured owned PostgreSQL cluster, then API/web; Ctrl+C stops application processes and retains the database. `postgres-status`, `postgres-start` and `postgres-stop` manage only that cluster. Normal multi-computer deployment uses HTTPS and a standalone worker.
 
-Optional local OCR requires Tesseract and its language data. Standard installations are detected automatically; use `CASEQUARRY_TESSERACT_COMMAND` for another trusted executable location. Scanned PDFs/images remain visibly partial when recognition is disabled or unavailable. [Adapter documentation](ADAPTERS.md) describes settings, quality flags, Outlook limits and explicit read-only mailbox acquisition.
+Optional Tesseract OCR requires local language data; `CASEQUARRY_TESSERACT_COMMAND` can select another trusted executable. Missing engines remain explicit partial extraction. See [adapter limits](ADAPTERS.md), [cloud consent/keys](CLOUD_AI_GUIDE.md) and [backup/recovery](BACKUP_RECOVERY.md).
 
-Run checks:
+`tasks.py lint`, `typecheck` and running-service `smoke` are available diagnostics. Test/browser/fixture/benchmark commands require local QA assets excluded from GitHub and report unavailable when absent. Docker Desktop can use the source Compose/HTTPS configuration in the server guide; Docker was unavailable on the current Windows validation host, so its deployment is not claimed as live-validated.
 
-```powershell
-uv run python scripts/tasks.py test
-uv run python scripts/tasks.py lint
-uv run python scripts/tasks.py typecheck
-uv run python scripts/tasks.py smoke
-```
-
-`smoke` requires running services and checks availability only. `test` and browser commands require local QA assets, which are excluded from the public source distribution; a public checkout reports this accurately instead of pretending tests ran. Lint/typecheck/setup/dev do not require those assets.
-
-Run the isolated real browser workflow with synthetic records:
-
-```powershell
-node apps/web/node_modules/@playwright/test/cli.js install chromium
-uv run python scripts/tasks.py test-e2e
-```
-
-Where the local QA harness is available, the E2E task creates a separate database and short-lived test account, starts private loopback API/web processes, checks the import/search/review/export workflow and saves actual screenshots under ignored `.data/browser-e2e`. It never changes an existing matter or prints credentials.
-
-## Docker Desktop option
-
-Install Docker Desktop with Linux containers and Compose support, then:
-
-```powershell
-uv run python scripts/tasks.py init
-docker compose up -d --build
-docker compose ps
-docker compose logs --tail=100 api worker
-```
-
-Only web port 3000 is published, bound to loopback. PostgreSQL, the API and the standalone durable worker share a private container network. `POSTGRES_PASSWORD` and the setup token must be present; Compose rejects missing credentials. No real `.env` is copied into images.
-
-Docker was not installed on the initial development machine. Until actual Compose acceptance results are recorded, treat container deployment as unverified configuration. The tested local runtime is the uv/Node flow.
-
-For confidential operation, require a completed security review, production TLS, encrypted disk/storage, independent backups and verified restore, preserved dependency notices, and professional workflow QA. Changing an environment flag does not satisfy those requirements. Store evidence outside automatically cloud-synchronized directories when matter policy requires local-only storage.
-
-## Optional Rust verification
-
-Install Rust using [official Rustup](https://rust-lang.org/tools/install/); Windows builds require Visual Studio C++ tools and a Windows SDK. Then `cargo build --release --locked`. `uv run casequarry evidence hash-file --path FILE --engine rust` and `uv run casequarry ingest inventory-mbox --path ARCHIVE --engine rust` run the native verifier. `--engine auto` selects the compiled binary when available, and `--engine python` uses the bounded fallback.
+Optional Rust verification uses [Rustup](https://rust-lang.org/tools/install/), Visual Studio C++ tools and a Windows SDK, then `cargo build --release --locked`. CLI file/hash/manifest and MBOX inventory commands support `--engine rust`, `auto` or the Python fallback. The desktop has a separate Rust/Tauri build.

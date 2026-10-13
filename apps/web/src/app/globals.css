@@ -6076,3 +6076,13 @@ td {
   display: block;
   margin-top: 6px;
 }
+/* Account provider connections */
+.provider-settings { margin-top: 24px; }
+.provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+.provider-card { border: 1px solid var(--border); border-radius: 12px; padding: 20px; min-width: 0; }
+.provider-card .section-heading { flex-wrap: wrap; gap: 8px; }
+.provider-card h3 { margin: 0; }
+.provider-card dd { overflow-wrap: anywhere; }
+.provider-firm-policy { border-top: 1px solid var(--border); padding-top: 20px; }
+.external-job-confirmation { margin: 16px 0; padding: 16px; border: 1px solid var(--border); border-radius: 10px; }
+@media (max-width: 700px) { .provider-grid { grid-template-columns: minmax(0, 1fr); } .provider-firm-policy .section-heading { flex-wrap: wrap; gap: 12px; } }

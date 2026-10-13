@@ -7,6 +7,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from .models import Audit, AuditHead, new_id, now
 from .security import utc
+from .sync import record_change
 
 
 def audit_payload(event: Audit) -> dict:
@@ -26,6 +27,7 @@ def record(db, user, case_id, event_type, target_type, target_id, metadata=None,
     event.event_hash = hash_event(event)
     db.add(event)
     db.execute(update(AuditHead).where(AuditHead.scope_key == scope_key).values(event_hash=event.event_hash))
+    record_change(db, user.tenant_id, case_id, event_type)
     db.flush()
     return event
 

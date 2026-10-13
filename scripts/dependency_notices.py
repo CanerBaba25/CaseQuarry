@@ -136,6 +136,8 @@ def generate_notices(root: Path) -> None:
                     else [],
                 }
             )
+    desktop_path = root / "apps/desktop/DEPENDENCY_INVENTORY.json"
+    desktop = json.loads(desktop_path.read_text(encoding="utf-8")) if desktop_path.exists() else None
     inventory = {
         "scope": "Locked Python packages incl local QA/platform dependencies; production npm lock packages; Cargo crate distributions",
         "project_license": "Apache-2.0",
@@ -143,6 +145,7 @@ def generate_notices(root: Path) -> None:
         "python": python,
         "javascript": javascript,
         "rust": rust,
+        "desktop": desktop,
         "separately_deployed": [
             {
                 "component": "PostgreSQL 16",
@@ -195,7 +198,9 @@ def generate_notices(root: Path) -> None:
         )
     lines += [
         "",
-        "Container base images and PostgreSQL are deployed as separate components. Their own distributions contain notices for bundled operating-system packages. This repository does not claim to have completed a container image license/security audit.",
+        "The Windows desktop binary includes its own exact dependency inventory and full license texts. See [desktop inventory](apps/desktop/DEPENDENCY_INVENTORY.json), [desktop notices](apps/desktop/THIRD_PARTY_NOTICES.txt) and [source provenance](apps/desktop/licenses/SOURCES.json). These materials are also packaged with the installer.",
+        "",
+        "Server standalone packages contain runtime dependency code and their own bundled notices. Container base images and PostgreSQL are deployed as separate components. Their distributions contain notices for bundled operating-system packages. This repository does not claim to have completed a container image license/security audit.",
         "",
     ]
     (root / "THIRD_PARTY_NOTICES.md").write_text("\n".join(lines), encoding="utf-8")

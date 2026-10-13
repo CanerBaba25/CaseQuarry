@@ -1,18 +1,19 @@
 name: casequarry
 
 x-api-environment: &api-environment
-  CASEQUARRY_ENVIRONMENT: development
+  CASEQUARRY_ENVIRONMENT: ${CASEQUARRY_ENVIRONMENT:-development}
   CASEQUARRY_DATABASE_URL: postgresql+psycopg://casequarry:${POSTGRES_PASSWORD:?Run uv run python scripts/tasks.py init}@db:5432/casequarry
   CASEQUARRY_STORAGE_ROOT: /app/private-data
   CASEQUARRY_SETUP_TOKEN: ${CASEQUARRY_SETUP_TOKEN:?Run uv run python scripts/tasks.py init}
   CASEQUARRY_WORKER_MODE: external
   CASEQUARRY_AI_ENABLED: "false"
-  CASEQUARRY_ALLOW_REMOTE_AI: "false"
+  CASEQUARRY_ALLOW_REMOTE_AI: ${CASEQUARRY_ALLOW_REMOTE_AI:-true}
+  CASEQUARRY_PROVIDER_KEY_ENCRYPTION_KEY: ${CASEQUARRY_PROVIDER_KEY_ENCRYPTION_KEY:?Generate a private provider encryption key with the init task}
   CASEQUARRY_ALLOW_INSECURE_LOCAL_COOKIES: "true"
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine
     environment:
       POSTGRES_DB: casequarry
       POSTGRES_USER: casequarry
@@ -27,10 +28,11 @@ services:
       retries: 20
     restart: unless-stopped
 
-  api:
+  migrate:
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
+    command: [python, -m, casequarry.database, migrate]
     environment: *api-environment
     volumes:
       - evidence:/app/private-data
@@ -38,6 +40,21 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    environment: *api-environment
+    volumes:
+      - evidence:/app/private-data
+    networks: [private, egress]
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"]
       interval: 10s
@@ -53,7 +70,7 @@ services:
     environment: *api-environment
     volumes:
       - evidence:/app/private-data
-    networks: [private]
+    networks: [private, egress]
     depends_on:
       api:
         condition: service_healthy
@@ -84,6 +101,7 @@ services:
 networks:
   private:
     internal: true
+  egress:
 
 volumes:
   database:

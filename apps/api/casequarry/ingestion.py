@@ -104,7 +104,7 @@ class CaseStorageLimit(ArchiveError):
     def __init__(self, filename, parent_id=None, used_bytes=0, byte_size=0):
         super().__init__("CASE_STORAGE_LIMIT")
         self.filename, self.parent_id = filename, parent_id
-        self.used_bytes, self.byte_size = used_bytes, byte_size
+        self.used_bytes, self.byte_size = int(used_bytes), int(byte_size)
 
 
 def empty_counts():

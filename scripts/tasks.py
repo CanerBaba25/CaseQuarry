@@ -53,10 +53,59 @@ def stop_children(children: list[subprocess.Popen]) -> None:
             child.kill()
 
 
+def postgres(task: str, binary: Path | None = None) -> None:
+    from casequarry.config import Settings
+    from casequarry.database import Database
+    from casequarry.local_postgres import LocalPostgres
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import make_url
+
+    env = environment()
+    settings = Settings()
+    url = make_url(settings.database_url)
+    if url.get_backend_name() != "postgresql":
+        raise RuntimeError("Normal development/server operation requires PostgreSQL. Keep explicit SQLite for QA/recovery; use the guarded legacy migration command before changing a populated installation.")
+    managed = LocalPostgres(ROOT, binary)
+    if task == "postgres-init":
+        if url.host not in {"127.0.0.1", "localhost"}:
+            raise RuntimeError("Automatic cluster provisioning only supports a local owned PostgreSQL server; an external database must be provisioned by its operator.")
+        password = url.password or env.get("POSTGRES_PASSWORD")
+        if not password:
+            raise RuntimeError("Generate private PostgreSQL credentials with the init task before provisioning.")
+        managed.initialize(url.port or 5432)
+        managed.provision_database(password, url.database or "casequarry", url.username or "casequarry")
+        database = Database(settings)
+        try:
+            database.migrate()
+        finally:
+            database.dispose()
+    elif task == "postgres-start":
+        managed.start()
+    elif task == "postgres-stop":
+        managed.stop()
+    elif task == "postgres-status":
+        print(json.dumps(managed.status()))
+        return
+    else:
+        if url.host in {"127.0.0.1", "localhost"} and managed.marker.exists():
+            if managed.configuration()["port"] != (url.port or 5432):
+                raise RuntimeError("The configured database port differs from the owned local cluster; both configurations were preserved.")
+            managed.start()
+    if task != "postgres-stop":
+        engine = create_engine(settings.database_url, pool_pre_ping=True)
+        try:
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        finally:
+            engine.dispose()
+    print("PostgreSQL stopped." if task == "postgres-stop" else "PostgreSQL ready; connection credentials remain private.")
+
+
 def dev() -> None:
     if not (ROOT / ".env").exists():
         initialize()
     env = environment()
+    postgres("ready")
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     npm = "npm.cmd" if os.name == "nt" else "npm"
     children = []
@@ -140,12 +189,19 @@ def main() -> None:
             "notices",
             "benchmark",
             "test-e2e",
+            "postgres-init",
+            "postgres-start",
+            "postgres-stop",
+            "postgres-status",
+            "server-package",
         ],
     )
     parser.add_argument("--server", default="http://127.0.0.1:8000")
     parser.add_argument("--web", default="http://127.0.0.1:3000")
     parser.add_argument("--count", type=int, default=10000)
     parser.add_argument("--output", type=Path, default=ROOT / ".data/synthetic")
+    parser.add_argument("--postgres-bin", type=Path)
+    parser.add_argument("--platform", choices=["windows-x64", "linux-x64"], default="windows-x64" if os.name == "nt" else "linux-x64")
     args = parser.parse_args()
     os.chdir(ROOT)
     qa_paths = {
@@ -171,8 +227,13 @@ def main() -> None:
         initialize()
         run("uv", "sync", "--locked")
         run(npm, "--prefix", "apps/web", "ci")
+        postgres("postgres-init", args.postgres_bin)
     elif args.task == "dev":
         dev()
+    elif args.task.startswith("postgres-"):
+        postgres(args.task, args.postgres_bin)
+    elif args.task == "server-package":
+        run(sys.executable, "scripts/build_server.py", "--platform", args.platform)
     elif args.task == "migrate":
         run(sys.executable, "-m", "alembic", "upgrade", "head")
     elif args.task == "test-e2e":

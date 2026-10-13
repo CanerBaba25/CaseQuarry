@@ -1,7 +1,7 @@
 """Run static migrations with a supplied transaction or an operator-owned connection."""
 
 from alembic import context
-from casequarry import ai_models, production_models, workflow_models  # noqa: F401 - register all application tables
+from casequarry import ai_models, production_models, provider_models, sync_models, workflow_models  # noqa: F401 - register all application tables
 from casequarry.config import Settings
 from casequarry.database import Database
 from casequarry.models import Base

@@ -14,11 +14,11 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from . import ai_models, production_models, workflow_models  # noqa: F401 - register the complete schema
+from . import ai_models, production_models, provider_models, sync_models, workflow_models  # noqa: F401 - register the complete schema
 from .config import Settings
 from .models import Base
 
-HEAD_REVISION = "0003_disclosure_workflow"
+HEAD_REVISION = "0004_firm_sync_providers"
 CORE_REVISION = "0001_core"
 _MIGRATION_LOCK = threading.RLock()
 _POSTGRES_LOCK_KEY = 0x4351534348454D41
@@ -129,7 +129,7 @@ class Database:
                 connection.begin()
                 connection.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _POSTGRES_LOCK_KEY})
             else:
-                raise SchemaMismatch("DATABASE_DIALECT_UNSUPPORTED", "Use SQLite for local development or PostgreSQL for deployment.")
+                raise SchemaMismatch("DATABASE_DIALECT_UNSUPPORTED", "Use PostgreSQL for development/deployment, or an explicit SQLite URL for local QA and legacy recovery.")
             try:
                 yield connection
                 connection.commit()

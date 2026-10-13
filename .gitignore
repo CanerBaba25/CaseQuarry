@@ -77,3 +77,6 @@ scripts/smoke_test.sh
 IMPLEMENTATION_STATUS.md
 API_CONTRACT.md
 BUILD_LOG.md
+
+# Local editor preferences
+.vscode/settings.json

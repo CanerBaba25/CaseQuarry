@@ -1,0 +1,96 @@
+.panel {
+  margin: 24px 0;
+  padding: 25px;
+}
+.heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.heading > div {
+  min-width: 0;
+}
+.heading h2 {
+  margin: 6px 0;
+  font-size: 22px;
+  letter-spacing: -0.6px;
+}
+.heading p {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+}
+.matter {
+  border-top: 1px solid var(--border);
+  padding: 16px 0;
+}
+.matterLink {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: var(--accent);
+}
+.matterLink span {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.matterLink small {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.matterLink strong {
+  font-size: 13px;
+}
+.tasks {
+  list-style: none;
+  padding: 0;
+  margin: 13px 0 0 28px;
+}
+.tasks li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 15px;
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 7px 0;
+}
+.tasks li > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tasks li > span:last-child {
+  flex-shrink: 0;
+}
+.footer {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.pageActions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+@media (max-width: 760px) {
+  .panel {
+    padding: 20px;
+  }
+  .tasks {
+    margin-left: 0;
+  }
+}

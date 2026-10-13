@@ -1,0 +1,32 @@
+services:
+  api:
+    environment:
+      CASEQUARRY_ENVIRONMENT: production
+      CASEQUARRY_ALLOW_INSECURE_LOCAL_COOKIES: "false"
+  worker:
+    environment:
+      CASEQUARRY_ENVIRONMENT: production
+      CASEQUARRY_ALLOW_INSECURE_LOCAL_COOKIES: "false"
+  migrate:
+    environment:
+      CASEQUARRY_ENVIRONMENT: production
+  tls:
+    image: caddy:2.11.7-alpine
+    environment:
+      CASEQUARRY_FIRM_HOST: ${CASEQUARRY_FIRM_HOST:?Set the firm DNS name before starting HTTPS deployment}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - tls-data:/data
+      - tls-config:/config
+    networks: [private, egress]
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  tls-data:
+  tls-config:

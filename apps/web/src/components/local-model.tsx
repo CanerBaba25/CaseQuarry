@@ -8,6 +8,7 @@ import { can } from "@/lib/permissions";
 import type { Matter, SearchSpec } from "@/lib/types";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { PageHeading } from "./matter-pages";
+import { providers, providerName, type CloudPolicy } from "./provider-settings";
 
 type Policy = {
   enabled: boolean;
@@ -19,6 +20,7 @@ type Policy = {
   mode: string;
   warnings: string[];
   reason: string;
+  revision: number;
 };
 type Citation = {
   evidence_id: string;
@@ -64,181 +66,57 @@ type Job = {
 };
 
 export function LocalModelPolicy({ matter }: { matter: Matter }) {
-  const resource = useResource<Policy>(`/cases/${matter.id}/ai/policy`),
-    [modal, setModal] = useState(false),
-    [consenting, setConsenting] = useState(false),
-    [error, setError] = useState<unknown>(null),
-    [busy, setBusy] = useState(false);
-  async function change(enabled: boolean, reason: string, confirmed: boolean) {
-    setBusy(true);
-    setError(null);
-    try {
-      await api(`/cases/${matter.id}/ai/policy`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          enabled,
-          provider: "local",
-          data_sharing: "off",
-          confirmed,
-          reason,
-        }),
-      });
-      setModal(false);
-      resource.refresh();
-    } catch (error) {
-      setError(error);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const resource = useResource<Policy>(`/cases/${matter.id}/ai/policy`);
+  const firm = useResource<CloudPolicy>("/ai/cloud-policy");
+  const [modal, setModal] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  const [provider, setProvider] = useState("local");
+  const [expectedRevision, setExpectedRevision] = useState(0);
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
   const data = resource.data;
-  return (
-    <section className="panel model-policy">
-      <div className="section-heading">
-        <h2>Local model policy</h2>
-        <Icon name="lock" />
-      </div>
-      <ErrorBox error={resource.error} retry={resource.refresh} />
-      <ErrorBox error={error} />
-      {resource.loading && !data ? (
-        <Loading />
-      ) : (
-        data && (
-          <>
-            <Badge
-              value={
-                data.effective_enabled
-                  ? "Enabled for this matter"
-                  : data.configured
-                    ? "Consent required"
-                    : "Not configured"
-              }
-              tone={data.effective_enabled ? "green" : "neutral"}
-            />
-            <h3>
-              {data.effective_enabled
-                ? "Local source quotation review."
-                : "Your workflow works without a model."}
-            </h3>
-            <p>
-              The optional adapter selects exact source quotations with verified
-              citations. It does not generate legal conclusions or change human
-              evidence decisions.
-            </p>
-            <dl className="metadata-list">
-              <div>
-                <dt>Provider</dt>
-                <dd>{data.configured ? "Local Ollama" : "None configured"}</dd>
-              </div>
-              <div>
-                <dt>Model tag</dt>
-                <dd>{data.model || "Not configured"}</dd>
-              </div>
-              {data.endpoint && (
-                <div>
-                  <dt>Local endpoint</dt>
-                  <dd>{data.endpoint}</dd>
-                </div>
-              )}
-              <div>
-                <dt>Remote providers</dt>
-                <dd>Unsupported · sharing off</dd>
-              </div>
-              <div>
-                <dt>Evidence scope</dt>
-                <dd>This matter only</dd>
-              </div>
-            </dl>
-            {!data.configured && (
-              <div className="notice subtle">
-                <Icon name="shield" size={18} />
-                <span>
-                  A server administrator must install a local model and
-                  configure its endpoint before a matter lead can approve use.
-                </span>
-              </div>
-            )}
-            {matter.role === "matter_lead" && data.configured && (
-              <button
-                className="button secondary"
-                disabled={busy}
-                onClick={() => {
-                  setConsenting(data.enabled);
-                  setModal(true);
-                }}
-              >
-                {data.enabled
-                  ? "Change local consent"
-                  : "Approve local processing"}
-              </button>
-            )}
-            {data.effective_enabled && (
-              <Link
-                className="button primary"
-                href={`/app/matters/${matter.id}/ai`}
-              >
-                Open source assistant
-                <Icon name="arrow" size={16} />
-              </Link>
-            )}
-          </>
-        )
-      )}
-      {modal && (
-        <Modal title="Local processing consent" close={() => setModal(false)}>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              const form = new FormData(event.currentTarget);
-              void change(
-                form.get("enabled") === "on",
-                String(form.get("reason")),
-                form.get("confirmed") === "on",
-              );
-            }}
-          >
-            <ErrorBox error={error} />
-            <p className="muted">
-              Only this configured local runtime may receive the selected
-              evidence. This consent is recorded for the matter.
-            </p>
-            <label className="checkbox-label">
-              <input
-                name="enabled"
-                type="checkbox"
-                checked={consenting}
-                onChange={(event) => setConsenting(event.target.checked)}
-              />
-              <span>Enable local model processing for this matter</span>
-            </label>
-            <label>
-              Purpose or reason
-              <textarea
-                name="reason"
-                required
-                minLength={3}
-                maxLength={2000}
-                rows={3}
-              />
-            </label>
-            <label className="checkbox-label">
-              <input name="confirmed" type="checkbox" required={consenting} />
-              <span>
-                I verified that the configured runtime uses local models, Ollama
-                Cloud is disabled (OLLAMA_NO_CLOUD=1), and runtime network
-                access is restricted.
-              </span>
-            </label>
-            <div className="form-actions">
-              <button className="button primary" disabled={busy}>
-                {busy ? "Recording consent…" : "Save matter consent"}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-    </section>
-  );
+  const external = provider !== "local";
+  return <section className="panel model-policy">
+    <div className="section-heading"><h2>Source assistant policy</h2><Icon name="lock" /></div>
+    <ErrorBox error={resource.error} retry={resource.refresh} />
+    <ErrorBox error={firm.error} retry={firm.refresh} />
+    {resource.loading && !data ? <Loading /> : data && <>
+      <Badge value={data.effective_enabled ? "Enabled for your account" : data.enabled ? "Approval saved · unavailable" : "Disabled for this matter"} tone={data.effective_enabled ? "green" : "neutral"} />
+      <h3>{data.effective_enabled ? "Review exact source quotations." : "Your workflow works without a model."}</h3>
+      <p>The optional adapter selects exact source quotations with verified citations. Each result requires human review before it can be accepted.</p>
+      <dl className="metadata-list">
+        <div><dt>Provider</dt><dd>{providerName(data.provider)}</dd></div>
+        <div><dt>Your model</dt><dd>{data.model || "Not configured"}</dd></div>
+        {data.endpoint && <div><dt>{providers.some((item) => item.id === data.provider) ? "Provider endpoint" : "Local endpoint"}</dt><dd>{data.endpoint}</dd></div>}
+        <div><dt>External processing</dt><dd>{providers.some((item) => item.id === data.provider) && data.enabled ? "Approved · each job needs confirmation" : "Off for this matter"}</dd></div>
+        <div><dt>Evidence scope</dt><dd>This matter only</dd></div>
+      </dl>
+      {data.warnings.map((warning, index) => <p className="field-help" key={index}>{warning}</p>)}
+      {providers.some((item) => item.id === data.provider) && !data.configured && <Link className="text-link" href="/app/settings">Add your provider API key in account settings<Icon name="arrow" size={13} /></Link>}
+      {matter.role === "matter_lead" && <button className="button secondary" disabled={busy || !firm.data} onClick={() => {setEnabled(data.enabled); setProvider(providers.some((item) => item.id === data.provider) ? data.provider : "local"); setExpectedRevision(data.revision); setError(null); setModal(true);}}>Manage matter consent</button>}
+      {data.effective_enabled && <Link className="button primary" href={`/app/matters/${matter.id}/ai`}>Open source assistant<Icon name="arrow" size={16} /></Link>}
+    </>}
+    {modal && <Modal title="Matter processing consent" close={() => setModal(false)}>
+      <form onSubmit={async (event) => {
+        event.preventDefault(); const form = new FormData(event.currentTarget); setBusy(true); setError(null);
+        try {
+          await api(`/cases/${matter.id}/ai/policy`, {method:"PATCH",body:JSON.stringify({enabled,provider,data_sharing:external ? "on" : "off",confirmed:form.get("confirmed") === "on",reason:form.get("reason"),expected_revision:expectedRevision})});
+          setModal(false); resource.refresh();
+        } catch(error){setError(error);} finally{setBusy(false);}
+      }}>
+        <ErrorBox error={error} />
+        <label htmlFor="matter-provider">Provider</label><select id="matter-provider" value={provider} disabled={busy} onChange={(event) => setProvider(event.target.value)}>
+          <option value="local">Local Ollama</option>
+          {providers.map((item) => <option key={item.id} value={item.id} disabled={item.id !== data?.provider && !(firm.data?.effective_enabled && firm.data.allowed_providers.includes(item.id))}>{item.name}{!firm.data?.allowed_providers.includes(item.id) ? " · firm approval required" : ""}</option>)}
+        </select>
+        <label className="checkbox-label"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} disabled={busy} /><span>Enable the selected provider for this matter</span></label>
+        <p className="muted">{external ? "Selected evidence excerpts and the question are sent to this external provider when a user confirms a job. Each user must supply their own API key. Vendor billing and retention terms apply." : "Selected evidence is processed by the configured local runtime. The server administrator must disable Ollama Cloud and restrict runtime network access."}</p>
+        <label>Purpose or reason<textarea name="reason" required minLength={3} maxLength={2000} rows={3} disabled={busy} /></label>
+        <label className="checkbox-label"><input key={provider} name="confirmed" type="checkbox" required={enabled} disabled={busy} /><span>{external ? "I approve sending selected source excerpts to this provider under the firm’s policy and this matter’s confidentiality requirements." : "I verified the local runtime configuration, including OLLAMA_NO_CLOUD=1 and restricted network access."}</span></label>
+        <div className="form-actions"><button className="button primary" disabled={busy}>{busy ? "Recording consent…" : "Save matter consent"}</button></div>
+      </form>
+    </Modal>}
+  </section>;
 }
 
 export default function SourceAssistant({ matter }: { matter: Matter }) {
@@ -252,6 +130,7 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
   const selected = useResource<Job>(
     jobId ? `/cases/${matter.id}/ai/jobs/${jobId}` : null,
   );
+  const external = providers.some((item) => item.id === policy.data?.provider);
   const active =
     selected.data &&
     ["pending", "queued", "running", "processing"].includes(
@@ -280,7 +159,7 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
     setError(null);
     if (ids.length > 50) {
       setError(
-        new Error("Select at most 50 evidence IDs for a local quotation job."),
+        new Error("Select at most 50 evidence IDs for a quotation job."),
       );
       setBusy(false);
       return;
@@ -299,6 +178,7 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
         question: form.get("question"),
         ...(ids.length ? { evidence_ids: ids } : { query_spec: query }),
         style: "brief",
+        ...(external ? {confirmed_external: form.get("confirmed_external") === "on", reason: String(form.get("external_reason") || "")} : {}),
       });
       setJobId(job.id || job.job_id);
       jobs.refresh();
@@ -311,9 +191,9 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
   return (
     <>
       <PageHeading
-        eyebrow="LOCAL SOURCE ASSISTANT"
+        eyebrow="SOURCE ASSISTANT"
         title="Return to the words themselves."
-        text="Optional local selection of exact source quotations. Each result is tied to a verified evidence location and requires human review."
+        text="Optional selection of exact source quotations. Each result is tied to a verified evidence location and requires human review."
       />
       <ErrorBox error={policy.error} retry={policy.refresh} />
       <ErrorBox error={jobs.error} retry={jobs.refresh} />
@@ -323,7 +203,7 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
             <h2>Request source quotations</h2>
             <Badge
               value={
-                policy.data?.effective_enabled ? "Local only" : "Unavailable"
+                policy.data?.effective_enabled ? providerName(policy.data.provider) : "Unavailable"
               }
               tone={policy.data?.effective_enabled ? "green" : "neutral"}
             />
@@ -336,8 +216,8 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
                 <Icon name="lock" size={18} />
                 <span>
                   {policy.data?.configured
-                    ? "A matter lead must approve local processing in matter settings."
-                    : "No local model is configured. Keyword search, review and exports remain available."}
+                    ? "The selected provider needs current firm approval, matter consent and a configured connection."
+                    : "No usable model connection is configured for your account. Keyword search, review and exports remain available."}
                   <Link
                     className="text-link"
                     href={`/app/matters/${matter.id}/settings`}
@@ -386,18 +266,23 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
               to 50 items and 40 source spans; coverage is displayed with the
               result.
             </p>
+            {external && <div className="external-job-confirmation" key={`${policy.data?.provider}:${policy.data?.model}`}>
+              <p className="field-help">This request sends your question and selected source excerpts to {providerName(policy.data!.provider)} using your saved model ({policy.data!.model || "not configured"}). Provider charges and retention terms apply.</p>
+              <label>External processing purpose<textarea name="external_reason" required minLength={3} maxLength={2000} rows={2} disabled={busy || !policy.data?.effective_enabled} /></label>
+              <label className="checkbox-label"><input name="confirmed_external" type="checkbox" required disabled={busy || !policy.data?.effective_enabled} /><span>I approve sending this job’s selected excerpts to {providerName(policy.data!.provider)}.</span></label>
+            </div>}
             <button
               className="button primary"
               disabled={busy || !policy.data?.effective_enabled}
             >
-              {busy ? "Requesting local job…" : "Extract local quotations"}
+              {busy ? "Requesting job…" : "Extract source quotations"}
               <Icon name="arrow" size={17} />
             </button>
           </form>
         </section>
         <section className="panel assistant-history">
           <div className="section-heading">
-            <h2>Recent local jobs</h2>
+            <h2>Recent jobs</h2>
             <button className="button ghost compact" onClick={jobs.refresh}>
               Refresh
             </button>

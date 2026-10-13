@@ -1,5 +1,7 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from . import audit
@@ -18,6 +20,7 @@ from .models import (
     now,
 )
 from .schemas import CaseInput, CasePatch, CustodianInput, MemberInput, Reason, SourceInput
+from .search import cursor_decode, cursor_encode
 from .security import Actor, authorize_case, current_actor, fail, get_db, utc
 
 router = APIRouter(prefix="/api/v1")
@@ -32,12 +35,36 @@ def source_json(source):
 
 
 @router.get("/cases")
-def list_cases(archived: bool = False, limit: int = Query(100, ge=1, le=200), actor: Actor = Depends(current_actor), db=Depends(get_db)):
+def list_cases(request: Request, archived: bool = False, limit: int = Query(100, ge=1, le=200), q: str = Query("", max_length=200), cursor: str | None = Query(None, max_length=4096), actor: Actor = Depends(current_actor), db=Depends(get_db)):
     statement = select(Case, Member.role).join(Member, Member.case_id == Case.id).where(Case.tenant_id == actor.user.tenant_id, Member.tenant_id == actor.user.tenant_id, Member.user_id == actor.user.id)
     if not archived:
         statement = statement.where(Case.archived_at.is_(None))
-    rows = db.execute(statement.order_by(Case.updated_at.desc(), Case.id).limit(limit + 1)).all()
-    return {"items": [case_json(case, role) for case, role in rows[:limit]], "next_cursor": None, "truncated": len(rows) > limit}
+    q = q.strip()
+    if q:
+        statement = statement.where(or_(Case.title.icontains(q, autoescape=True), Case.matter_number.icontains(q, autoescape=True), Case.client.icontains(q, autoescape=True)))
+    scope = {"kind": "matters", "tenant": actor.user.tenant_id, "user": actor.user.id, "archived": archived, "q": q}
+    snapshot = now()
+    last = None
+    if cursor:
+        value = cursor_decode(cursor, request.app.state.cursor_secret)
+        if not isinstance(value, dict) or value.get("scope") != scope:
+            fail(422, "CURSOR_SCOPE_MISMATCH", "This cursor belongs to another account or matter filter. Start a new page.")
+        try:
+            snapshot = utc(datetime.fromisoformat(value["snapshot"]))
+            last = utc(datetime.fromisoformat(value["created_at"]))
+            identifier = value["id"]
+            if not isinstance(identifier, str) or not 1 <= len(identifier) <= 36:
+                raise ValueError()
+        except (KeyError, TypeError, ValueError):
+            fail(422, "INVALID_CURSOR", "The matter cursor is invalid. Start a new page.")
+    statement = statement.where(Case.created_at <= snapshot)
+    total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
+    if last:
+        statement = statement.where(or_(Case.created_at < last, and_(Case.created_at == last, Case.id > identifier)))
+    rows = db.execute(statement.order_by(Case.created_at.desc(), Case.id).limit(limit + 1)).all()
+    items = rows[:limit]
+    next_cursor = cursor_encode({"scope": scope, "snapshot": snapshot.isoformat(), "created_at": utc(items[-1][0].created_at).isoformat(), "id": items[-1][0].id}, request.app.state.cursor_secret) if len(rows) > limit else None
+    return {"items": [case_json(case, role) for case, role in items], "next_cursor": next_cursor, "truncated": len(rows) > limit, "total": total}
 
 
 @router.post("/cases", status_code=201)

@@ -1,4 +1,4 @@
-"""Bounded, consented local quotation extraction with verified immutable citations."""
+"""Bounded local or explicitly authorized BYOK quotations with verified citations."""
 
 import hashlib
 import ipaddress
@@ -18,7 +18,18 @@ from sqlalchemy.orm import Session
 from . import audit
 from .ai_models import AIJob, AIResult
 from .evidence_routes import checked_text, get_item
-from .models import Artifact, Evidence, Member, Setting, Span, User, new_id, now
+from .models import Artifact, Case, Evidence, Member, Setting, Span, User, new_id, now
+from .provider_service import (
+    CLOUD_WARNINGS,
+    PROVIDERS,
+    credential,
+    decrypt_key,
+    firm_policy_json,
+    provider,
+    require_firm_policy,
+)
+from .provider_transport import generate as generate_cloud
+from .provider_transport import request_data as cloud_request_data
 from .schemas import Input, SearchInput
 from .search import search_conditions
 from .security import Actor, authorize_case, current_actor, fail, get_db, utc
@@ -47,6 +58,7 @@ class PolicyInput(Input):
     data_sharing: Literal["off", "on"] = "off"
     confirmed: bool = False
     reason: str = Field(default="", max_length=2000)
+    expected_revision: int | None = Field(default=None, ge=0)
 
 
 class AIInput(Input):
@@ -54,6 +66,8 @@ class AIInput(Input):
     evidence_ids: list[str] | None = Field(default=None, max_length=MAX_ITEMS)
     query_spec: SearchInput | None = None
     style: Literal["brief", "detailed", "table", "executive"] = "brief"
+    confirmed_external: bool = False
+    reason: str = Field(default="", max_length=2000)
 
 
 class QuoteFinding(Input):
@@ -110,8 +124,17 @@ def _policy(db, user, case_id):
 
 
 def _require_policy(db, user, case_id, settings, revision=None):
-    endpoint = _configuration(settings)
     value, consent = _policy(db, user, case_id)
+    identifier = value.get("provider", "local")
+    if identifier in PROVIDERS:
+        require_firm_policy(db, user, settings, identifier)
+        if not value.get("enabled") or not consent or value.get("data_sharing") != "on":
+            fail(503, "AI_CASE_CONSENT_REQUIRED", "A matter lead must explicitly consent to this external provider for the matter.")
+        if revision is not None and value.get("revision") != revision:
+            fail(409, "AI_POLICY_CHANGED", "The matter model policy changed. Request a new job under the current policy.")
+        credential(db, user, identifier)
+        return provider(identifier)["endpoint"], value
+    endpoint = _configuration(settings)
     if not value.get("enabled") or not consent or value.get("provider") != "local" or value.get("data_sharing") != "off":
         fail(503, "AI_CASE_CONSENT_REQUIRED", "A matter lead must explicitly enable local-only processing for this matter.")
     if revision is not None and value.get("revision") != revision:
@@ -121,6 +144,18 @@ def _require_policy(db, user, case_id, settings, revision=None):
 
 def _policy_json(db, user, case_id, settings):
     value, consent = _policy(db, user, case_id)
+    identifier = value.get("provider", "local")
+    if identifier in PROVIDERS:
+        row = None
+        firm = firm_policy_json(db, user, settings)
+        try:
+            require_firm_policy(db, user, settings, identifier)
+            row = credential(db, user, identifier)
+            decrypt_key(settings, row)
+            configured, unavailable = True, None
+        except HTTPException as error:
+            configured, unavailable = False, error.detail["error_code"]
+        return {"enabled": bool(value.get("enabled")), "effective_enabled": configured and consent and bool(value.get("enabled")) and value.get("data_sharing") == "on", "configured": configured, "provider": identifier, "data_sharing": value.get("data_sharing", "off"), "remote_ai_allowed": firm["effective_enabled"], "endpoint": provider(identifier)["endpoint"], "model": row.model if row else None, "credential_revision": row.revision if row else None, "firm_policy_revision": firm["revision"], "consented_by": value.get("consented_by"), "consented_at": value.get("consented_at"), "revision": value.get("revision", 0), "unavailable_reason": unavailable, "mode": "extractive_quotes", "reason": "Cloud processing requires firm approval, matter-lead consent, your own key and explicit confirmation for each job.", "warnings": [*WARNINGS, *CLOUD_WARNINGS]}
     try:
         endpoint = _configuration(settings)
         configured, unavailable = True, None
@@ -132,7 +167,7 @@ def _policy_json(db, user, case_id, settings):
         "remote_ai_allowed": False, "endpoint": endpoint, "model": settings.ai_model or None,
         "consented_by": value.get("consented_by"), "consented_at": value.get("consented_at"), "revision": value.get("revision", 0),
         "unavailable_reason": unavailable, "mode": "extractive_quotes",
-        "reason": "Enable an installed local Ollama model globally, then obtain matter-lead consent. No remote provider is supported.",
+        "reason": "Enable an installed local Ollama model globally, then obtain matter-lead consent. Cloud providers require separate firm approval, matter consent and your own key.",
         "warnings": [*WARNINGS, "The runtime administrator must disable Ollama Cloud (OLLAMA_NO_CLOUD=1) and restrict runtime network access. Loopback transport alone does not attest runtime behavior."],
     }
 
@@ -145,29 +180,52 @@ def get_policy(case_id: str, request: Request, actor: Actor = Depends(current_ac
 @router.get("/cases/{case_id}/ai/providers")
 def providers(case_id: str, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
     policy = _policy_json(db, actor.user, case_id, request.app.state.settings)
-    return {**policy, "providers": [{"id": "local", "name": "Local Ollama", "configured": policy["configured"], "enabled": policy["effective_enabled"], "mode": "extractive_quotes"}]}
+    firm = firm_policy_json(db, actor.user, request.app.state.settings)
+    available = [{"id": "local", "name": "Local Ollama", "configured": bool(request.app.state.settings.ai_enabled and request.app.state.settings.ai_model), "enabled": policy["effective_enabled"] and policy["provider"] == "local", "mode": "extractive_quotes"}]
+    for identifier, metadata in PROVIDERS.items():
+        try:
+            row = credential(db, actor.user, identifier)
+            configured, model = True, row.model
+        except HTTPException:
+            configured, model = False, None
+        available.append({"id": identifier, "name": metadata["name"], "configured": configured, "model": model, "firm_allowed": firm["effective_enabled"] and identifier in firm["allowed_providers"], "enabled": policy["effective_enabled"] and policy["provider"] == identifier, "mode": "extractive_quotes", "validation_status": "saved_not_tested" if configured else "not_configured"})
+    return {**policy, "providers": available}
 
 
 @router.patch("/cases/{case_id}/ai/policy")
 def update_policy(case_id: str, body: PolicyInput, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
+    # Serialize policy revisions, including concurrent first consent, on its matter.
+    db.execute(update(Case).where(Case.id == case_id, Case.tenant_id == actor.user.tenant_id).values(title=Case.title))
+    db.refresh(actor.user)
+    if not actor.user.active:
+        fail(403, "AI_PERMISSION_REVOKED", "The policy requester is no longer active.")
     _case, member = authorize_case(db, actor.user, case_id)
     if member.role != "matter_lead":
-        fail(403, "AI_POLICY_PERMISSION_DENIED", "Only a matter lead may approve local model processing.")
-    if body.provider != "local" or body.data_sharing != "off":
-        fail(503, "REMOTE_AI_UNAVAILABLE", "Remote providers and external data sharing are not supported in this release.")
+        fail(403, "AI_POLICY_PERMISSION_DENIED", "Only a matter lead may approve model processing for this matter.")
+    cloud = body.provider in PROVIDERS
+    if body.provider != "local" and not cloud or body.provider == "local" and body.data_sharing != "off":
+        fail(503, "REMOTE_AI_UNAVAILABLE", "Choose local-only processing or an implemented cloud provider with explicit external consent.")
     if body.enabled:
-        _configuration(request.app.state.settings)
+        if cloud:
+            require_firm_policy(db, actor.user, request.app.state.settings, body.provider)
+            if body.data_sharing != "on":
+                fail(422, "AI_CONSENT_REQUIRED", "Explicitly consent to external data transmission for this provider.")
+        else:
+            _configuration(request.app.state.settings)
         if not body.confirmed or len(body.reason.strip()) < 3:
-            fail(422, "AI_CONSENT_REQUIRED", "Confirm that the runtime has cloud features disabled and give the purpose of local processing.")
+            fail(422, "AI_CONSENT_REQUIRED", "Confirm the selected processing policy and give its authorized purpose.")
     key = f"ai-policy:{case_id}"
     setting = db.get(Setting, key)
-    revision = int(setting.value.get("revision", 0)) + 1 if setting else 1
-    value = {"tenant_id": actor.user.tenant_id, "enabled": body.enabled, "provider": "local", "data_sharing": "off", "consented_by": actor.user.id if body.enabled else None, "consented_at": now().isoformat() if body.enabled else None, "revision": revision}
+    previous_revision = int(setting.value.get("revision", 0)) if setting else 0
+    if body.expected_revision is not None and body.expected_revision != previous_revision:
+        fail(409, "AI_POLICY_CONFLICT", "Another matter lead changed this policy. Reload its current revision before saving.")
+    revision = previous_revision + 1
+    value = {"tenant_id": actor.user.tenant_id, "enabled": body.enabled, "provider": body.provider, "data_sharing": "on" if cloud and body.enabled else "off", "consented_by": actor.user.id if body.enabled else None, "consented_at": now().isoformat() if body.enabled else None, "revision": revision}
     if setting is None:
         db.add(Setting(key=key, value=value))
     else:
         setting.value = value
-    audit.record(db, actor.user, case_id, "ai.policy_changed", "case", case_id, {"enabled": body.enabled, "provider": "local", "revision": revision}, getattr(request.state, "request_id", ""))
+    audit.record(db, actor.user, case_id, "ai.policy_changed", "case", case_id, {"enabled": body.enabled, "provider": body.provider, "revision": revision, "data_sharing": value["data_sharing"]}, getattr(request.state, "request_id", ""))
     db.commit()
     return _policy_json(db, actor.user, case_id, request.app.state.settings)
 
@@ -198,16 +256,18 @@ def result_json(result):
 def job_json(job, results=()):
     findings = [result_json(result) for result in results]
     superseded = any(finding["superseded_sources"] for finding in findings)
+    cloud = job.provider in PROVIDERS
+    reported_model = job.usage.get("response_model") if cloud else None
     return {
         "id": job.id, "job_id": job.id, "case_id": job.case_id, "task": job.task, "state": job.state,
-        "provider": job.provider, "model": job.model, "model_tag": job.model, "model_version": None,
-        "model_version_status": "Configured tag; exact weights fingerprint not recorded.",
+        "provider": job.provider, "model": job.model, "model_tag": job.model, "model_version": reported_model,
+        "model_version_status": "Provider-reported model identifier; weights fingerprint unavailable." if reported_model else "Configured tag; exact weights fingerprint not recorded.",
         "prompt_version": job.prompt_version, "template_version": job.prompt_version,
         "question": job.question, "mode": "extractive_quotes", "scope": job.scope, "coverage": job.coverage,
         "answer": job.answer, "findings": findings, "usage": job.usage, "superseded_sources": superseded,
         "error_code": job.error_code, "created_at": utc(job.created_at).isoformat(),
         "generated_at": utc(job.completed_at).isoformat() if job.completed_at and job.state == "completed" else None,
-        "completed_at": utc(job.completed_at).isoformat() if job.completed_at else None, "warnings": WARNINGS + (["One or more citations use a superseded extraction. Inspect their immutable version links and rerun current analysis before accepting a finding."] if superseded else []),
+        "completed_at": utc(job.completed_at).isoformat() if job.completed_at else None, "warnings": WARNINGS + (CLOUD_WARNINGS if cloud else []) + (["One or more citations use a superseded extraction. Inspect their immutable version links and rerun current analysis before accepting a finding."] if superseded else []),
     }
 
 
@@ -215,7 +275,17 @@ def _enqueue(case_id, body, task, request, actor, db):
     authorize_case(db, actor.user, case_id)
     endpoint, policy = _require_policy(db, actor.user, case_id, request.app.state.settings)
     ids, scope, count = _scope(db, actor.user, case_id, body)
-    job = AIJob(tenant_id=actor.user.tenant_id, case_id=case_id, requested_by=actor.user.id, task=task, question=body.question, style=body.style, provider_endpoint=endpoint, model=request.app.state.settings.ai_model, prompt_version=PROMPT_VERSION, policy_revision=policy["revision"], evidence_ids=ids, scope={"case_id": case_id, **scope}, coverage={"matched_items": count, "selected_items": len(ids), "processed_items": 0, "retrieved_spans": 0, "sampled": count > len(ids)})
+    identifier, model = "local-ollama", request.app.state.settings.ai_model
+    if policy.get("provider") in PROVIDERS:
+        if not body.confirmed_external or len(body.reason.strip()) < 3:
+            fail(422, "AI_EXTERNAL_CONFIRMATION_REQUIRED", "Confirm that this selected evidence may leave the server and state the purpose; provider charges may apply.")
+        identifier = policy["provider"]
+        row = credential(db, actor.user, identifier)
+        decrypt_key(request.app.state.settings, row)
+        firm = require_firm_policy(db, actor.user, request.app.state.settings, identifier)
+        model = row.model
+        scope.update(confirmed_external=True, external_reason=body.reason.strip(), credential_id=row.id, credential_revision=row.revision, firm_policy_revision=firm["revision"], transmission_attempted=False, input_byte_limit=128 * 1024, max_output_tokens=2048)
+    job = AIJob(tenant_id=actor.user.tenant_id, case_id=case_id, requested_by=actor.user.id, task=task, question=body.question, style=body.style, provider=identifier, provider_endpoint=endpoint, model=model, prompt_version=PROMPT_VERSION, policy_revision=policy["revision"], evidence_ids=ids, scope={"case_id": case_id, **scope}, coverage={"matched_items": count, "selected_items": len(ids), "processed_items": 0, "retrieved_spans": 0, "sampled": count > len(ids)})
     db.add(job)
     db.flush()
     audit.record(db, actor.user, case_id, "ai.job_requested", "ai_job", job.id, {"task": task, "selected_items": len(ids), "model": job.model}, getattr(request.state, "request_id", ""))
@@ -315,7 +385,11 @@ def _gather_sources(db, user, job, storage):
     return sources, coverage
 
 
-def _generate(settings, job, sources):
+def _generate(settings, job, sources, api_key=None):
+    if job.provider in PROVIDERS:
+        if not api_key:
+            fail(503, "PROVIDER_CREDENTIAL_REQUIRED", "The current requester's credential is unavailable.")
+        return generate_cloud(job, sources, SYSTEM_INSTRUCTIONS, api_key, QuoteOutput)
     payload = {
         "model": job.model, "stream": False, "format": QuoteOutput.model_json_schema(),
         "messages": [
@@ -371,7 +445,15 @@ def _requester(db, job, settings, token):
     if user is None or not user.active:
         fail(403, "AI_PERMISSION_REVOKED", "The model job requester is no longer authorized.")
     endpoint, _policy_value = _require_policy(db, user, job.case_id, settings, job.policy_revision)
-    if endpoint != job.provider_endpoint or settings.ai_model != job.model:
+    if job.provider in PROVIDERS:
+        if _policy_value.get("provider") != job.provider or not job.scope.get("confirmed_external"):
+            fail(409, "AI_POLICY_CHANGED", "The job's external provider consent is no longer current.")
+        require_firm_policy(db, user, settings, job.provider, revision=job.scope.get("firm_policy_revision"))
+        row = credential(db, user, job.provider, revision=job.scope.get("credential_revision"))
+        if row.id != job.scope.get("credential_id") or row.model != job.model:
+            fail(409, "PROVIDER_CREDENTIAL_CHANGED", "Your provider configuration changed. Request a new job.")
+        decrypt_key(settings, row)
+    if endpoint != job.provider_endpoint or job.provider not in PROVIDERS and settings.ai_model != job.model:
         fail(409, "AI_CONFIGURATION_CHANGED", "Model configuration changed. Request a new job.")
     return user
 
@@ -396,7 +478,21 @@ def process_pending_ai(database, settings, storage):
             job.source_refs = [{key: value for key, value in source.items() if key != "text"} for source in sources]
             job.lease_until = now() + timedelta(minutes=2)
             db.commit()
-        output, usage = _generate(settings, job, sources) if sources else (QuoteOutput(), {})
+        api_key = None
+        if job.provider in PROVIDERS and sources:
+            # Fresh authorization/source checks immediately before any external attempt.
+            with database.sessions() as db:
+                job = db.get(AIJob, claimed)
+                user = _requester(db, job, settings, token)
+                for source in sources:
+                    if _source_ref(db, user, job.case_id, source["evidence_id"], source["span_id"], storage) != source:
+                        fail(409, "AI_SOURCE_CHANGED", "A cited source changed before transmission; no provider request was made.")
+                api_key = decrypt_key(settings, credential(db, user, job.provider, revision=job.scope["credential_revision"]))
+                _url, _headers, encoded = cloud_request_data(job, sources, SYSTEM_INSTRUCTIONS, api_key)
+                job.scope = {**job.scope, "transmission_attempted": True, "transmission_started_at": now().isoformat(), "input_bytes": len(encoded)}
+                audit.record(db, user, job.case_id, "ai.external_transmission_attempted", "ai_job", job.id, {"provider": job.provider, "model": job.model, "items": len({source["evidence_id"] for source in sources}), "input_bytes": len(encoded)})
+                db.commit()
+        output, usage = _generate(settings, job, sources, api_key) if sources else (QuoteOutput(), {})
         with database.sessions() as db:
             job = db.get(AIJob, claimed)
             user = _requester(db, job, settings, token)

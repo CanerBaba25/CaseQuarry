@@ -6,6 +6,7 @@ import { useResource } from "@/lib/hooks";
 import type { User } from "@/lib/types";
 import { Badge, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { PageHeading } from "./matter-pages";
+import ProviderSettings from "./provider-settings";
 
 export default function AccountSecurity({ user }: { user: User }) {
   const status = useResource<{ enabled: boolean; method: string }>(
@@ -187,6 +188,7 @@ export default function AccountSecurity({ user }: { user: User }) {
           </div>
         )}
       </section>
+      <ProviderSettings user={user} />
       {passwordModal && (
         <PasswordModal
           mfaEnabled={status.data?.enabled || false}

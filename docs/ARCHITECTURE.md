@@ -1,25 +1,29 @@
 # Architecture and release boundary
 
-The development application uses Next.js/React/TypeScript, FastAPI/Pydantic, SQLAlchemy with migrations, private filesystem storage and a durable SQL-backed import queue. Local development uses SQLite; Compose selects PostgreSQL 16 and a separate worker. The browser and CLI use the same versioned authenticated `/api/v1` API.
+The application uses Next.js/React/TypeScript, FastAPI/Pydantic, SQLAlchemy with migrations, private filesystem storage and a durable SQL-backed import queue. PostgreSQL 16 is the normal shared database, including managed local development. SQLite remains available for explicit local QA and guarded legacy recovery. Browsers, the Rust/Tauri desktop client and the CLI use the same versioned authenticated `/api/v1` API.
 
 ```mermaid
 flowchart LR
   Browser --> Web[Next.js same-origin proxy]
+  Desktop[Rust/Tauri Windows client] --> Web
   Web --> API[FastAPI authorization]
   CLI[CLI and OS keyring] --> API
-  API --> DB[SQLite development / PostgreSQL Compose]
+  API --> DB[Shared PostgreSQL]
   API --> Store[Private originals and derived artifacts]
   Worker[Durable SQL worker] --> DB
   Worker --> Store
+  Worker -->|Explicit firm, matter and job approval| Provider[Selected official provider API]
 ```
 
 Evidence storage is private; downloads go through authorization and hash verification. Metadata, source occurrences, derived text, review decisions and audit events are separate from original bytes. Deduplication must retain source occurrences and family relationships. Extraction failures retain originals and remain visible in coverage.
 
 Search currently uses scoped SQL keyword/metadata queries and server aggregations. OpenSearch, vector search, RabbitMQ/Celery, enterprise OIDC, Microsoft/Google OAuth collection and multi-million-message capacity are not claimed by this stack. Explicit read-only IMAPS/Maildir acquisition is available through the CLI; validation used a synthetic TLS loopback mailbox. Pagination and streaming are design safeguards; actual throughput and capacity require benchmarks.
 
-AI and remote transmission are disabled by default. Optional local analysis must validate citations against retrieved, authorized text spans and must not change human review decisions. Unavailable adapters/models return explicit errors.
+Model processing and remote transmission are disabled by default. Optional local Ollama and external OpenAI/Gemini/Grok/Claude adapters validate exact quotations against authorized source spans and cannot change human review decisions. External requests use encrypted user-owned keys and require firm policy, matter consent and explicit per-job confirmation; fixed official HTTPS endpoints and bounded input/output prevent arbitrary URL or tool execution. Live vendor compatibility remains unvalidated.
 
-`apps/api/casequarry` contains domain/API/worker code; `apps/cli/casequarry_cli` is the public API client; `apps/web` is the interface; `migrations` tracks schema; public `scripts` contains portable setup, backup, dependency-notice and source-release utilities. Test/fixture/benchmark/browser harnesses remain local and are excluded from public source distributions. Application-level preservation and hash-chain auditing are not tamper-proof against a machine administrator.
+Committed audit mutations increment tenant/catalog or matter revision signals in the same transaction. Browser and desktop views poll authorized revision metadata every five seconds while visible, re-fetch changed scopes and clear revoked matter views. Read audits do not cause refresh loops. Import heartbeat metadata provides progress updates. Shared PostgreSQL remains authoritative; clients have no offline evidence replica or queued offline writes. The personal worklist separately refreshes current-user active assignments.
+
+`apps/api/casequarry` contains domain/API/worker code; `apps/cli/casequarry_cli` is the public API client; `apps/web` is the shared interface; `apps/desktop` is the isolated Windows client with its own Cargo workspace; `migrations` tracks schema. Public `scripts` contains setup, backup, notices, package construction and required package verification utilities. Local test/fixture/benchmark/browser harnesses are excluded from source distributions. Application-level preservation and hash-chain auditing are not tamper-proof against a machine administrator.
 
 PDF text/OCR and MSG extraction use isolated fixed-command subprocesses with bounded output and timeouts. Import claims use a fenced owner nonce, a renewable lease and cooperative record quotas; a dedicated import slot allows exports and production work to progress during slow extraction. Parsing occurs outside SQL writer transactions and authorization is checked before publication. See [adapter limits and acquisition behavior](ADAPTERS.md).
 

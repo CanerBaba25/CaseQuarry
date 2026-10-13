@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>CaseQuarry — Firm connection</title>
+  </head>
+  <body>
+    <main class="connection-shell">
+      <section class="identity" aria-labelledby="identity-title">
+        <div class="brand">
+          <img src="/logo.svg" alt="" /><strong>CaseQuarry</strong>
+        </div>
+        <div class="identity-copy">
+          <p class="eyebrow">YOUR FIRM. ONE WORKSPACE.</p>
+          <h1 id="identity-title">Evidence belongs<br />in the same place.</h1>
+          <p>
+            Connect this desktop to your firm's CaseQuarry server. Your team
+            shares the same matters, review decisions and preservation records.
+          </p>
+          <div class="connection-diagram" aria-hidden="true">
+            <span class="device">This desktop</span
+            ><span class="connection-line"></span
+            ><span class="server">Firm server</span>
+          </div>
+          <ul class="principles">
+            <li><span>01</span>Shared matters and permissions</li>
+            <li><span>02</span>Evidence stays on your firm's server</li>
+            <li><span>03</span>Sign in with your existing firm account</li>
+          </ul>
+        </div>
+        <p class="identity-footer">CaseQuarry Desktop · Preview 0.3</p>
+      </section>
+      <section class="connection" aria-labelledby="connection-title">
+        <div class="connection-copy">
+          <span class="status-pill"><span></span>Firm connection</span>
+          <h2 id="connection-title">Open your workspace.</h2>
+          <p class="intro">
+            Enter the website address provided by your firm's administrator.
+            Every desktop connects to that same server.
+          </p>
+          <form id="connection-form">
+            <label class="field-label" for="server-url"
+              >Firm server address</label
+            >
+            <input
+              id="server-url"
+              name="server_url"
+              type="url"
+              placeholder="https://cases.example.com"
+              autocomplete="url"
+              spellcheck="false"
+              required
+              aria-describedby="address-help"
+            />
+            <p id="address-help" class="field-help">
+              Use the website's HTTPS origin, without a matter path or sign-in
+              token.
+            </p>
+            <label class="checkbox"
+              ><input id="remember-server" type="checkbox" checked /><span
+                >Remember this server on this Windows account</span
+              ></label
+            >
+            <details class="development">
+              <summary>Local development connection</summary>
+              <label class="checkbox"
+                ><input id="allow-loopback" type="checkbox" /><span
+                  >Allow HTTP for a server running on this computer</span
+                ></label
+              >
+              <p>
+                Only literal loopback addresses such as
+                <code>http://127.0.0.1:3000</code> or
+                <code>http://[::1]:3000</code> are accepted. Other computers
+                require HTTPS.
+              </p>
+            </details>
+            <div id="connection-error" class="error" role="alert" hidden></div>
+            <div
+              id="connection-status"
+              class="live-status"
+              role="status"
+              aria-live="polite"
+            ></div>
+            <button id="connect-button" class="primary" type="submit">
+              Connect to firm server <span aria-hidden="true">↗</span>
+            </button>
+          </form>
+          <button id="forget-button" class="text-button" type="button" hidden>
+            Forget saved server
+          </button>
+          <div class="server-note">
+            <span aria-hidden="true">◇</span>
+            <div>
+              <strong>A server connection is required.</strong>
+              <p>
+                This client opens the live firm workspace. It does not create a
+                separate evidence database or synchronize matters offline.
+              </p>
+            </div>
+          </div>
+          <p class="connection-footer">
+            Your password is entered only in the firm workspace. Use the
+            desktop's <strong>Connection</strong> menu to return here.
+          </p>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

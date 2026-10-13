@@ -1,25 +1,21 @@
-# Run on Linux or macOS
+# Install on Linux
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and Node.js 24, then run from the checkout:
+The release's `casequarry-server-VERSION-linux-x64.zip` contains the API/worker wheel, Next standalone web and installer. Use the matching operating-system build; Windows native dependencies cannot be relabeled for Linux. See [shared server installation](SERVER_INSTALL.md) for PostgreSQL, HTTPS, storage, legacy migration and upgrades. Other client computers use the same firm browser URL; the current desktop installer targets Windows.
+
+For source development, install [uv](https://docs.astral.sh/uv/getting-started/installation/), Node24 and PostgreSQL16 or newer. Debian/Ubuntu tools may be under `/usr/lib/postgresql/16/bin`:
 
 ```sh
 uv sync --locked
-uv run python scripts/tasks.py setup
+uv run python scripts/tasks.py setup --postgres-bin /usr/lib/postgresql/16/bin
 uv run python scripts/tasks.py dev
 ```
 
-Open `http://127.0.0.1:3000/setup`; read the one-time setup token from local `.env` and choose an administrator password. The generated `.env` is mode 0600 on these platforms. Protect the data directory with equivalent owner-only permissions and an encrypted volume.
+New private configuration defaults to PostgreSQL on loopback5432 and is mode0600. Managed database files live under `~/.local/share/casequarry/postgres`; initialization refuses an existing unmanaged directory. `dev` can start the exact owned cluster, while `postgres-status`, `postgres-start` and `postgres-stop` expose its lifecycle without credentials. Existing configurations are preserved. An explicit SQLite URL remains for local QA and guarded recovery.
 
-The local mode uses SQLite and an embedded durable worker. Data persists under `.data`. `.env` and the evidence store are ignored by Git and excluded from source releases. To use the CLI, configure the OS credential store: macOS Keychain or Linux Secret Service/KWallet. The client refuses a plaintext fallback. A short-lived `CASEQUARRY_TOKEN` may be supplied in the invoking process environment for automated private use; never place it in committed files or shell command arguments.
+Local development opens `http://127.0.0.1:3000/setup` using the one-time `.env` token. Persistent data must stay outside live synchronization folders. Other computers connect through a configured HTTPS firm hostname to one central API/database/evidence store; authorized revision polling refreshes views after changes.
 
-With Docker/Compose installed, `uv run python scripts/tasks.py init` followed by `docker compose up -d --build` runs private PostgreSQL/API/worker services and web on loopback port 3000. Compose has not yet been verified on the initial Windows machine. See [Windows installation](INSTALL_WINDOWS.md) for the exact deployment limits and required production safeguards.
+Configure Linux Secret Service/KWallet for CLI profiles; there is no plaintext token fallback. Private automation can use process `CASEQUARRY_TOKEN`, without committed files or token arguments. Optional OCR uses distribution Tesseract/language-data packages; [adapter documentation](ADAPTERS.md) states bounds and missing-runtime behavior.
 
-For optional local OCR on Debian/Ubuntu, install the distribution's `tesseract-ocr` and `tesseract-ocr-eng` packages, or configure a trusted executable with `CASEQUARRY_TESSERACT_COMMAND`. The locked Python dependencies provide the PDF renderer. [Adapter documentation](ADAPTERS.md) explains limits, quality flags and read-only IMAPS/Maildir acquisition; absence of an engine remains an explicit partial state.
+Compose includes static migrations and unpublished PostgreSQL. API/worker have outbound connectivity for explicitly authorized optional vendor requests; the HTTPS overlay accepts the firm's actual hostname. Docker was unavailable on the Windows host. Linux artifacts require their release job's native validation, and deployment/restore must be checked on the operator's host.
 
-For an offline installation, first obtain the pinned Python/npm distributions and container images through an approved connected environment. `uv sync --offline --locked` works only when every required distribution is cached. `npm ci --offline` similarly requires its cache. The application has no mandatory model or telemetry connection, but dependency installation is not automatically offline.
-
-Portable quality/diagnostic tasks are `lint`, `typecheck` and `smoke`. `test` and fixture/browser/benchmark tasks require local QA assets excluded from the public source distribution; missing assets produce a precise unavailable response. GNU Make aliases are optional; supported tasks have Python equivalents.
-
-For browser acceptance, run `node apps/web/node_modules/@playwright/test/cli.js install chromium`, then `uv run python scripts/tasks.py test-e2e`. Some Linux hosts need Playwright's documented system dependencies. The task uses an isolated synthetic database/account and writes real screenshots under ignored `.data/browser-e2e`.
-
-Optional native verification uses [official Rustup](https://rust-lang.org/tools/install/) and `cargo build --release --locked`. The CLI's `evidence hash-file`, `evidence verify-file`, `evidence verify-manifest` and `ingest inventory-mbox` select a fixed native binary with `--engine rust` or use the Python fallback with `--engine python`. Core ingestion/search/review do not depend on a Rust compiler.
+Offline installation requires cached pinned Python/npm/runtime distributions; `uv sync --offline --locked` and `npm ci --offline` cannot supply missing files. Cloud transmission requires [firm policy, matter consent and user keys](CLOUD_AI_GUIDE.md). Source lint/typecheck/smoke do not require private QA; local test/browser/benchmark tasks report unavailable when excluded assets are absent. Optional native verification uses [Rustup](https://rust-lang.org/tools/install/) and `cargo build --release --locked`.

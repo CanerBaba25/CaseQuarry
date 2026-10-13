@@ -1,0 +1,11 @@
+{
+  "identifier": "connection-settings",
+  "description": "Only bundled connection settings can read or change the firm server address.",
+  "windows": ["connection"],
+  "local": true,
+  "permissions": [
+    "allow-get-connection",
+    "allow-connect-server",
+    "allow-forget-connection"
+  ]
+}

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api";
+import type { RefreshScope } from "./sync";
 
 export function useResource<T>(path: string | null) {
   const [data, setData] = useState<T | null>(null);
@@ -11,6 +12,22 @@ export function useResource<T>(path: string | null) {
   const [loading, setLoading] = useState(Boolean(path));
   const [version, setVersion] = useState(0);
   const refresh = useCallback(() => setVersion((value) => value + 1), []);
+  useEffect(() => {
+    function receive(event: Event) {
+      const scope = (event as CustomEvent<RefreshScope>).detail;
+      const prefix = scope.caseId ? `/cases/${scope.caseId}` : null;
+      if (!path || (!scope.system && (!prefix || !(path === prefix || path.startsWith(`${prefix}/`))))) return;
+      if (scope.clear) {
+        setData(null);
+        setDataPath(null);
+        setError(null);
+        setErrorPath(null);
+      }
+      refresh();
+    }
+    window.addEventListener("cq:refresh", receive);
+    return () => window.removeEventListener("cq:refresh", receive);
+  }, [path, refresh]);
   useEffect(() => {
     if (!path) {
       setData(null);

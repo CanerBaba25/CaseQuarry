@@ -125,8 +125,12 @@ def show(value: Any, options: Options, output: str | None = None) -> None:
 def init_environment(path: Path = Path(".env")) -> bool:
     if path.exists():
         return False
+    from cryptography.fernet import Fernet
+
     token, password = (secrets.token_urlsafe(48) for _ in range(2))
-    content = f"CASEQUARRY_SETUP_TOKEN={token}\nPOSTGRES_PASSWORD={password}\nCASEQUARRY_DATABASE_URL=sqlite:///.data/casequarry.db\nCASEQUARRY_STORAGE_ROOT=.data/storage\nCASEQUARRY_WORKER_MODE=embedded\nCASEQUARRY_AI_ENABLED=false\nCASEQUARRY_ALLOW_REMOTE_AI=false\nCASEQUARRY_ALLOW_INSECURE_LOCAL_COOKIES=true\nCASEQUARRY_API_INTERNAL_URL=http://127.0.0.1:8000\nNEXT_TELEMETRY_DISABLED=1\nWEB_PORT=3000\n"
+    encryption_key = Fernet.generate_key().decode("ascii")
+    postgres_port = 55432 if os.name == "nt" else 5432
+    content = f"CASEQUARRY_SETUP_TOKEN={token}\nPOSTGRES_PASSWORD={password}\nCASEQUARRY_DATABASE_URL=postgresql+psycopg://casequarry:{password}@127.0.0.1:{postgres_port}/casequarry\nCASEQUARRY_STORAGE_ROOT=.data/storage\nCASEQUARRY_WORKER_MODE=embedded\nCASEQUARRY_AI_ENABLED=false\nCASEQUARRY_ALLOW_REMOTE_AI=true\nCASEQUARRY_PROVIDER_KEY_ENCRYPTION_KEY={encryption_key}\nCASEQUARRY_ALLOW_INSECURE_LOCAL_COOKIES=true\nCASEQUARRY_API_INTERNAL_URL=http://127.0.0.1:8000\nNEXT_TELEMETRY_DISABLED=1\nWEB_PORT=3000\n"
     with path.open("x", encoding="utf-8") as stream:
         stream.write(content)
     if os.name != "nt":
@@ -137,7 +141,7 @@ def init_environment(path: Path = Path(".env")) -> bool:
 @app.command("init")
 def initialize(local: bool = False) -> None:
     if not local:
-        fail("Use --local to generate this checkout's .env; server provisioning is not implemented.", 2)
+        fail("Use --local to generate this checkout's private PostgreSQL configuration, or use the server installer.", 2)
     created = init_environment()
     typer.echo(
         "Generated .env with unique local secrets. Run uv run python scripts/tasks.py dev, then open /setup. Read the one-time setup token locally from .env."

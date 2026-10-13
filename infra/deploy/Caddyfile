@@ -1,0 +1,4 @@
+{$CASEQUARRY_FIRM_HOST} {
+    reverse_proxy web:3000
+    header X-Content-Type-Options nosniff
+}
