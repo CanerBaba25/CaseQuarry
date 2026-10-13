@@ -36,7 +36,7 @@ class IssueReviewInput(Reason):
 
 
 def _scoped(db, model, user, case_id, identifier):
-    row = db.scalar(select(model).where(model.id == identifier, model.tenant_id == user.tenant_id, model.case_id == case_id))
+    row = db.scalar(_visible_items(model, user, case_id).where(model.id == identifier))
     if row is None:
         fail(404, "NOT_FOUND", "The matter item is unavailable.")
     return row
@@ -45,7 +45,7 @@ def _scoped(db, model, user, case_id, identifier):
 def _page(db, model, user, case_id, limit, cursor):
     if not 1 <= limit <= 200:
         fail(422, "PAGE_SIZE_INVALID", "Choose a page size between 1 and 200.")
-    query = select(model).where(model.tenant_id == user.tenant_id, model.case_id == case_id)
+    query = _visible_items(model, user, case_id)
     if cursor:
         _scoped(db, model, user, case_id, cursor)
         query = query.where(model.id > cursor)
@@ -114,8 +114,12 @@ def release_hold(case_id: str, hold_id: str, body: Reason, request: Request, act
     return hold_json(row)
 
 
-def _issue_evidence_snapshot(db, issue, require_limit=True):
-    links = list(db.execute(select(IssueLink, Evidence).options(load_only(Evidence.id, Evidence.review_version, Evidence.text_hash, Evidence.text_version)).join(Evidence, IssueLink.evidence_id == Evidence.id).where(IssueLink.issue_id == issue.id, IssueLink.tenant_id == issue.tenant_id, IssueLink.case_id == issue.case_id, Evidence.tenant_id == issue.tenant_id, Evidence.case_id == issue.case_id).order_by(IssueLink.id).limit(1001)))
+def _issue_evidence_snapshot(db, issue, require_limit=True, user=None):
+    query = select(IssueLink, Evidence).options(load_only(Evidence.id, Evidence.review_version, Evidence.text_hash, Evidence.text_version)).join(Evidence, IssueLink.evidence_id == Evidence.id).where(IssueLink.issue_id == issue.id, IssueLink.tenant_id == issue.tenant_id, IssueLink.case_id == issue.case_id, Evidence.tenant_id == issue.tenant_id, Evidence.case_id == issue.case_id)
+    if user is not None:
+        authorized = _visible_case_query(user, issue.case_id).cte("authorized_issue_case")
+        query = query.join(authorized, authorized.c.id == IssueLink.case_id)
+    links = list(db.execute(query.order_by(IssueLink.id).limit(1001)))
     if len(links) > 1000:
         if require_limit:
             fail(413, "ISSUE_REVIEW_SCOPE_LIMIT", "Issue review supports at most 1,000 linked evidence items.")
@@ -123,11 +127,15 @@ def _issue_evidence_snapshot(db, issue, require_limit=True):
     return {link.id: {"evidence_id": item.id, "side": link.side, "note": link.note, "review_version": item.review_version, "text_hash": item.text_hash, "text_version": item.text_version} for link, item in links}
 
 
-def issue_json(row, db=None):
+def issue_json(row, db=None, user=None):
     result = {"id": row.id, "title": row.title, "description": row.description, "created_by": row.created_by, "created_at": utc(row.created_at).isoformat()}
     if db is not None:
-        review = db.scalar(select(IssueReview).where(IssueReview.issue_id == row.id, IssueReview.tenant_id == row.tenant_id, IssueReview.case_id == row.case_id))
-        result["review"] = {"state": review.state, "version": review.version, "reviewed_by": review.reviewed_by, "reason": review.reason, "stale": review.evidence_snapshot != _issue_evidence_snapshot(db, row, require_limit=False)} if review else {"state": "needs_review", "version": 0, "stale": False}
+        query = select(IssueReview).where(IssueReview.issue_id == row.id, IssueReview.tenant_id == row.tenant_id, IssueReview.case_id == row.case_id)
+        if user is not None:
+            authorized = _visible_case_query(user, row.case_id).cte("authorized_issue_case")
+            query = query.join(authorized, authorized.c.id == IssueReview.case_id)
+        review = db.scalar(query)
+        result["review"] = {"state": review.state, "version": review.version, "reviewed_by": review.reviewed_by, "reason": review.reason, "stale": review.evidence_snapshot != _issue_evidence_snapshot(db, row, require_limit=False, user=user)} if review else {"state": "needs_review", "version": 0, "stale": False}
     return result
 
 
@@ -135,12 +143,12 @@ def issue_json(row, db=None):
 def list_issues(case_id: str, limit: int = 50, cursor: str | None = None, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
     authorize_case(db, actor.user, case_id)
     rows, cursor = _page(db, Issue, actor.user, case_id, limit, cursor)
-    return {"items": [issue_json(row, db) for row in rows], "next_cursor": cursor}
+    return {"items": [issue_json(row, db, actor.user) for row in rows], "next_cursor": cursor}
 
 
 @router.post("/cases/{case_id}/issues", status_code=201)
 def create_issue(case_id: str, body: IssueInput, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
-    authorize_case(db, actor.user, case_id, "review")
+    lock_case_action(db, actor.user, case_id, "review")
     row = Issue(tenant_id=actor.user.tenant_id, case_id=case_id, title=body.title.strip(), description=body.description, created_by=actor.user.id)
     if not row.title:
         fail(422, "ISSUE_TITLE_REQUIRED", "Provide an issue title.")
@@ -157,18 +165,20 @@ def get_issue(case_id: str, issue_id: str, limit: int = 100, cursor: str | None 
     if not 1 <= limit <= 200:
         fail(422, "PAGE_SIZE_INVALID", "Choose a page size between 1 and 200.")
     query = select(IssueLink, Evidence.title).join(Evidence, IssueLink.evidence_id == Evidence.id).where(IssueLink.issue_id == row.id, IssueLink.tenant_id == actor.user.tenant_id, IssueLink.case_id == case_id, Evidence.tenant_id == actor.user.tenant_id, Evidence.case_id == case_id)
+    authorized = _visible_case_query(actor.user, case_id).cte("authorized_issue_case")
+    query = query.join(authorized, authorized.c.id == IssueLink.case_id)
     if cursor:
         anchor = _scoped(db, IssueLink, actor.user, case_id, cursor)
         if anchor.issue_id != issue_id:
             fail(422, "CURSOR_SCOPE_MISMATCH", "The cursor belongs to a different issue.")
         query = query.where(IssueLink.id > cursor)
     links = list(db.execute(query.order_by(IssueLink.id).limit(limit + 1)))
-    return {**issue_json(row, db), "evidence": [{"id": link.id, "evidence_id": link.evidence_id, "title": title, "side": link.side, "note": link.note, "created_by": link.created_by} for link, title in links[:limit]], "next_cursor": links[limit - 1][0].id if len(links) > limit else None}
+    return {**issue_json(row, db, actor.user), "evidence": [{"id": link.id, "evidence_id": link.evidence_id, "title": title, "side": link.side, "note": link.note, "created_by": link.created_by} for link, title in links[:limit]], "next_cursor": links[limit - 1][0].id if len(links) > limit else None}
 
 
 @router.post("/cases/{case_id}/issues/{issue_id}/evidence", status_code=201)
 def add_issue_evidence(case_id: str, issue_id: str, body: IssueLinkInput, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
-    authorize_case(db, actor.user, case_id, "review")
+    lock_case_action(db, actor.user, case_id, "review")
     _scoped(db, Issue, actor.user, case_id, issue_id)
     _scoped(db, Evidence, actor.user, case_id, body.evidence_id)
     row = db.scalar(select(IssueLink).where(IssueLink.issue_id == issue_id, IssueLink.evidence_id == body.evidence_id, IssueLink.side == body.side, IssueLink.tenant_id == actor.user.tenant_id, IssueLink.case_id == case_id))
@@ -191,7 +201,7 @@ def task_detail_json(row, user):
     return {**task_json(row, detail=True), "server_today": local_today(user.time_zone, now()).isoformat(), "time_zone": user.time_zone}
 
 
-def _visible_task_cases(user, case_id):
+def _visible_case_query(user, case_id):
     # Membership and account authority must remain true in the data statement,
     # including when they change after the preliminary authorize_case call.
     return select(Case.id).join(Member, and_(Member.case_id == Case.id, Member.tenant_id == Case.tenant_id, Member.user_id == user.id)).join(User, and_(User.id == Member.user_id, User.tenant_id == Member.tenant_id)).where(
@@ -201,9 +211,9 @@ def _visible_task_cases(user, case_id):
     )
 
 
-def _visible_tasks(user, case_id):
-    authorized = _visible_task_cases(user, case_id).cte("authorized_task_case")
-    return select(Task).join(authorized, authorized.c.id == Task.case_id).where(Task.tenant_id == user.tenant_id, Task.case_id == case_id)
+def _visible_items(model, user, case_id):
+    authorized = _visible_case_query(user, case_id).cte("authorized_matter")
+    return select(model).join(authorized, authorized.c.id == model.case_id).where(model.tenant_id == user.tenant_id, model.case_id == case_id)
 
 
 def _assignee(db, user, case_id, user_id):
@@ -233,7 +243,7 @@ def list_tasks(case_id: str, request: Request, limit: int = Query(50, ge=1, le=2
                 raise ValueError()
         except (KeyError, ValueError, TypeError):
             fail(422, "TASK_CURSOR_INVALID", "Start the task list again; this cursor belongs to another scope.")
-    authorized = _visible_task_cases(actor.user, case_id).cte("authorized_task_case")
+    authorized = _visible_case_query(actor.user, case_id).cte("authorized_task_case")
     query = select(Task.id, Task.case_id, Task.title, Task.state, Task.assigned_to, Task.created_by, Task.created_at, Task.updated_at, Task.version, Task.due_date).join(authorized, authorized.c.id == Task.case_id).where(Task.tenant_id == actor.user.tenant_id, Task.case_id == case_id, Task.created_at <= snapshot)
     if after:
         query = query.where(Task.id > after)
@@ -249,7 +259,7 @@ def list_tasks(case_id: str, request: Request, limit: int = Query(50, ge=1, le=2
 @router.get("/cases/{case_id}/tasks/{task_id}")
 def get_task(case_id: str, task_id: str, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
     authorize_case(db, actor.user, case_id)
-    row = db.scalar(_visible_tasks(actor.user, case_id).where(Task.id == task_id))
+    row = db.scalar(_visible_items(Task, actor.user, case_id).where(Task.id == task_id))
     if row is None:
         fail(404, "NOT_FOUND", "The matter task is unavailable.")
     return task_detail_json(row, actor.user)
@@ -313,7 +323,9 @@ def update_task(case_id: str, task_id: str, body: TaskPatch, request: Request, a
 
 @router.post("/cases/{case_id}/issues/{issue_id}/review")
 def review_issue(case_id: str, issue_id: str, body: IssueReviewInput, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
-    authorize_case(db, actor.user, case_id, "privilege" if body.state == "reviewed" else "review")
+    lock_case_action(db, actor.user, case_id, "review")
+    if body.state == "reviewed":
+        authorize_case(db, actor.user, case_id, "privilege")
     issue = _scoped(db, Issue, actor.user, case_id, issue_id)
     reason = _reason(body.reason)
     snapshot = _issue_evidence_snapshot(db, issue)
@@ -330,4 +342,4 @@ def review_issue(case_id: str, issue_id: str, body: IssueReviewInput, request: R
         fail(409, "ISSUE_REVIEW_CONFLICT", "The issue review changed; reload its current version.")
     audit.record(db, actor.user, case_id, "issue.reviewed", "issue", issue.id, {"state": body.state, "version": body.expected_version + 1})
     db.commit()
-    return issue_json(issue, db)
+    return issue_json(issue, db, actor.user)

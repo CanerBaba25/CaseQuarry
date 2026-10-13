@@ -22,7 +22,7 @@ TypeScript/React for the interface, Python for its API and document processing, 
 Rust for streaming integrity checks and the native desktop client. PostgreSQL stores
 the shared firm data; browsers and desktop clients connect to the same firm server.
 
-> **Release 0.5.0.** Installable Windows, macOS and Linux desktop clients and Windows/Linux web-server
+> **Release 0.5.1.** Installable Windows, macOS and Linux desktop clients and Windows/Linux web-server
 > packages, with PostgreSQL firm sync, conflict-safe task editing and optional provider connections.
 > Production capacity and the two-million-email scale target remain unvalidated.
 
@@ -32,7 +32,7 @@ the shared firm data; browsers and desktop clients connect to the same firm serv
 
 ## What you can do
 
-| Workflow | Available in 0.5.0 |
+| Workflow | Available in 0.5.1 |
 |---|---|
 | Preserve | SHA-256 originals, source paths, MBOX offsets, duplicates and attachment families |
 | Import | Resumable uploads, bounded OCR, durable jobs and retries that preserve extraction history |
@@ -95,9 +95,9 @@ Choose the assets on the [Releases page](https://github.com/CanerBaba25/CaseQuar
 
 | Download | Use it for |
 |---|---|
-| `CaseQuarry_0.5.0_x64-setup.exe` | Install the Windows desktop client on each workstation |
-| `CaseQuarry_0.5.0_universal.dmg` | Install on an Apple Silicon or Intel MacBook |
-| `CaseQuarry_0.5.0_amd64.deb` | Install the Linux client on Ubuntu 24.04 x64 |
+| `CaseQuarry_0.5.1_x64-setup.exe` | Install the Windows desktop client on each workstation |
+| `CaseQuarry_0.5.1_universal.dmg` | Install on an Apple Silicon or Intel MacBook |
+| `CaseQuarry_0.5.1_amd64.deb` | Install the Linux client on Ubuntu 24.04 x64 |
 | `casequarry-server-*-windows-x64.zip` | Install the shared web/API server on Windows |
 | `casequarry-server-*-linux-x64.zip` | Install the shared web/API server on Linux |
 | `*-source.zip` | Build, inspect or modify the application |
@@ -205,12 +205,13 @@ the larger benchmark has not yet been repeated with the new extraction pipeline.
 Percentiles use 15 queries; these results are not a production SLA or a multi-million
 capacity claim. See [benchmark scope and method](docs/BENCHMARKS.md).
 
-The complete local Python suite passed **424 tests**, with PostgreSQL checks enabled
+The complete local Python suite passed **447 tests**, with PostgreSQL checks enabled
 and no skipped tests. Coverage includes task conflicts and delayed commits,
-timezone boundaries, permission revocation, last-lead races, legal holds and upgrades.
+timezone boundaries, permission revocation, concurrent uploads, session expiration,
+last-lead races, legal holds and upgrades.
 The evidence-query improvement preserved **39 complete comparison responses** and
 passed **16 focused projection/detail checks** across SQLite and PostgreSQL.
-The Rust integrity component passed **five tests**, and the native desktop client
+The Rust integrity component passed **11 tests**, and the native desktop client
 passed **eight Rust tests**, an actual WebView2 runtime diagnostic and three isolated
 install/launch/uninstall checks. Real-browser checks cover evidence import/search,
 review and production approvals, shared task refresh, account isolation, provider

@@ -1,12 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { date, getDisplayTimeZone, number, post } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { csrfToken, date, getDisplayTimeZone, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import type { User } from "@/lib/types";
 import { Badge, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { PageHeading } from "./matter-pages";
 import ProviderSettings from "./provider-settings";
+
+function useDialogLifetime() {
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
+  return live;
+}
 
 export default function AccountSecurity({
   user,
@@ -219,6 +230,7 @@ export default function AccountSecurity({
       )}
       {revoke && (
         <RevokeSession
+          key={revoke.id}
           id={revoke.id}
           current={revoke.current}
           close={() => setRevoke(null)}
@@ -234,6 +246,7 @@ export default function AccountSecurity({
       )}
       {modal && (
         <AuthenticatorModal
+          key={modal}
           kind={modal}
           close={() => setModal(null)}
           done={() => {
@@ -256,6 +269,7 @@ function PasswordModal({
   close: () => void;
   done: (count: number) => void;
 }) {
+  const live = useDialogLifetime();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null);
   return (
@@ -283,11 +297,11 @@ function PasswordModal({
                   : {}),
               },
             );
-            done(result.other_sessions_revoked);
+            if (live.current) done(result.other_sessions_revoked);
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >
@@ -367,6 +381,7 @@ function RevokeSession({
   close: () => void;
   done: (current: boolean) => void;
 }) {
+  const live = useDialogLifetime();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null);
   return (
@@ -378,6 +393,7 @@ function RevokeSession({
         onSubmit={async (event) => {
           event.preventDefault();
           const data = new FormData(event.currentTarget);
+          const submittedSession = csrfToken();
           setBusy(true);
           setError(null);
           try {
@@ -385,11 +401,13 @@ function RevokeSession({
               `/auth/sessions/${id}/revoke`,
               { reason: data.get("reason") },
             );
-            done(result.current);
+            if (live.current) done(result.current);
+            else if (result.current && csrfToken() === submittedSession)
+              window.dispatchEvent(new Event("cq:unauthorized"));
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >
@@ -425,6 +443,7 @@ function AuthenticatorModal({
   close: () => void;
   done: () => void;
 }) {
+  const live = useDialogLifetime();
   const [enrollment, setEnrollment] = useState<{
       secret: string;
       provisioning_uri: string;
@@ -444,19 +463,21 @@ function AuthenticatorModal({
           password: data.get("password"),
           code: data.get("code"),
         });
-        done();
+        if (live.current) done();
       } else if (enrollment) {
         await post("/auth/mfa/confirm", { code: data.get("code") });
-        done();
+        if (live.current) done();
       } else {
-        setEnrollment(
-          await post("/auth/mfa/enroll", { password: data.get("password") }),
+        const result = await post<NonNullable<typeof enrollment>>(
+          "/auth/mfa/enroll",
+          { password: data.get("password") },
         );
+        if (live.current) setEnrollment(result);
       }
     } catch (error) {
-      setError(error);
+      if (live.current) setError(error);
     } finally {
-      setBusy(false);
+      if (live.current) setBusy(false);
     }
   }
   return (
@@ -486,9 +507,9 @@ function AuthenticatorModal({
                 onClick={async () => {
                   try {
                     await navigator.clipboard.writeText(enrollment.secret);
-                    setCopied(true);
+                    if (live.current) setCopied(true);
                   } catch {
-                    setCopied(false);
+                    if (live.current) setCopied(false);
                   }
                 }}
               >

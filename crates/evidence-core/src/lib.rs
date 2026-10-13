@@ -22,7 +22,11 @@ pub fn hash_reader(mut source: impl Read) -> io::Result<FileHash> {
     let mut buffer = [0_u8; BUFFER];
     let mut bytes = 0_u64;
     loop {
-        let amount = source.read(&mut buffer)?;
+        let amount = match source.read(&mut buffer) {
+            Ok(amount) => amount,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        };
         if amount == 0 {
             break;
         }
@@ -87,7 +91,11 @@ fn bounded_line(
 ) -> io::Result<usize> {
     target.clear();
     loop {
-        let available = source.fill_buf()?;
+        let available = match source.fill_buf() {
+            Ok(available) => available,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        };
         if available.is_empty() {
             return Ok(target.len());
         }
@@ -281,6 +289,81 @@ mod tests {
     use std::io::Cursor;
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+    struct InterruptedReader<'a> {
+        remaining: &'a [u8],
+        interrupt: bool,
+    }
+
+    impl Read for InterruptedReader<'_> {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            if self.interrupt {
+                self.interrupt = false;
+                return Err(io::Error::from(io::ErrorKind::Interrupted));
+            }
+            self.interrupt = true;
+            let amount = output.len().min(self.remaining.len()).min(7);
+            output[..amount].copy_from_slice(&self.remaining[..amount]);
+            self.remaining = &self.remaining[amount..];
+            Ok(amount)
+        }
+    }
+
+    #[test]
+    fn streaming_hash_retries_interrupted_reads_without_losing_bytes() {
+        let input = vec![0x83; BUFFER + 17];
+        let actual = hash_reader(InterruptedReader {
+            remaining: &input,
+            interrupt: true,
+        })
+        .unwrap();
+        let expected = hash_reader(Cursor::new(&input)).unwrap();
+        assert_eq!(actual.sha256, expected.sha256);
+        assert_eq!(actual.byte_size, expected.byte_size);
+    }
+
+    #[test]
+    fn mbox_retries_interrupted_refills_without_changing_boundaries_or_size() {
+        let input = b"From one\r\nSubject: first\r\n\r\n>From escaped\r\nFrom two\nSubject: last\n\nNo final newline";
+        let actual = scan_mbox_reader(
+            InterruptedReader {
+                remaining: input,
+                interrupt: true,
+            },
+            1024,
+            512,
+        )
+        .unwrap();
+        let expected = scan_mbox_reader(Cursor::new(input), 1024, 512).unwrap();
+        assert_eq!(actual.record_boundaries, 2);
+        assert_eq!(actual.record_boundaries, expected.record_boundaries);
+        assert_eq!(actual.sha256, expected.sha256);
+        assert_eq!(actual.byte_size, expected.byte_size);
+        assert_eq!(
+            actual.max_observed_message_bytes,
+            expected.max_observed_message_bytes
+        );
+    }
+
+    #[test]
+    fn permanent_stream_errors_are_preserved() {
+        struct FailedReader;
+        impl Read for FailedReader {
+            fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+                Err(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "read denied",
+                ))
+            }
+        }
+        for error in [
+            hash_reader(FailedReader).unwrap_err(),
+            scan_mbox_reader(FailedReader, 1024, 512).unwrap_err(),
+        ] {
+            assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+            assert_eq!(error.to_string(), "read denied");
+        }
+    }
 
     fn temp_file(contents: &[u8]) -> std::path::PathBuf {
         let path = std::env::temp_dir().join(format!(

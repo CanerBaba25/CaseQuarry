@@ -253,6 +253,10 @@ mod unix_tests {
         assert!(load(directory.path()).is_err());
         fs::write(&path, vec![b'x'; 65537]).unwrap();
         assert!(load(directory.path()).is_err());
+        assert!(save(directory.path(), &connection).is_err());
+        forget(directory.path()).unwrap();
+        save(directory.path(), &connection).unwrap();
+        assert_eq!(load(directory.path()).unwrap(), Some(connection));
     }
 
     #[test]
@@ -300,5 +304,11 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         fs::write(directory.path().join(SETTINGS_FILE), b"not encrypted").unwrap();
         assert!(load(directory.path()).is_err());
+        let connection = Connection::validate("https://cases.example.com", false).unwrap();
+        assert!(save(directory.path(), &connection).is_ok());
+        fs::write(directory.path().join(SETTINGS_FILE), b"not encrypted").unwrap();
+        forget(directory.path()).unwrap();
+        save(directory.path(), &connection).unwrap();
+        assert_eq!(load(directory.path()).unwrap(), Some(connection));
     }
 }

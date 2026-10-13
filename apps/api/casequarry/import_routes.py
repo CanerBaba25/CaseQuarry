@@ -9,8 +9,9 @@ from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from sqlalchemy import func, select
 
 from . import audit
+from .case_domain import lock_case_action
 from .ingestion import empty_counts
-from .models import Custodian, ImportBatch, Original, Source, UploadSession, new_id, now
+from .models import Custodian, ImportBatch, LoginSession, Original, Source, UploadSession, new_id, now
 from .schemas import Reason, UploadInput
 from .security import Actor, authorize_case, current_actor, fail, get_db, utc
 from .storage import file_hash
@@ -63,7 +64,6 @@ def enqueue(db, user, case_id, source, files, request_id, idempotency_key=None):
     db.add(batch)
     db.flush()
     audit.record(db, user, case_id, "import.submitted", "import", batch.id, {"file_count": len(files), "source_id": source.id}, request_id)
-    db.commit()
     return batch
 
 
@@ -159,6 +159,7 @@ async def submit_import(case_id: str, request: Request, files: list[UploadFile] 
             await file.close()
     case.updated_at = now()
     batch = enqueue(db, actor.user, case_id, source, uploaded, request.state.request_id, idempotency)
+    db.commit()
     return batch_json(batch)
 
 
@@ -227,6 +228,16 @@ def upload_json(upload):
     return {"id": upload.id, "filename": upload.filename, "byte_size": upload.byte_size, "part_size": upload.part_size, "part_count": math.ceil(upload.byte_size / upload.part_size), "received_parts": sorted(int(part) for part in upload.parts), "state": upload.state, "expires_at": utc(upload.expires_at).isoformat(), "batch_id": upload.batch_id}
 
 
+def lock_upload_action(db, actor, case_id):
+    # Capture identities before refreshing ORM state, then preserve the existing
+    # Case -> User -> LoginSession lock order used by account revocation.
+    session_id, user_id = actor.session.id, actor.user.id
+    lock_case_action(db, actor.user, case_id, "import")
+    session = db.scalar(select(LoginSession).where(LoginSession.id == session_id, LoginSession.user_id == user_id).with_for_update(read=True))
+    if session is None or session.revoked or utc(session.expires_at) <= now():
+        fail(401, "SESSION_EXPIRED", "Your session has expired. Sign in again.")
+
+
 @router.post("/cases/{case_id}/upload-sessions", status_code=201)
 def begin_upload(case_id: str, body: UploadInput, request: Request, actor: Actor = Depends(current_actor), db=Depends(get_db)):
     authorize_case(db, actor.user, case_id, "import")
@@ -264,6 +275,12 @@ async def upload_part(case_id: str, upload_id: str, part: int, request: Request,
     provided = request.headers.get("x-chunk-sha256")
     if provided and provided.lower() != value:
         fail(422, "UPLOAD_HASH_MISMATCH", "This upload part failed its supplied hash check.")
+    # Receive the bounded body before taking writer locks. Refresh both authority
+    # and the parts map so simultaneous requests cannot overwrite accepted parts.
+    lock_upload_action(db, actor, case_id)
+    upload = get_upload(db, actor, case_id, upload_id)
+    if upload.state != "open":
+        fail(409, "UPLOAD_PART_INVALID", "This upload part is not valid for the current session.")
     existing = upload.parts.get(str(part))
     if existing and existing["sha256"] != value:
         fail(409, "UPLOAD_PART_CONFLICT", "A different part was already accepted at this position.")
@@ -297,12 +314,30 @@ def complete_upload(case_id: str, upload_id: str, request: Request, actor: Actor
         value, size = file_hash(temporary)
         if size != upload.byte_size or (upload.sha256 and value != upload.sha256):
             fail(422, "UPLOAD_HASH_MISMATCH", "The assembled file failed its size or hash check.")
+        # Assemble and verify bytes before locking the matter. Publish the import
+        # and completion marker together, with fresh authority and session state.
+        lock_upload_action(db, actor, case_id)
+        upload = get_upload(db, actor, case_id, upload_id)
+        if upload.state == "complete" and upload.batch_id:
+            return batch_json(get_batch(db, actor.user, case_id, upload.batch_id))
+        if upload.state != "open":
+            fail(409, "UPLOAD_STATE_CONFLICT", "This upload cannot be completed in its current state.")
+        filename, original_path = upload_identity(upload.filename)
+        existing = db.scalar(select(ImportBatch).where(ImportBatch.tenant_id == actor.user.tenant_id, ImportBatch.case_id == case_id, ImportBatch.idempotency_key == f"upload:{upload.id}"))
+        if existing:
+            # Earlier releases could commit an import before its upload marker.
+            # Reconnect only the exact original submission, never a key collision.
+            expected = {"filename": filename, "original_path": original_path, "sha256": value, "byte_size": size}
+            if existing.submitted_by != actor.user.id or existing.source_id != upload.source_id or len(existing.files) != 1 or any(existing.files[0].get(key) != expected_value for key, expected_value in expected.items()):
+                fail(409, "UPLOAD_STATE_CONFLICT", "The upload completion reference does not match this file.")
+            upload.state, upload.batch_id = "complete", existing.id
+            db.commit()
+            return batch_json(existing)
         used = db.scalar(select(func.coalesce(func.sum(Original.byte_size), 0)).where(Original.case_id == case_id, Original.tenant_id == actor.user.tenant_id)) or 0
         delta = original_storage_delta(db, actor.user.tenant_id, case_id, value, size)
         if delta and used + delta > request.app.state.settings.max_case_bytes:
             fail(413, "CASE_QUOTA_EXCEEDED", "This matter exceeds its configured storage quota.")
         key, _, _ = storage.store_file(actor.user.tenant_id, case_id, temporary)
-        filename, original_path = upload_identity(upload.filename)
         batch = enqueue(db, actor.user, case_id, db.get(Source, upload.source_id), [{"filename": filename, "original_path": original_path, "storage_key": key, "sha256": value, "byte_size": size}], request.state.request_id, f"upload:{upload.id}")
         upload.state, upload.batch_id = "complete", batch.id
         db.commit()

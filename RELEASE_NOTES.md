@@ -1,5 +1,53 @@
 # Release notes
 
+## 0.5.1 — October 13, 2026
+
+Maintenance release for resumable uploads, current matter permissions, security
+dialogs and desktop connection recovery. Includes the same website/server and
+Windows, universal Mac and Ubuntu desktop package formats as 0.5.0.
+
+### Fixed
+
+- Concurrent upload parts retain every accepted position; conflicting bytes at the
+  same position return a conflict. Bounded transfer and assembly happen before
+  writer locks, then membership, account, session and archive state are checked
+  again before publication.
+- Upload completion commits its import and completion marker together. Interrupted
+  submissions can be retried, concurrent completions return the same import, and
+  matching submissions stranded by the older two-commit boundary can be recovered
+  without creating another import. Mismatching completion references are rejected.
+- Hold and issue reads include current matter authority in the data query. Issue
+  changes serialize with membership changes, archived issue reviews are rejected,
+  and simultaneous first reviews return a version conflict instead of a server error.
+- `cq task list` forwards the selected `--limit` and `--cursor` to the server.
+- Delayed password, session-revocation and authenticator responses cannot close a
+  newer dialog or replace its draft. An old current-session revocation acknowledgment
+  cannot sign out a subsequently authenticated session.
+- Desktop connection controls wait for saved settings and preserve the submitted
+  options during a pending connection. Failed saved-preference reads expose the
+  existing **Forget saved server** recovery action.
+- Rust hashing and MBOX scanning retry interrupted reads while preserving permanent
+  errors and exact hash/size/boundary checks. Supplied CLI size and limit options
+  require values; duplicate and unsupported options fail explicitly.
+
+### Validation
+
+The complete local backend suite passed 447 tests with PostgreSQL checks enabled
+and no skips. All 25 existing browser workflows and three actual delayed-response
+security-dialog regressions passed without runtime errors. Fourteen focused
+PostgreSQL upload tests cover competing parts, rollback/retry, completion recovery
+and authority/session changes during transfer or assembly. The Rust integrity core
+passed 11 tests, the Windows native client passed eight, and three desktop UI
+regressions passed. The local Windows installer passed isolated install, launch and
+uninstall checks while preserving existing settings and data.
+
+### Upgrade
+
+There is no new database migration after `0007_task_versions`. Follow the normal
+backup, dependency-upgrade and restart process, then reload existing clients.
+Windows remains unsigned and Mac remains non-notarized. The operational and
+production-scale limits documented below still apply.
+
 ## 0.5.0 — October 13, 2026
 
 Daily review improvements with task details, conflict-safe team edits and lighter

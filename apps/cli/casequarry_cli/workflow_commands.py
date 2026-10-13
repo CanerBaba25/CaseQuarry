@@ -147,7 +147,13 @@ def add_read(group, command, resource):
     @group.command(command)
     def read(ctx: typer.Context, case: str | None = None):
         api = API(ctx.obj)
-        display(api.request("GET", api.case_route(case, "/" + resource)), ctx.obj)
+        kwargs = {}
+        if resource == "tasks":
+            parameters = {"limit": ctx.obj.limit}
+            if ctx.obj.cursor:
+                parameters["cursor"] = ctx.obj.cursor
+            kwargs["params"] = parameters
+        display(api.request("GET", api.case_route(case, "/" + resource), **kwargs), ctx.obj)
 
 
 def add_resource(group, resource):

@@ -29,9 +29,13 @@ The CLI reads the same authorized task details and sends the supplied JSON uncha
 ```text
 cq --output json task show TASK_ID --case CASE_ID
 cq --output json task update TASK_ID --case CASE_ID --body task-edit.json
+cq --output json --limit 20 task list --case CASE_ID
+cq --output json --limit 20 --cursor NEXT_CURSOR task list --case CASE_ID
 ```
 
 Create `task-edit.json` with the returned `version` as `expected_version` and the fields to change, as in the PATCH example above. A stale update exits with code 5 and preserves the server's `TASK_VERSION_CONFLICT` diagnostic. The CLI does not fetch a newer version or retry automatically. The equivalent detail request is `cq api request GET /cases/CASE_ID/tasks/TASK_ID`.
+
+For task lists, pass the response's `next_cursor` unchanged with the same `--limit` to read the next page. Start again without a cursor when the server reports that the task list changed.
 
 ## My work
 
