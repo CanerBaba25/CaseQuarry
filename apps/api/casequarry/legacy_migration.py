@@ -19,6 +19,10 @@ from .storage import Storage, file_hash
 
 def transfer_sqlite(source_path: Path, storage_root: Path, backup_path: Path, settings: Settings):
     """Leave the source untouched; lock and atomically populate an empty target."""
+    if source_path.is_symlink() or (hasattr(source_path, "is_junction") and source_path.is_junction()):
+        raise SchemaMismatch("SOURCE_BACKUP_INVALID", "The source must be a regular SQLite file, not a link.")
+    if settings.storage_path.resolve() != storage_root.resolve():
+        raise SchemaMismatch("STORAGE_ROOT_MISMATCH", "The PostgreSQL runtime must retain the same verified immutable storage root. This transfer does not copy or rewrite evidence files.")
     source_path, backup_path = source_path.resolve(), backup_path.resolve()
     if make_url(settings.database_url).get_backend_name() != "postgresql":
         raise SchemaMismatch("TARGET_POSTGRES_REQUIRED", "The migration target must be PostgreSQL.")

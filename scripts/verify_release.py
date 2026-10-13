@@ -54,7 +54,8 @@ def verify(directory: Path) -> None:
             if len(names) != len(set(names)) or any(name.startswith(("/", "\\")) or ".." in Path(name).parts for name in names):
                 raise RuntimeError("Archive contains unsafe or duplicate paths")
             if path in source:
-                if any(not allowed(name) for name in names):
+                prefix = f"casequarry-{version}/"
+                if any(not name.startswith(prefix) or not allowed(name[len(prefix):]) for name in names):
                     raise RuntimeError("Source ZIP contains excluded local artifacts")
             else:
                 manifest_names = [name for name in names if name.endswith("manifest.json") and name.count("/") <= 1]

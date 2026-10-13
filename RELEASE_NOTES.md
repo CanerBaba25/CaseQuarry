@@ -53,6 +53,11 @@ Cloud/local adapter checks passed 82 focused tests, with two actual API checks a
 run on PostgreSQL. These use controlled provider HTTP responses; no paid vendor
 request or real account/model compatibility claim is made.
 
+Six independent PostgreSQL transfer checks verify every row across all 39 legacy
+tables, original bytes, review history, audit chains and cyclic foreign keys. Tampered
+originals, linked source files, mismatched storage roots and populated targets are
+refused; invalid audits roll back the complete copy while retaining the legacy source.
+
 This remains a development preview. The Windows installer is unsigned. Clients
 require a reachable firm server; offline editing is unavailable. Production recovery,
 Docker runtime operation, recipient loadfile import, real-model quality and

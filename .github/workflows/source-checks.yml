@@ -89,6 +89,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
       - run: npm --prefix apps/desktop ci
+      - run: npm --prefix apps/desktop run build:ui
       - run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
       - run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings
       - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
