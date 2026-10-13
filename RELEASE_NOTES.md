@@ -58,6 +58,11 @@ tables, original bytes, review history, audit chains and cyclic foreign keys. Ta
 originals, linked source files, mismatched storage roots and populated targets are
 refused; invalid audits roll back the complete copy while retaining the legacy source.
 
+The Windows server ZIP passed a fresh isolated runtime installation and four actual
+PostgreSQL workflows covering migrations, authentication, shared-client matters,
+worker imports, exact original bytes and revision updates. Distribution checks wait
+for API readiness and use the installed private runtime on each operating system.
+
 This remains a development preview. The Windows installer is unsigned. Clients
 require a reachable firm server; offline editing is unavailable. Production recovery,
 Docker runtime operation, recipient loadfile import, real-model quality and

@@ -90,8 +90,10 @@ def verify(args):
                         raise RuntimeError("Packaged service exited; inspect private service log")
                     try:
                         if httpx.get(web + "/login", timeout=3).status_code == 200:
-                            break
-                    except httpx.RequestError:
+                            ready = httpx.get(web + "/api/v1/health", timeout=3)
+                            if ready.status_code == 200 and ready.json().get("version") == manifest["version"] and ready.json().get("database_engine") == "postgresql":
+                                break
+                    except (httpx.RequestError, ValueError):
                         pass
                     time.sleep(.5)
                 else:

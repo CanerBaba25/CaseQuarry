@@ -230,7 +230,8 @@ def main():
             configure(args)
         elif args.action == "start":
             python = interpreter(args.data_dir.resolve())
-            if Path(sys.executable).resolve() != python.resolve():
+            # Distinct venv paths can resolve to the same base executable on Linux.
+            if Path(sys.executable).absolute() != python.absolute():
                 command([python, PACKAGE / "server.py", "start", "--data-dir", args.data_dir, "--web-port", str(args.web_port), *(["--postgres-bin", args.postgres_bin] if args.postgres_bin else [])])
             else:
                 serve(args)
