@@ -6,6 +6,7 @@ import re
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import String, and_, cast, func, not_, or_, select, true
+from sqlalchemy.orm import load_only
 
 from .models import Evidence, Original, Participant
 from .schemas import SearchInput
@@ -205,7 +206,7 @@ def search_conditions(tenant_id, case_id, spec: SearchInput):
     return conditions
 
 
-def evidence_json(item: Evidence, original: Original):
+def evidence_json(item: Evidence, original: Original, snippet: str | None = None):
     return {
         "id": item.id,
         "evidence_id": item.id,
@@ -220,7 +221,7 @@ def evidence_json(item: Evidence, original: Original):
         "source_id": item.source_id,
         "custodian_id": item.custodian_id,
         "parent_id": item.parent_id,
-        "snippet": item.text[:300],
+        "snippet": item.text[:300] if snippet is None else snippet,
         "sha256": original.sha256,
         "byte_size": original.byte_size,
         "original_name": item.filename,
@@ -347,7 +348,20 @@ def run_search(db, tenant_id, case_id, spec, secret, extra_conditions=None, scop
         else [expression.desc(), Evidence.id.desc()]
     )
     rows = db.execute(
-        select(Evidence, Original)
+        select(Evidence, Original, func.substr(Evidence.text, 1, 300))
+        .options(
+            load_only(
+                Evidence.id, Evidence.item_type, Evidence.title, Evidence.date_utc,
+                Evidence.created_at, Evidence.date_raw, Evidence.timezone_source,
+                Evidence.sender, Evidence.recipients, Evidence.source_id,
+                Evidence.custodian_id, Evidence.parent_id, Evidence.filename,
+                Evidence.has_attachments, Evidence.review_status,
+                Evidence.privilege_status, Evidence.tags, Evidence.bookmarked,
+                Evidence.parser_state, Evidence.parser_error, Evidence.review_version,
+                Evidence.assigned_to, Evidence.thread_id, raiseload=True,
+            ),
+            load_only(Original.sha256, Original.byte_size, Original.integrity_status, raiseload=True),
+        )
         .join(Original, Evidence.original_id == Original.id)
         .where(*page_conditions)
         .order_by(*ordering)
@@ -355,7 +369,7 @@ def run_search(db, tenant_id, case_id, spec, secret, extra_conditions=None, scop
     ).all()
     next_cursor = None
     if len(rows) > spec.page_size:
-        item, original = rows[spec.page_size - 1]
+        item, original, _ = rows[spec.page_size - 1]
         value = original.byte_size if attribute == "byte_size" else getattr(item, attribute)
         if attribute in {"date_utc", "created_at"}:
             value = utc(value or date_min).isoformat()
@@ -380,7 +394,7 @@ def run_search(db, tenant_id, case_id, spec, secret, extra_conditions=None, scop
         "total_hits": total,
         "total_hits_relation": "eq",
         "next_cursor": next_cursor,
-        "items": [evidence_json(item, original) for item, original in rows[: spec.page_size]],
+        "items": [evidence_json(item, original, snippet) for item, original, snippet in rows[: spec.page_size]],
         "facets": facets,
         "groups": groups,
         "coverage": {
