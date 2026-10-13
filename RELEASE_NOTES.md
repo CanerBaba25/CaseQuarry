@@ -1,6 +1,6 @@
 # Release notes
 
-## 0.4.0 — October 12, 2026
+## 0.4.0 — October 13, 2026
 
 Installable web and desktop release with a redesigned daily workspace, personal
 timezones and manual task deadlines.

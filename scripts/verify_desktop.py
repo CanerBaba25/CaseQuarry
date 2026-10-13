@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import plistlib
+import re
 import shutil
 import struct
 import subprocess
@@ -17,17 +18,60 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.release_version import release_version
 
 
+def captured(args: list[str], *, timeout=180, **kwargs) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(args, check=False, capture_output=True, timeout=timeout, **kwargs)
+    except subprocess.TimeoutExpired as error:
+        context = tool_context(subprocess.CompletedProcess(args, 124, error.stdout, error.stderr))
+        raise RuntimeError(f"{args[0]} timed out after {timeout}s: {context}") from error
+
+
 def command(*args: str, **kwargs) -> subprocess.CompletedProcess:
-    return subprocess.run(list(args), check=True, capture_output=True, timeout=180, **kwargs)
+    process = captured(list(args), **kwargs)
+    if process.returncode:
+        raise RuntimeError(f"{args[0]} failed ({process.returncode}): {tool_context(process)}")
+    return process
+
+
+def tool_context(process: subprocess.CompletedProcess) -> str:
+    def decoded(value):
+        return value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value or ""
+    return (decoded(process.stdout) + "\n" + decoded(process.stderr))[-3000:]
+
+
+def reviewed_apache_prompt(output: str) -> bool:
+    normalized = " ".join(output.casefold().split())
+    return ("apache license" in normalized and "version 2.0" in normalized
+            and re.search(r"do you agree|\[y/n\]|\(y/n\)|type [\"']?y\b", normalized) is not None)
+
+
+def attach_image(bundle: Path, mount: Path) -> bool:
+    arguments = ["hdiutil", "attach", "-readonly", "-nobrowse", "-mountpoint", str(mount), str(bundle)]
+    process = captured(arguments, input=b"\n")
+    if process.returncode == 0:
+        return False
+    # Tauri embeds bundle.licenseFile as a DMG EULA. Accept only our reviewed
+    # Apache image license after the actual tool output identifies its prompt.
+    output = ((process.stdout or b"") + (process.stderr or b"")).decode("utf-8", errors="replace")
+    root = Path(__file__).resolve().parents[1]
+    configuration = json.loads((root / "apps/desktop/src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
+    license_file = (root / "apps/desktop/src-tauri" / configuration["bundle"]["licenseFile"]).resolve()
+    license_text = license_file.read_text(encoding="utf-8")
+    if license_file != root / "LICENSE" or "Apache License" not in license_text or "Version 2.0" not in license_text or not reviewed_apache_prompt(output):
+        raise RuntimeError(f"hdiutil attach failed ({process.returncode}): {tool_context(process)}")
+    prompt = [line.strip() for line in output.splitlines() if re.search(r"do you agree|\[y/n\]|\(y/n\)", line, re.IGNORECASE)]
+    print("DMG displayed the reviewed Apache2.0 agreement prompt: " + " ".join(prompt)[-600:])
+    command(*arguments, input=b"Y\n")
+    return True
 
 
 def runtime(binary: Path, directory: Path) -> dict:
     report = directory / "runtime.json"
     environment = os.environ.copy()
     environment["CASEQUARRY_DESKTOP_DIAGNOSTIC_REPORT"] = str(report)
-    process = subprocess.run(
+    process = captured(
         [str(binary), "--diagnose-runtime"], env=environment, cwd=directory,
-        capture_output=True, timeout=45, check=False,
+        timeout=45,
     )
     if process.returncode != 0 or not report.is_file():
         context = (process.stderr or process.stdout).decode("utf-8", errors="replace")[-3000:]
@@ -83,7 +127,7 @@ def verify(platform: str, bundle: Path, binary: Path | None, install: bool) -> d
         mount.mkdir()
         attached = False
         try:
-            command("hdiutil", "attach", "-readonly", "-nobrowse", "-mountpoint", str(mount), str(bundle))
+            accepted_license = attach_image(bundle, mount)
             attached = True
             applications = list(mount.glob("*.app"))
             if len(applications) != 1:
@@ -104,7 +148,7 @@ def verify(platform: str, bundle: Path, binary: Path | None, install: bool) -> d
             installed = directory / application.name
             shutil.copytree(application, installed, symlinks=True)
             result = runtime(installed / "Contents/MacOS" / name, directory)
-            return {"platform": platform, "architectures": sorted(architectures), "ad_hoc_signature_verified": True, "runtime": result}
+            return {"platform": platform, "architectures": sorted(architectures), "ad_hoc_signature_verified": True, "reviewed_project_license_accepted": accepted_license, "runtime": result}
         finally:
             if attached:
                 command("hdiutil", "detach", str(mount))
