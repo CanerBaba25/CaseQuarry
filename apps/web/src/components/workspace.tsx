@@ -3,11 +3,22 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, api, date, number, post } from "@/lib/api";
+import {
+  ApiError,
+  api,
+  date,
+  getDisplayTimeZone,
+  number,
+  post,
+  setDisplayTimeZone,
+  timeZoneSupported,
+} from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import { useFirmSync } from "@/lib/sync";
 import type { Matter, Stats, User } from "@/lib/types";
-import { Badge, Empty, ErrorBox, Icon, Loading, Logo, Modal } from "./ui";
+import { Badge, Empty, ErrorBox, Icon, Loading, Logo } from "./ui";
+import CommandPalette from "./command-palette";
+import TimeZoneSettings from "./time-zone-settings";
 import {
   MatterOverview,
   SourcesPage,
@@ -28,7 +39,11 @@ import ReviewQueue from "./review-queue";
 import ProductionsPage from "./productions";
 import MyWork from "./task-worklist";
 
-type MatterPage = {items: Matter[]; next_cursor: string | null; total: number};
+type MatterPage = {
+  items: Matter[];
+  next_cursor: string | null;
+  total: number;
+};
 
 const matterNavigation = [
   ["overview", "Overview", "grid"],
@@ -49,6 +64,18 @@ const matterNavigation = [
   ["audit", "Audit trail", "shield"],
   ["settings", "Matter settings", "settings"],
 ];
+const matterGroups = [
+  { title: "Evidence", keys: ["overview", "explorer", "emails", "sources"] },
+  {
+    title: "Investigation",
+    keys: ["people", "network", "analytics", "timeline"],
+  },
+  { title: "Review & work", keys: ["review", "issues", "tasks", "ai"] },
+  {
+    title: "Delivery & control",
+    keys: ["productions", "reports", "holds", "audit", "settings"],
+  },
+];
 
 export default function Workspace() {
   const router = useRouter(),
@@ -60,15 +87,21 @@ export default function Workspace() {
   const [palette, setPalette] = useState(false),
     [navOpen, setNavOpen] = useState(false),
     [dark, setDark] = useState(false);
+  const [commandKey, setCommandKey] = useState("Ctrl");
   const [includeArchived, setIncludeArchived] = useState(false);
   const [matterFilter, setMatterFilter] = useState("");
   const [caseSearch, setCaseSearch] = useState("");
   const [caseCursors, setCaseCursors] = useState<(string | null)[]>([null]);
   useEffect(() => {
-    const timer = setTimeout(() => {setCaseSearch(matterFilter.trim()); setCaseCursors([null]);}, 250);
+    const timer = setTimeout(() => {
+      setCaseSearch(matterFilter.trim());
+      setCaseCursors([null]);
+    }, 250);
     return () => clearTimeout(timer);
   }, [matterFilter]);
-  useEffect(() => {setCaseCursors([null]);}, [includeArchived, user?.id]);
+  useEffect(() => {
+    setCaseCursors([null]);
+  }, [includeArchived, user?.id]);
   const pieces = pathname.split("/").filter(Boolean),
     caseId =
       pieces[0] === "app" && pieces[1] === "matters" && pieces[2] !== "new"
@@ -83,14 +116,36 @@ export default function Workspace() {
     user && caseId ? `/cases/${caseId}` : null,
   );
   const cases = useResource<MatterPage>(
-    user ? `/cases?archived=${includeArchived}&q=${encodeURIComponent(caseSearch)}${caseCursors.at(-1) ? `&cursor=${encodeURIComponent(caseCursors.at(-1)!)}` : ""}` : null,
+    user
+      ? `/cases?limit=24&archived=${includeArchived}&q=${encodeURIComponent(caseSearch)}${caseCursors.at(-1) ? `&cursor=${encodeURIComponent(caseCursors.at(-1)!)}` : ""}`
+      : null,
   );
   const refreshUser = useCallback(() => {
-    void api<User>("/me").then((me) => {
-      setUser((current) => current?.id === me.id && current.tenant_id === me.tenant_id ? me : current);
-    }).catch(() => {});
+    void api<User>("/me")
+      .then((me) => {
+        setUser((current) =>
+          current?.id === me.id && current.tenant_id === me.tenant_id
+            ? me
+            : current,
+        );
+      })
+      .catch(() => {});
   }, []);
   const syncState = useFirmSync(user?.id ?? null, caseId, refreshUser);
+  const timeZoneIdentity = useRef<{ userId: string; zone: string } | null>(
+    null,
+  );
+  useEffect(() => {
+    const zone = user?.time_zone || "UTC";
+    const previous = timeZoneIdentity.current;
+    setDisplayTimeZone(zone);
+    timeZoneIdentity.current = user ? { userId: user.id, zone } : null;
+    if (user && previous?.userId === user.id && previous.zone !== zone) {
+      window.dispatchEvent(
+        new CustomEvent("cq:refresh", { detail: { system: true } }),
+      );
+    }
+  }, [user?.id, user?.time_zone]);
 
   const boot = useCallback(async () => {
     setBooting(true);
@@ -123,7 +178,11 @@ export default function Workspace() {
     void boot();
   }, [boot]);
   useEffect(() => {
-    const theme = window.localStorage.getItem("cq_theme");
+    let theme: string | null = null;
+    try {
+      theme = window.localStorage.getItem("cq_theme");
+    } catch {}
+    setCommandKey(/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl");
     setDark(theme === "dark");
     document.documentElement.dataset.theme =
       theme === "dark" ? "dark" : "light";
@@ -184,7 +243,9 @@ export default function Workspace() {
     const value = !dark;
     setDark(value);
     document.documentElement.dataset.theme = value ? "dark" : "light";
-    window.localStorage.setItem("cq_theme", value ? "dark" : "light");
+    try {
+      window.localStorage.setItem("cq_theme", value ? "dark" : "light");
+    } catch {}
   }
 
   if (booting)
@@ -241,105 +302,101 @@ export default function Workspace() {
         <Link href="/app" className="brand-link">
           <Logo />
         </Link>
-        <div className="sidebar-section-title">WORKSPACE</div>
-        <Link
-          href="/app"
-          className={`nav-link ${!caseId && pieces[2] !== "new" && !accountSettings && !administration ? "active" : ""}`}
-        >
-          <Icon name="matters" />
-          All matters
-          <span className="nav-count">
-            {cases.data ? number(cases.data.items.length) : "—"}
-          </span>
-        </Link>
-        {user.role === "firm_admin" && (
+        <div className="sidebar-scroll">
+          <div className="sidebar-section-title">WORKSPACE</div>
           <Link
-            href="/app/admin"
-            className={`nav-link ${administration ? "active" : ""}`}
+            href="/app"
+            className={`nav-link ${!caseId && pieces[2] !== "new" && !accountSettings && !administration ? "active" : ""}`}
           >
-            <Icon name="people" />
-            Firm administration
+            <Icon name="matters" />
+            All matters
+            {!caseSearch && !includeArchived && cases.data && (
+              <span className="nav-count">{number(cases.data.total)}</span>
+            )}
           </Link>
-        )}
-        <Link
-          href="/app/matters/new"
-          className={`nav-link ${pieces[2] === "new" ? "active" : ""}`}
-        >
-          <Icon name="plus" />
-          Create matter
-        </Link>
-        <Link
-          href="/app/settings"
-          className={`nav-link ${accountSettings ? "active" : ""}`}
-        >
-          <Icon name="shield" />
-          Account security
-        </Link>
-        {caseId && (
-          <>
-            <div className="sidebar-section-title matter-label">
-              CURRENT MATTER
-            </div>
-            <div className="sidebar-matter">
-              <span>{matter.data?.matter_number || "Loading matter"}</span>
-              <strong>{matter.data?.title || "Evidence workspace"}</strong>
-            </div>
-            <nav>
-              {matterNavigation
-                .filter(
-                  ([key]) =>
-                    !["tasks", "holds", "settings", "ai"].includes(key),
-                )
-                .map(([key, text, icon]) => (
-                  <Link
-                    key={key}
-                    href={`/app/matters/${caseId}/${key}`}
-                    className={`nav-link ${section === key || (section === "evidence" && key === "explorer") || (section === "imports" && key === "sources") ? "active" : ""}`}
-                  >
-                    <Icon name={icon} />
-                    {text}
-                  </Link>
+          {user.role === "firm_admin" && (
+            <Link
+              href="/app/admin"
+              className={`nav-link ${administration ? "active" : ""}`}
+            >
+              <Icon name="people" />
+              Firm administration
+            </Link>
+          )}
+          <Link
+            href="/app/matters/new"
+            className={`nav-link ${pieces[2] === "new" ? "active" : ""}`}
+          >
+            <Icon name="plus" />
+            Create matter
+          </Link>
+          <Link
+            href="/app/settings"
+            className={`nav-link ${accountSettings ? "active" : ""}`}
+          >
+            <Icon name="shield" />
+            Account security
+          </Link>
+          {caseId && (
+            <>
+              <div className="sidebar-matter">
+                <span className="sidebar-section-title">CURRENT MATTER</span>
+                <span>{matter.data?.matter_number || "Loading matter"}</span>
+                <strong>{matter.data?.title || "Evidence workspace"}</strong>
+              </div>
+              <nav aria-label="Matter pages">
+                {matterGroups.map((group) => (
+                  <div className="nav-group" key={group.title}>
+                    <div className="sidebar-section-title">{group.title}</div>
+                    {matterNavigation
+                      .filter(([key]) => group.keys.includes(key))
+                      .map(([key, text, icon]) => (
+                        <Link
+                          key={key}
+                          href={`/app/matters/${caseId}/${key}`}
+                          className={`nav-link ${section === key || (section === "evidence" && key === "explorer") || (section === "imports" && key === "sources") ? "active" : ""}`}
+                          aria-current={
+                            section === key ||
+                            (section === "evidence" && key === "explorer") ||
+                            (section === "imports" && key === "sources")
+                              ? "page"
+                              : undefined
+                          }
+                        >
+                          <Icon name={icon} />
+                          {text}
+                        </Link>
+                      ))}
+                  </div>
                 ))}
-              <details
-                className="nav-more"
-                open={["tasks", "holds", "settings", "ai"].includes(section)}
-              >
-                <summary>
-                  <Icon name="settings" />
-                  Matter tools
-                  <Icon name="chevron" size={13} />
-                </summary>
-                {matterNavigation
-                  .filter(([key]) =>
-                    ["tasks", "holds", "settings", "ai"].includes(key),
-                  )
-                  .map(([key, text, icon]) => (
-                    <Link
-                      key={key}
-                      href={`/app/matters/${caseId}/${key}`}
-                      className={`nav-link ${section === key ? "active" : ""}`}
-                    >
-                      <Icon name={icon} />
-                      {text}
-                    </Link>
-                  ))}
-              </details>
-            </nav>
-          </>
-        )}
+              </nav>
+            </>
+          )}
+        </div>
         <div className="sidebar-bottom">
-          <div className="preview-label">PREVIEW 0.3</div>
-          <div className="privacy-status">
+          <div className="privacy-status" data-state={syncState}>
             <span className="status-dot" />
             <span>
-              {syncState === "connected" ? "Connected to firm server" : syncState === "checking" ? "Checking connection" : syncState === "unavailable" ? "Matter unavailable" : "Reconnecting"}
-              <small>External AI requires consent</small>
+              {syncState === "connected"
+                ? "Connected to firm server"
+                : syncState === "checking"
+                  ? "Checking connection"
+                  : syncState === "unavailable"
+                    ? "Matter unavailable"
+                    : "Reconnecting"}
+              <small>CaseQuarry 0.4</small>
             </span>
             <Icon name="lock" size={15} />
           </div>
           <div className="user-row">
             <span className="avatar">
-              {user.name.slice(0, 2).toUpperCase()}
+              {user.name
+                .trim()
+                .split(/\s+/)
+                .map((part) => part[0])
+                .slice(0, 2)
+                .join("")
+                .toUpperCase()}
             </span>
             <div>
               <strong>{user.name}</strong>
@@ -398,13 +455,27 @@ export default function Workspace() {
             </strong>
           </div>
           <div className="topbar-actions">
+            <Link
+              href="/app/settings"
+              className="time-zone-status"
+              aria-label={`Timezone settings, displaying ${getDisplayTimeZone(user.time_zone || "UTC")}`}
+              title={`Account timezone: ${user.time_zone || "UTC"}${timeZoneSupported(user.time_zone || "UTC") ? "" : ". This browser displays UTC as a fallback."}`}
+            >
+              <Icon name="clock" size={14} />
+              <span>
+                {timeZoneSupported(user.time_zone || "UTC")
+                  ? getDisplayTimeZone(user.time_zone || "UTC")
+                  : "UTC fallback"}
+              </span>
+            </Link>
             <button
               className="command-trigger"
+              aria-label="Quick navigation"
               onClick={() => setPalette(true)}
             >
               <Icon name="search" size={16} />
-              <span>Quick navigation</span>
-              <kbd>⌘ K</kbd>
+              <span>Search matters & pages</span>
+              <kbd>{commandKey} K</kbd>
             </button>
             <button
               className="icon-button"
@@ -478,7 +549,23 @@ export default function Workspace() {
               />
             )
           ) : accountSettings ? (
-            <AccountSecurity user={user} />
+            <AccountSecurity
+              user={user}
+              preferences={
+                <TimeZoneSettings
+                  key={user.id}
+                  user={user}
+                  saved={(updated) =>
+                    setUser((current) =>
+                      current?.id === updated.id &&
+                      current.tenant_id === updated.tenant_id
+                        ? updated
+                        : current,
+                    )
+                  }
+                />
+              }
+            />
           ) : administration ? (
             <FirmAdministration user={user} />
           ) : pieces[2] === "new" ? (
@@ -494,19 +581,29 @@ export default function Workspace() {
               includeArchived={includeArchived}
               toggleArchived={setIncludeArchived}
               userId={user.id}
+              userName={user.name}
+              openFinder={() => setPalette(true)}
               filter={matterFilter}
               setFilter={setMatterFilter}
               hasPrevious={caseCursors.length > 1}
               previous={() => setCaseCursors((current) => current.slice(0, -1))}
-              next={() => {if(cases.data?.next_cursor) setCaseCursors((current) => [...current, cases.data!.next_cursor]);}}
+              next={() => {
+                if (cases.data?.next_cursor)
+                  setCaseCursors((current) => [
+                    ...current,
+                    cases.data!.next_cursor,
+                  ]);
+              }}
             />
           )}
         </main>
       </div>
       {palette && (
         <CommandPalette
-          cases={cases.data?.items || []}
+          key={user.id}
           caseId={caseId}
+          navigation={matterNavigation}
+          administrator={user.role === "firm_admin"}
           close={() => setPalette(false)}
           navigate={(path) => {
             setPalette(false);
@@ -666,18 +763,20 @@ function MatterDashboard({
   includeArchived,
   toggleArchived,
   userId,
+  userName,
+  openFinder,
   filter,
   setFilter,
   hasPrevious,
   previous,
   next,
 }: {
-  cases: ReturnType<
-    typeof useResource<MatterPage>
-  >;
+  cases: ReturnType<typeof useResource<MatterPage>>;
   includeArchived: boolean;
   toggleArchived: (value: boolean) => void;
   userId: string;
+  userName: string;
+  openFinder: () => void;
   filter: string;
   setFilter: (value: string) => void;
   hasPrevious: boolean;
@@ -685,62 +784,122 @@ function MatterDashboard({
   next: () => void;
 }) {
   const rows = cases.data?.items || [];
+  const [view, setView] = useState<"cards" | "list">("cards");
+  useEffect(() => {
+    let value: string | null = null;
+    try {
+      value = window.localStorage.getItem(`cq_matter_view.${userId}`);
+    } catch {}
+    setView(value === "list" ? "list" : "cards");
+  }, [userId]);
+  function changeView(value: "cards" | "list") {
+    setView(value);
+    try {
+      window.localStorage.setItem(`cq_matter_view.${userId}`, value);
+    } catch {}
+  }
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <span className="eyebrow">YOUR MATTER WORKSPACE</span>
-          <h1>The evidence starts here.</h1>
-          <p>Keep every matter organized, every source traceable.</p>
-        </div>
-        <Link className="button primary" href="/app/matters/new">
-          <Icon name="plus" size={18} />
-          New matter
-        </Link>
-      </div>
-      <div className="workspace-banner">
-        <div className="banner-icon">
-          <Icon name="shield" size={29} />
-        </div>
-        <div>
-          <strong>Your work stays in your workspace.</strong>
+      <section className="firm-dashboard-hero">
+        <div className="firm-dashboard-intro">
+          <span className="eyebrow">
+            FIRM WORKSPACE · {userName.split(" ")[0]}
+          </span>
+          <h1>
+            Your matters.
+            <br />A clearer perspective.
+          </h1>
           <p>
-            Originals are preserved separately from extracted text. External AI
-            and telemetry are disabled by default.
+            A focused place to follow the record, coordinate review and move
+            your matters forward.
           </p>
+          <div className="button-row">
+            <Link className="button primary" href="/app/matters/new">
+              <Icon name="plus" size={18} />
+              New matter
+            </Link>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={openFinder}
+            >
+              <Icon name="search" size={17} /> Find a matter
+            </button>
+          </div>
         </div>
-        <span className="privacy-pill">
-          <span className="status-dot" />
-          PRIVATE BY DEFAULT
+        <div className="firm-dashboard-summary">
+          <span className="hero-summary-icon">
+            <Icon name="matters" size={25} />
+          </span>
+          <strong>
+            {cases.data && !cases.loading ? number(cases.data.total) : "—"}
+          </strong>
+          <span>Matters in this view</span>
+          <small>
+            {filter
+              ? "Matching your current search"
+              : includeArchived
+                ? "Active and archived matters"
+                : "Active matters you can access"}
+          </small>
+        </div>
+      </section>
+      <div className="workspace-assurance">
+        <Icon name="shield" size={16} />
+        <span>
+          Preserved originals. Human review. External processing only with
+          explicit consent.
         </span>
       </div>
       <MyWork userId={userId} />
-      <section className="section">
+      <section className="section matter-directory">
         <div className="section-heading">
           <h2>
             Your matters{" "}
-            <span className="count-chip">
-              {number(cases.data?.total)}
-            </span>
+            <span className="count-chip">{number(cases.data?.total)}</span>
           </h2>
-          <label className="archived-toggle">
-            <input
-              type="checkbox"
-              checked={includeArchived}
-              onChange={(event) => toggleArchived(event.target.checked)}
-            />
-            <span>Include archived</span>
-          </label>
-          <label className="search-small">
-            <Icon name="search" size={17} />
-            <input
-              value={filter}
-              onChange={(event) => setFilter(event.target.value)}
-              placeholder="Find a matter…"
-              maxLength={200}
-              aria-label="Find a matter"
-            />
-          </label>
+          <div className="matter-directory-tools">
+            <label className="archived-toggle">
+              <input
+                type="checkbox"
+                checked={includeArchived}
+                onChange={(event) => toggleArchived(event.target.checked)}
+              />
+              <span>Include archived</span>
+            </label>
+            <label className="search-small">
+              <Icon name="search" size={17} />
+              <input
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                placeholder="Find a matter…"
+                maxLength={200}
+                aria-label="Find a matter"
+              />
+            </label>
+            <div
+              className="view-switch"
+              role="group"
+              aria-label="Matter layout"
+            >
+              <button
+                type="button"
+                aria-label="Card view"
+                aria-pressed={view === "cards"}
+                onClick={() => changeView("cards")}
+              >
+                <Icon name="grid" size={17} />
+              </button>
+              <button
+                type="button"
+                aria-label="List view"
+                aria-pressed={view === "list"}
+                onClick={() => changeView("list")}
+              >
+                <Icon name="list" size={17} />
+              </button>
+            </div>
+          </div>
         </div>
         <ErrorBox error={cases.error} retry={cases.refresh} />
         {cases.loading ? (
@@ -763,22 +922,36 @@ function MatterDashboard({
             )}
           </Empty>
         ) : (
-          <div className="matter-grid">
+          <div className="matter-grid" data-view={view}>
             {rows.map((item) => (
               <MatterCard key={item.id} matter={item} />
             ))}
           </div>
         )}
-        {(hasPrevious || cases.data?.next_cursor) && <div className="button-row">
-          <button className="button secondary compact" disabled={!hasPrevious || cases.loading} onClick={previous}>Previous matters</button>
-          <button className="button secondary compact" disabled={!cases.data?.next_cursor || cases.loading} onClick={next}>Next matters</button>
-        </div>}
+        {(hasPrevious || cases.data?.next_cursor) && (
+          <div className="button-row">
+            <button
+              className="button secondary compact"
+              disabled={!hasPrevious || cases.loading}
+              onClick={previous}
+            >
+              Previous matters
+            </button>
+            <button
+              className="button secondary compact"
+              disabled={!cases.data?.next_cursor || cases.loading}
+              onClick={next}
+            >
+              Next matters
+            </button>
+          </div>
+        )}
       </section>
       <div className="workspace-footer">
         <Icon name="shield" size={16} />
         <span>
-          Investigation workspace · Professional review required · Scale targets
-          remain subject to benchmarking
+          CaseQuarry 0.4 · Professional judgment and verified source records
+          remain essential.
         </span>
       </div>
     </>
@@ -795,23 +968,47 @@ function MatterCard({ matter }: { matter: Matter }) {
         </span>
         <Badge value={matter.archived_at ? "Archived" : "Active"} />
       </div>
-      <span className="eyebrow">{matter.matter_number}</span>
-      <h3>{matter.title}</h3>
-      <p>
-        {matter.client || "Client not specified"}
-        {matter.case_type ? ` · ${matter.case_type}` : ""}
-      </p>
-      <div className="matter-card-metrics">
-        <div>
-          <strong>
-            {stats.data ? number(stats.data.evidence_items) : "—"}
-          </strong>
-          <span>Evidence items</span>
+      <div className="matter-card-identity">
+        <span className="eyebrow">{matter.matter_number}</span>
+        <h3>{matter.title}</h3>
+        <p>
+          {matter.client || "Client not specified"}
+          {matter.case_type ? ` · ${matter.case_type}` : ""}
+        </p>
+      </div>
+      <div className="matter-card-review">
+        <div className="matter-card-metrics">
+          <div>
+            <strong>
+              {stats.data ? number(stats.data.evidence_items) : "—"}
+            </strong>
+            <span>Evidence items</span>
+          </div>
+          <div>
+            <strong>{stats.data ? number(stats.data.reviewed) : "—"}</strong>
+            <span>Reviewed</span>
+          </div>
         </div>
-        <div>
-          <strong>{stats.data ? number(stats.data.reviewed) : "—"}</strong>
-          <span>Reviewed</span>
-        </div>
+        {stats.data && (
+          <div className="matter-review-progress">
+            <div>
+              <span>Human review</span>
+              <strong>
+                {stats.data.evidence_items
+                  ? Math.round(
+                      (stats.data.reviewed / stats.data.evidence_items) * 100,
+                    )
+                  : 0}
+                %
+              </strong>
+            </div>
+            <progress
+              max={stats.data.evidence_items || 1}
+              value={stats.data.reviewed}
+              aria-label={`${number(stats.data.reviewed)} of ${number(stats.data.evidence_items)} evidence items reviewed`}
+            />
+          </div>
+        )}
       </div>
       <div className="matter-card-bottom">
         <span>Updated {date(matter.updated_at)}</span>
@@ -934,61 +1131,5 @@ function CreateMatter({ created }: { created: (id: string) => void }) {
         </div>
       </form>
     </>
-  );
-}
-
-function CommandPalette({
-  cases,
-  caseId,
-  close,
-  navigate,
-}: {
-  cases: Matter[];
-  caseId: string | null;
-  close: () => void;
-  navigate: (path: string) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const actions = [
-    { title: "All matters", path: "/app", icon: "matters" },
-    { title: "Create a matter", path: "/app/matters/new", icon: "plus" },
-    ...(caseId
-      ? matterNavigation.map(([key, title, icon]) => ({
-          title,
-          path: `/app/matters/${caseId}/${key}`,
-          icon,
-        }))
-      : []),
-    ...cases.map((item) => ({
-      title: `${item.matter_number} · ${item.title}`,
-      path: `/app/matters/${item.id}/overview`,
-      icon: "matters",
-    })),
-  ].filter((item) => item.title.toLowerCase().includes(query.toLowerCase()));
-  return (
-    <Modal title="Quick navigation" close={close}>
-      <label className="palette-search">
-        <Icon name="search" />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Find a page, command or matter…"
-          autoFocus
-          aria-label="Search navigation"
-        />
-      </label>
-      <div className="palette-results">
-        {actions.map((item) => (
-          <button key={item.path} onClick={() => navigate(item.path)}>
-            <Icon name={item.icon} />
-            <span>{item.title}</span>
-            <Icon name="arrow" size={16} />
-          </button>
-        ))}
-        {!actions.length && (
-          <p className="muted">No matching commands or authorized matters.</p>
-        )}
-      </div>
-    </Modal>
   );
 }

@@ -18,7 +18,7 @@ from . import ai_models, production_models, provider_models, sync_models, workfl
 from .config import Settings
 from .models import Base
 
-HEAD_REVISION = "0004_firm_sync_providers"
+HEAD_REVISION = "0006_user_time_zones"
 CORE_REVISION = "0001_core"
 _MIGRATION_LOCK = threading.RLock()
 _POSTGRES_LOCK_KEY = 0x4351534348454D41
@@ -70,7 +70,7 @@ def schema_differences(connection, revision):
                 differences.append(f"{name}.{column}: expected {expected_type}, found {actual_type}")
             if actual["nullable"] != desired["nullable"]:
                 differences.append(f"{name}.{column}: nullability differs")
-            if actual.get("default") != desired["default"]:
+            if actual.get("default") != desired.get("defaults", {}).get(connection.dialect.name, desired["default"]):
                 differences.append(f"{name}.{column}: server default differs")
         if inspector.get_pk_constraint(name)["constrained_columns"] != definition["primary_key"]:
             differences.append(f"{name}: primary key differs")

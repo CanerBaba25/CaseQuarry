@@ -1,12 +1,15 @@
 {
   "name": "@casequarry/desktop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
     "build:ui": "tsc --noEmit && vite build",
     "build": "tauri build --bundles nsis --target x86_64-pc-windows-msvc -- --locked",
+    "build:windows": "tauri build --bundles nsis --target x86_64-pc-windows-msvc -- --locked",
+    "build:linux": "tauri build --bundles deb --target x86_64-unknown-linux-gnu -- --locked",
+    "build:macos": "tauri build --bundles app,dmg --target universal-apple-darwin -- --locked",
     "tauri": "tauri",
     "licenses": "node scripts/notices.mjs",
     "typecheck": "tsc --noEmit",

@@ -3,14 +3,17 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import Field
-from sqlalchemy import func, select, update
+from pydantic import Field, field_validator
+from sqlalchemy import and_, func, select, update
+from sqlalchemy.orm import aliased
 
 from . import audit
 from .mfa_routes import valid_mfa
-from .models import Audit, LoginSession, Tenant, User, now
+from .models import Audit, Case, LoginSession, Member, Tenant, User, now
 from .schemas import Input, Reason
 from .security import PASSWORDS, Actor, current_actor, fail, get_db, password_valid, user_json, utc
+from .time_zones import names as time_zone_names
+from .time_zones import validate as validate_time_zone
 
 router = APIRouter(prefix="/api/v1")
 
@@ -31,6 +34,33 @@ class UserPatch(Reason):
     expected_role: str = Field(max_length=30)
 
 
+class UserPreferences(Input):
+    time_zone: str = Field(min_length=1, max_length=100, strict=True)
+
+    @field_validator("time_zone")
+    @classmethod
+    def supported_zone(cls, value):
+        return validate_time_zone(value)
+
+
+@router.get("/timezones")
+def time_zones(actor: Actor = Depends(current_actor)):
+    return {"items": time_zone_names(), "default": "UTC", "current": actor.user.time_zone}
+
+
+@router.patch("/me/preferences")
+def preferences(body: UserPreferences, request: Request, actor: Actor = Depends(current_actor), db=Depends(get_db)):
+    db.refresh(actor.user, with_for_update={"key_share": True})
+    if not actor.user.active:
+        fail(401, "ACCOUNT_DISABLED", "This account is unavailable.")
+    changed = actor.user.time_zone != body.time_zone
+    if changed:
+        actor.user.time_zone = body.time_zone
+        audit.record(db, actor.user, None, "user.preferences_updated", "user", actor.user.id, {"fields": ["time_zone"]}, request.state.request_id)
+        db.commit()
+    return {**user_json(actor.user), "changed": changed}
+
+
 def require_admin(db, actor, *, lock=False):
     if lock:
         # A tenant row write serializes the last-administrator invariant on SQLite and PostgreSQL.
@@ -38,6 +68,43 @@ def require_admin(db, actor, *, lock=False):
         db.refresh(actor.user)
     if not actor.user.active or actor.user.role != "firm_admin":
         fail(403, "PERMISSION_DENIED", "Firm administrator access is required.")
+
+
+def _lock_user_and_matters(db, actor, user_id):
+    """Use the same matter-before-sorted-users order as team and task changes."""
+    tenant_id, actor_id = actor.user.tenant_id, actor.user.id
+    for _attempt in range(3):
+        scopes = select(Member.case_id).join(Case, and_(Case.id == Member.case_id, Case.tenant_id == Member.tenant_id)).where(Member.tenant_id == tenant_id, Member.user_id == user_id)
+        case_ids = set(db.scalars(scopes))
+        if case_ids:
+            db.scalars(select(Case.id).where(Case.tenant_id == tenant_id, Case.id.in_(case_ids)).order_by(Case.id).with_for_update()).all()
+        db.expire_all()
+        users = {row.id: row for row in db.scalars(select(User).where(User.tenant_id == tenant_id, User.id.in_({actor_id, user_id})).order_by(User.id).with_for_update(key_share=True))}
+        admin = users.get(actor_id)
+        if admin is None or not admin.active or admin.role != "firm_admin":
+            fail(403, "PERMISSION_DENIED", "Firm administrator access is required.")
+        if user_id not in users:
+            fail(404, "NOT_FOUND", "This user is unavailable.")
+        if set(db.scalars(scopes)) <= case_ids:
+            return users[user_id]
+        # A concurrent grant added a matter before the user lock. Retry without
+        # taking a new matter lock while retaining a user lock in the wrong order.
+        db.rollback()
+        require_admin(db, actor, lock=True)
+    fail(409, "USER_TEAM_SCOPE_CHANGED", "This user's matter memberships are changing. Refresh and try again.", True)
+
+
+def _guard_active_matter_lead(db, tenant_id, user_id):
+    other, other_user = aliased(Member), aliased(User)
+    another_lead = select(other.id).join(other_user, and_(other_user.id == other.user_id, other_user.tenant_id == other.tenant_id)).where(
+        other.tenant_id == tenant_id, other.case_id == Member.case_id,
+        other.role == "matter_lead", other.user_id != user_id, other_user.active.is_(True),
+    ).correlate(Member).exists()
+    stranded = db.scalar(select(Member.case_id).join(Case, and_(Case.id == Member.case_id, Case.tenant_id == Member.tenant_id)).where(
+        Member.tenant_id == tenant_id, Member.user_id == user_id, Member.role == "matter_lead", ~another_lead,
+    ).limit(1))
+    if stranded:
+        fail(409, "LAST_MATTER_LEAD", "Assign another active lead to this user's matters before deactivating the account.")
 
 
 @router.get("/auth/sessions")
@@ -138,9 +205,7 @@ def patch_user(
     user_id: str, body: UserPatch, request: Request, actor: Actor = Depends(current_actor), db=Depends(get_db)
 ):
     require_admin(db, actor, lock=True)
-    row = db.scalar(select(User).where(User.id == user_id, User.tenant_id == actor.user.tenant_id))
-    if row is None:
-        fail(404, "NOT_FOUND", "This user is unavailable.")
+    row = _lock_user_and_matters(db, actor, user_id)
     if row.active != body.expected_active or row.role != body.expected_role:
         fail(409, "USER_VERSION_CONFLICT", "Another administrator changed this user. Refresh before saving.")
     changes = body.model_dump(exclude_none=True, include={"active", "role"})
@@ -169,6 +234,8 @@ def patch_user(
         <= 1
     ):
         fail(409, "LAST_ADMIN_BLOCKED", "Keep at least one active firm administrator.")
+    if row.active and not active:
+        _guard_active_matter_lead(db, actor.user.tenant_id, user_id)
     result = db.execute(
         update(User)
         .where(

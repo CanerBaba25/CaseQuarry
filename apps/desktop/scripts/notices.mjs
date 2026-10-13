@@ -11,30 +11,53 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const metadata = JSON.parse(
-  execFileSync(
-    "cargo",
-    [
-      "metadata",
-      "--locked",
-      "--format-version",
-      "1",
-      "--manifest-path",
-      join(desktop, "src-tauri/Cargo.toml"),
-      "--filter-platform",
-      "x86_64-pc-windows-msvc",
-    ],
-    { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
-  ),
-);
-const nodes = new Map(metadata.resolve.nodes.map((node) => [node.id, node]));
+function metadataFor(target) {
+  return JSON.parse(
+    execFileSync(
+      "cargo",
+      [
+        "metadata",
+        "--locked",
+        "--format-version",
+        "1",
+        "--manifest-path",
+        join(desktop, "src-tauri/Cargo.toml"),
+        "--filter-platform",
+        target,
+      ],
+      { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
+    ),
+  );
+}
+const targets = [
+  "x86_64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+];
+const graphs = targets.map(metadataFor);
 const selected = new Set();
-function visit(id) {
+function visit(id, nodes) {
   if (selected.has(id)) return;
   selected.add(id);
-  for (const dependency of nodes.get(id)?.dependencies || []) visit(dependency);
+  for (const dependency of nodes.get(id)?.dependencies || [])
+    visit(dependency, nodes);
 }
-visit(metadata.resolve.root);
+// Traverse each graph separately: a shared crate has different target dependencies.
+const union = new Set();
+for (const graph of graphs) {
+  selected.clear();
+  visit(
+    graph.resolve.root,
+    new Map(graph.resolve.nodes.map((node) => [node.id, node])),
+  );
+  for (const id of selected) union.add(id);
+}
+const packages = [
+  ...new Map(
+    graphs.flatMap((graph) => graph.packages).map((pkg) => [pkg.id, pkg]),
+  ).values(),
+];
 const missing = [];
 const entries = [];
 function licenses(directory, explicit) {
@@ -53,11 +76,14 @@ function licenses(directory, explicit) {
     .filter((file) => existsSync(file) && statSync(file).isFile())
     .map((file) => ({
       name: file.split(/[\\/]/).pop(),
-      text: readFileSync(file, "utf8").replace(/\r\n/g, "\n").trim(),
+      text: readFileSync(file, "utf8")
+        .replace(/\r\n/g, "\n")
+        .replace(/[ \t]+$/gm, "")
+        .trim(),
     }));
 }
-for (const pkg of metadata.packages.filter(
-  (pkg) => selected.has(pkg.id) && pkg.id !== metadata.resolve.root,
+for (const pkg of packages.filter(
+  (pkg) => union.has(pkg.id) && pkg.id !== graphs[0].resolve.root,
 )) {
   const texts = [
     ...licenses(dirname(pkg.manifest_path), pkg.license_file),
@@ -135,7 +161,7 @@ entries.sort(
 );
 let output = "CaseQuarry Desktop — third-party dependency notices\n\n";
 output +=
-  "Exact locked Windows x64 Cargo dependencies and locally installed npm source/build dependencies.\nBuild tools are listed for source distribution transparency; not every listed dependency is included in the installed executable.\n\n";
+  "Union of locked desktop Cargo dependencies across Windows, macOS and Linux, plus locally installed npm source/build dependencies.\nBuild tools are listed for source distribution transparency; not every listed dependency is included in each installed executable. Linux GTK/WebKit and macOS WKWebView remain system prerequisites.\n\n";
 for (const entry of entries) {
   output +=
     "=".repeat(76) +
@@ -172,9 +198,9 @@ writeFileSync(
   join(desktop, "DEPENDENCY_INVENTORY.json"),
   JSON.stringify(
     {
-      platform: "windows-x64",
+      platform: "windows-x64, macos-universal, linux-x64",
       scope:
-        "Locked Windows Cargo graph and installed npm source/build packages; includes build tools.",
+        "Union of locked desktop Cargo graphs and installed npm source/build packages; includes build tools.",
       notice_file: "THIRD_PARTY_NOTICES.txt",
       notice_sha256: createHash("sha256").update(output).digest("hex"),
       packages: entries.map((entry) => ({

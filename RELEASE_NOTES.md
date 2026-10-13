@@ -1,8 +1,91 @@
 # Release notes
 
+## 0.4.0 — October 12, 2026
+
+Installable web and desktop release with a redesigned daily workspace, personal
+timezones and manual task deadlines.
+
+### Workspace and tasks
+
+- Refreshed light/dark interface with grouped navigation, clearer tables, responsive
+  controls and card/list matter views. README images show the actual website and
+  native desktop connection screen.
+- Keyboard command palette searches all accessible server matters, including optional
+  archived matters, with signed pagination and keyboard selection.
+- My work orders assignments by their nearest deadline across matters. Overdue,
+  next-seven-day and undated filters have counts across the full authorized scope.
+  Complete authorized tasks directly from the dashboard.
+- Create, edit and remove manual task due dates. Dates remain calendar dates and
+  are never calculated court deadlines. Changing a deadline or assignment invalidates
+  an older worklist ordering cursor instead of silently skipping rows.
+- Each user can search IANA timezones, save a preference or use the device timezone.
+  Preferences persist on the firm server across clients. Timestamp display and task
+  day classification use that preference; date-only deadlines retain their entered
+  date. The server uses a pinned timezone database on every operating system.
+
+### Permission and consistency fixes
+
+- Matter and task lists now enforce current active account and valid membership permissions
+  in the same query that reads the returned data.
+- Task views immediately clear cached details after access-denied responses.
+- Concurrent account deactivation and team changes cannot remove a matter's last
+  active lead. Legal-hold changes share the matter lock used by archive operations.
+- Transactional task-order revisions detect deadline and assignment changes even
+  when the editing transaction commits after a worklist snapshot was opened.
+- Restored spacing in account/session/provider controls and fixed refresh events
+  without payloads. Existing provider consent and source-integrity controls remain.
+- Successful review saves update the displayed revision immediately, preventing a
+  following tag save from sending the previous revision before a background refresh.
+  Background reads preserve unsaved tag drafts, and switching evidence isolates
+  pending save messages from the newly opened item.
+
+### Desktop and distribution
+
+- Windows x64 NSIS installer, universal macOS DMG for Intel and Apple Silicon, and
+  Ubuntu 24.04 x64 DEB. All clients connect to the same PostgreSQL-backed firm server.
+- Windows URL preferences use DPAPI; macOS/Linux use private account files with
+  permission and symlink checks. No provider key, password or evidence is stored
+  in these connection preferences.
+- Release assets include three desktop installers, built Windows/Linux web-server
+  ZIPs, a source ZIP and a SHA-256 sidecar for each package. The release is regular,
+  not marked as a prerelease.
+- Build checks install and launch the Linux DEB, mount and launch the same universal
+  DMG on Intel and Apple Silicon runners, and launch the Windows system WebView.
+  Native diagnostics use isolated preferences and check the connection screen;
+  browser acceptance separately checks authenticated firm workflows.
+- Dependency notices cover all four desktop architecture targets and preserve
+  full applicable license texts. Server packages include the required notices and
+  corresponding native-library source material.
+
+### Validation and limits
+
+The complete local Python suite passed 378 tests, with ten skipped in that run.
+An additional 89 focused checks ran against actual PostgreSQL, including delayed
+commits, last-lead races, legal holds, timezone boundaries and populated upgrades.
+The native Windows client passed eight Rust tests, formatting and lint checks,
+an actual WebView runtime diagnostic and three isolated install/launch/uninstall
+checks. Browser validation covers the new workspace, deadlines, timezone persistence,
+server-wide navigation, mobile layout and existing evidence workflows.
+
+The Windows installer is unsigned and the Mac app is not notarized. Follow the
+platform guide for installation approval. Ubuntu 24.04 x64 is the packaged Linux
+target; other distributions and physical device combinations are not certified.
+Clients require a reachable firm server; offline editing is unavailable. Paid vendor
+accounts, model quality, Docker runtime operation, production recovery and
+100k/1m/2m capacity remain unvalidated. The earlier SQLite benchmark is unchanged.
+
+### Upgrade
+
+Stop the application and preserve a verified database/evidence backup. Upgrade the
+dependencies and run `uv run python scripts/tasks.py migrate` before restarting.
+The forward migrations are `0005_task_due_dates` and `0006_user_time_zones`;
+existing users start with UTC and existing tasks have no deadline. Startup refuses
+a stale schema. Preserve provider encryption keys and private server configuration.
+Follow the guarded transfer guide for older SQLite installations.
+
 ## 0.3.0 — October 12, 2026
 
-Web and Windows desktop development preview with a shared PostgreSQL firm server.
+Installable web and Windows desktop release with a shared PostgreSQL firm server.
 
 ### Desktop and collaboration
 
@@ -70,7 +153,7 @@ PostgreSQL workflows covering migrations, authentication, shared-client matters,
 worker imports, exact original bytes and revision updates. Distribution checks wait
 for API readiness and use the installed private runtime on each operating system.
 
-This remains a development preview. The Windows installer is unsigned. Clients
+The Windows installer is unsigned. Clients
 require a reachable firm server; offline editing is unavailable. Production recovery,
 Docker runtime operation, recipient loadfile import, real-model quality and
 100k/1m/2m capacity remain unvalidated. The earlier SQLite 10k benchmark is unchanged.

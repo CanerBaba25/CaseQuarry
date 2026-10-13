@@ -1,6 +1,17 @@
-from typing import Literal
+import re
+from datetime import date
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
+
+
+def _date_only(value):
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+        raise ValueError("Use a date in YYYY-MM-DD format, without a time or timezone.")
+    return date.fromisoformat(value)
+
+
+DateOnly = Annotated[date, BeforeValidator(_date_only)]
 
 
 class Input(BaseModel):
@@ -179,6 +190,7 @@ class IssueLinkInput(Input):
 class TaskInput(Input):
     title: str = Field(min_length=1, max_length=300)
     assigned_to: str | None = None
+    due_date: DateOnly | None = None
 
 
 class BulkReviewInput(Input):

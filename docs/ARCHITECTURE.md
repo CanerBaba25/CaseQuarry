@@ -5,7 +5,7 @@ The application uses Next.js/React/TypeScript, FastAPI/Pydantic, SQLAlchemy with
 ```mermaid
 flowchart LR
   Browser --> Web[Next.js same-origin proxy]
-  Desktop[Rust/Tauri Windows client] --> Web
+  Desktop[Rust/Tauri Windows, Mac and Ubuntu clients] --> Web
   Web --> API[FastAPI authorization]
   CLI[CLI and OS keyring] --> API
   API --> DB[Shared PostgreSQL]
@@ -23,7 +23,7 @@ Model processing and remote transmission are disabled by default. Optional local
 
 Committed audit mutations increment tenant/catalog or matter revision signals in the same transaction. Browser and desktop views poll authorized revision metadata every five seconds while visible, re-fetch changed scopes and clear revoked matter views. Read audits do not cause refresh loops. Import heartbeat metadata provides progress updates. Shared PostgreSQL remains authoritative; clients have no offline evidence replica or queued offline writes. The personal worklist separately refreshes current-user active assignments.
 
-`apps/api/casequarry` contains domain/API/worker code; `apps/cli/casequarry_cli` is the public API client; `apps/web` is the shared interface; `apps/desktop` is the isolated Windows client with its own Cargo workspace; `migrations` tracks schema. Public `scripts` contains setup, backup, notices, package construction and required package verification utilities. Local test/fixture/benchmark/browser harnesses are excluded from source distributions. Application-level preservation and hash-chain auditing are not tamper-proof against a machine administrator.
+`apps/api/casequarry` contains domain/API/worker code; `apps/cli/casequarry_cli` is the public API client; `apps/web` is the shared interface; `apps/desktop` is the isolated Windows/macOS/Ubuntu client with its own Cargo workspace; `migrations` tracks schema. Public `scripts` contains setup, backup, notices, package construction and required package verification utilities. Local test/fixture/benchmark/browser harnesses are excluded from source distributions. Application-level preservation and hash-chain auditing are not tamper-proof against a machine administrator.
 
 PDF text/OCR and MSG extraction use isolated fixed-command subprocesses with bounded output and timeouts. Import claims use a fenced owner nonce, a renewable lease and cooperative record quotas; a dedicated import slot allows exports and production work to progress during slow extraction. Parsing occurs outside SQL writer transactions and authorization is checked before publication. See [adapter limits and acquisition behavior](ADAPTERS.md).
 

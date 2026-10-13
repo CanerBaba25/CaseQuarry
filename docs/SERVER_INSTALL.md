@@ -2,7 +2,7 @@
 
 Each firm uses one API, PostgreSQL database, worker and immutable evidence store. Browser and desktop clients connect to that same HTTPS firm address. A desktop installation is a client; copying database files between computers is not the synchronization mechanism. Transactional revision polling refreshes authorized client views after another client changes the shared server. Offline editing and multi-master replication are not implemented.
 
-The GitHub Release provides a Windows desktop installer, a source ZIP, and separate `casequarry-server-VERSION-windows-x64.zip` and `casequarry-server-VERSION-linux-x64.zip` packages. Use the server ZIP matching the server operating system. Each contains the API/worker wheel, built Next standalone web application, installer/controller, dependency lock, retained runtime license notices and a file-hash manifest. PostgreSQL, Python/uv and Node are prerequisites rather than bundled runtimes.
+The regular release provides [Windows, macOS Universal and Ubuntu desktop installers](DESKTOP.md), a source ZIP, and separate `casequarry-server-VERSION-windows-x64.zip` and `casequarry-server-VERSION-linux-x64.zip` packages. Use the server ZIP matching the server operating system and verify its matching SHA-256 sidecar before installation. Each contains the API/worker wheel, built Next standalone web application, installer/controller, dependency lock, retained runtime license notices and a file-hash manifest. PostgreSQL, Python/uv and Node are prerequisites rather than bundled runtimes. Mac clients connect to these same shared servers; a Linux or Windows server ZIP cannot be installed as a Mac server.
 
 ## Prerequisites
 
@@ -54,6 +54,8 @@ Stop API/worker application services before a coordinated backup. Use PostgreSQL
 
 For an upgrade, stop services, take that coordinated backup, install the new versioned package using the same data directory, and apply its forward migrations. The static schema checker refuses unknown revisions and drift; it never performs a destructive downgrade. If an interrupted supervisor leaves `run.json`, inspect the recorded process and private logs before removing only that stale marker.
 
+The 0.3 → 0.4 upgrade applies `0005_task_due_dates` and `0006_user_time_zones` after `0004_firm_sync_providers`. Existing tasks keep an unset due date, and existing accounts start with the UTC time zone. These are calendar/display preferences, not computed legal deadlines. The installer applies both migrations before services start. In a source installation, run `uv run python -m casequarry.database migrate` with the same private `.env` after the verified backup. Compare retained row IDs, original hashes and audit chains and check the schema status before restarting API/worker.
+
 ## Compose deployment
 
 The source distribution includes PostgreSQL/API/worker/web Compose configuration. `tasks.py init` generates private secrets, and the migration service runs before the API. PostgreSQL is unpublished on an internal network; only API/worker gain outbound connectivity for explicitly authorized vendor requests. The optional HTTPS overlay is:
@@ -66,7 +68,7 @@ Set `CASEQUARRY_FIRM_HOST` first. For a private CA, use the included LAN Caddyfi
 
 ## Artifact checks
 
-Builders run `uv run python scripts/build_server.py --platform windows-x64|linux-x64 --output-dir .release-artifacts/server` on the matching operating system. Validation uses an isolated PostgreSQL schema:
+Builders first run `uv run python scripts/release_version.py` to check that Python, JavaScript, Rust, installer and lockfile versions agree. The resulting filenames are derived from that validated version; the release job does not hardcode a previous archive name. Run `uv run python scripts/build_server.py --platform windows-x64|linux-x64 --output-dir .release-artifacts/server` on the matching operating system. Validation uses an isolated PostgreSQL schema:
 
 ```sh
 uv run python scripts/verify_server.py --archive PATH_TO_SERVER.zip --database-env CASEQUARRY_TEST_POSTGRES_URL

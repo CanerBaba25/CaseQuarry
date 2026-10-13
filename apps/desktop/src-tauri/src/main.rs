@@ -1,9 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod connection;
+mod diagnostics;
 mod secure_store;
 
-use connection::{Connection, probe_server};
+use connection::{Connection, probe_server, trusted_settings_context};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
@@ -11,10 +12,7 @@ fn trusted_settings(window: &WebviewWindow) -> Result<(), String> {
     let url = window
         .url()
         .map_err(|_| "The local settings window is unavailable.")?;
-    if window.label() == "connection"
-        && ((url.scheme() == "https" && url.host_str() == Some("tauri.localhost"))
-            || (url.scheme() == "tauri" && url.host_str() == Some("localhost")))
-    {
+    if trusted_settings_context(window.label(), &url) {
         Ok(())
     } else {
         Err("This action is available only in local connection settings.".into())
@@ -34,11 +32,7 @@ fn get_connection(
     app: tauri::AppHandle,
 ) -> Result<Option<Connection>, String> {
     trusted_settings(&window)?;
-    secure_store::load(
-        &app.path()
-            .app_config_dir()
-            .map_err(|_| "Cannot locate local settings.")?,
-    )
+    secure_store::load(&diagnostics::settings_directory(&app)?)
 }
 
 #[derive(serde::Serialize)]
@@ -56,12 +50,16 @@ async fn connect_server(
     remember: bool,
 ) -> Result<Connected, String> {
     trusted_settings(&window)?;
+    if app
+        .state::<diagnostics::RuntimeDiagnostic>()
+        .directory
+        .is_some()
+    {
+        return Err("Connecting to a firm is disabled during the runtime diagnostic.".into());
+    }
     let connection = Connection::validate(&server_url, allow_loopback_http)?;
     let setup_required = probe_server(&connection).await?;
-    let settings_dir = app
-        .path()
-        .app_config_dir()
-        .map_err(|_| "Cannot locate local settings.")?;
+    let settings_dir = diagnostics::settings_directory(&app)?;
     if remember {
         secure_store::save(&settings_dir, &connection)?;
     } else {
@@ -74,22 +72,25 @@ async fn connect_server(
     }
     let remote_url = connection.url()?;
     let navigation_origin = remote_url.origin();
-    let workspace =
-        WebviewWindowBuilder::new(&app, "firm-workspace", WebviewUrl::External(remote_url))
-            .title("CaseQuarry — Firm workspace")
-            .inner_size(1440.0, 940.0)
-            .min_inner_size(700.0, 580.0)
-            .incognito(true)
-            .devtools(false)
-            .disable_drag_drop_handler()
-            .on_navigation(move |url| {
-                url.origin() == navigation_origin && matches!(url.scheme(), "https" | "http")
-            })
-            .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
-            .build()
-            .map_err(
-                |_| "The workspace window could not be opened. Check the WebView2 installation.",
-            )?;
+    let workspace = WebviewWindowBuilder::new(
+        &app,
+        "firm-workspace",
+        WebviewUrl::External(remote_url),
+    )
+    .title("CaseQuarry — Firm workspace")
+    .inner_size(1440.0, 940.0)
+    .min_inner_size(700.0, 580.0)
+    .incognito(true)
+    .devtools(false)
+    .disable_drag_drop_handler()
+    .on_navigation(move |url| {
+        url.origin() == navigation_origin && matches!(url.scheme(), "https" | "http")
+    })
+    .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
+    .build()
+    .map_err(
+        |_| "The workspace window could not be opened. Check your system webview installation.",
+    )?;
     let on_close_app = app.clone();
     workspace.on_window_event(move |event| {
         if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -108,27 +109,42 @@ async fn connect_server(
 #[tauri::command]
 fn forget_connection(window: WebviewWindow, app: tauri::AppHandle) -> Result<(), String> {
     trusted_settings(&window)?;
-    secure_store::forget(
-        &app.path()
-            .app_config_dir()
-            .map_err(|_| "Cannot locate local settings.")?,
-    )
+    secure_store::forget(&diagnostics::settings_directory(&app)?)
 }
 
 fn main() {
+    let diagnostic = diagnostics::RuntimeDiagnostic::from_arguments()
+        .expect("CaseQuarry runtime diagnostic configuration is invalid");
+    let diagnostic_enabled = diagnostic.directory.is_some();
     tauri::Builder::default()
+        .manage(diagnostic)
+        .on_page_load(|webview, payload| {
+            if payload.event() == tauri::webview::PageLoadEvent::Finished {
+                webview
+                    .app_handle()
+                    .state::<diagnostics::RuntimeDiagnostic>()
+                    .finish(webview.app_handle(), webview.label(), payload.url());
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             get_connection,
             connect_server,
             forget_connection
         ])
-        .setup(|app| {
+        .setup(move |app| {
+            if diagnostic_enabled {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(30));
+                    handle.exit(124);
+                });
+            }
             let settings = MenuItem::with_id(
                 app,
                 "settings",
                 "Firm connection…",
                 true,
-                Some("Ctrl+Shift+C"),
+                Some("CmdOrCtrl+Shift+C"),
             )?;
             let leave = MenuItem::with_id(app, "leave", "Close workspace", true, None::<&str>)?;
             let quit = PredefinedMenuItem::quit(app, Some("Exit CaseQuarry"))?;

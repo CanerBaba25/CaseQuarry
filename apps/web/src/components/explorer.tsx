@@ -2,8 +2,16 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { api, bytes, date, label, number, post } from "@/lib/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  api,
+  bytes,
+  date,
+  getDisplayTimeZone,
+  label,
+  number,
+  post,
+} from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import { bucketRange, filtersFromParams } from "@/lib/search-scope";
@@ -834,7 +842,7 @@ export default function Explorer({
                       />
                     </th>
                     <th>Evidence</th>
-                    <th>Date · UTC</th>
+                    <th>Date · {getDisplayTimeZone()}</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -974,6 +982,7 @@ export default function Explorer({
         </section>
         {selectedId ? (
           <EvidenceInspector
+            key={`${matter.id}:${selectedId}`}
             caseId={matter.id}
             id={selectedId}
             canReview={canReview}
@@ -1064,6 +1073,15 @@ export function EvidenceInspector({
     version = path.endsWith(`/evidence/${id}`) ? params.get("version") : null;
   const canReview = allowReview && !version,
     canManage = allowManage && !version;
+  const reviewScope = `${caseId}:${id}:${version || "current"}`;
+  const activeReviewScope = useRef<string | null>(reviewScope);
+  activeReviewScope.current = reviewScope;
+  useEffect(() => {
+    activeReviewScope.current = reviewScope;
+    return () => {
+      activeReviewScope.current = null;
+    };
+  }, [reviewScope]);
   const detail = useResource<EvidenceDetail>(`/cases/${caseId}/evidence/${id}`);
   const historical = useResource<{
     text: string;
@@ -1104,6 +1122,7 @@ export function EvidenceInspector({
   const [tags, setTags] = useState(""),
     [note, setNote] = useState(""),
     [noteSpan, setNoteSpan] = useState<string | null>(null);
+  const tagDraft = useRef({ dirty: false, revision: 0 });
   const data = useMemo(
     () =>
       !detail.data
@@ -1128,9 +1147,15 @@ export function EvidenceInspector({
     setRaw(false);
     setNote("");
     setNoteSpan(null);
-  }, [id, version]);
+    setBusy(false);
+    tagDraft.current = {
+      dirty: false,
+      revision: tagDraft.current.revision + 1,
+    };
+    setTags("");
+  }, [caseId, id, version]);
   useEffect(() => {
-    if (data) setTags(data.tags.join(", "));
+    if (data && !tagDraft.current.dirty) setTags(data.tags.join(", "));
   }, [data]);
   useEffect(() => {
     if (!data || !window.location.hash.startsWith("#span-")) return;
@@ -1140,22 +1165,44 @@ export function EvidenceInspector({
   }, [data]);
   async function review(changes: Record<string, unknown>) {
     if (!data) return;
+    const submittedDraftRevision = tagDraft.current.revision;
+    const submittedScope = reviewScope;
     setBusy(true);
     setError(null);
     setMessage("");
     try {
-      await post(`/cases/${caseId}/evidence/${id}/reviews`, {
-        ...changes,
-        expected_version: data.review_version,
-      });
+      const reviewed = await post<Evidence>(
+        `/cases/${caseId}/evidence/${id}/reviews`,
+        {
+          ...changes,
+          expected_version: data.review_version,
+        },
+      );
+      if (activeReviewScope.current !== submittedScope) return;
+      detail.setData((current) =>
+        current &&
+        current.id === reviewed.id &&
+        current.review_version <= reviewed.review_version
+          ? { ...current, ...reviewed }
+          : current,
+      );
+      if (
+        "tags" in changes &&
+        tagDraft.current.revision === submittedDraftRevision
+      ) {
+        tagDraft.current.dirty = false;
+        setTags(reviewed.tags.join(", "));
+      }
       detail.refresh();
       changed();
       setMessage("Review saved in the audit record.");
     } catch (error) {
-      setError(error);
-      detail.refresh();
+      if (activeReviewScope.current === submittedScope) {
+        setError(error);
+        detail.refresh();
+      }
     } finally {
-      setBusy(false);
+      if (activeReviewScope.current === submittedScope) setBusy(false);
     }
   }
   function people(value: unknown): string {
@@ -1795,7 +1842,13 @@ export function EvidenceInspector({
                       </span>
                       <input
                         value={tags}
-                        onChange={(event) => setTags(event.target.value)}
+                        onChange={(event) => {
+                          tagDraft.current = {
+                            dirty: true,
+                            revision: tagDraft.current.revision + 1,
+                          };
+                          setTags(event.target.value);
+                        }}
                         placeholder="Payment approval, Key witness"
                         disabled={!canReview}
                       />

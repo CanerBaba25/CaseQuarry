@@ -18,6 +18,7 @@ const paths: Record<string, React.ReactNode> = {
       <rect x="14" y="14" width="7" height="7" rx="1" />
     </>
   ),
+  list: <path d="M8 5h13M8 12h13M8 19h13M3 5h1M3 12h1M3 19h1" />,
   search: (
     <>
       <circle cx="10.5" cy="10.5" r="6.5" />
@@ -301,7 +302,7 @@ export function Modal({
         ref.current?.querySelectorAll<HTMLElement>(
           'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]',
         ) || [],
-      );
+      ).filter((element) => element.getClientRects().length > 0);
     focusables()[0]?.focus();
     function key(event: KeyboardEvent) {
       const dialogs = document.querySelectorAll("[data-cq-modal]");

@@ -1,17 +1,22 @@
 """Audited matter preservation, issue mapping and task workflows."""
 
+from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import Field
-from sqlalchemy import select, update
+from sqlalchemy import and_, select, update
 from sqlalchemy.orm import Session, load_only
 
 from . import audit
-from .models import Evidence, Hold, Issue, IssueLink, Member, Task, User
+from .case_domain import lock_case_action
+from .models import Case, Evidence, Hold, Issue, IssueLink, Member, Task, User, now
 from .production_models import IssueReview
-from .schemas import HoldInput, Input, IssueInput, IssueLinkInput, Reason, TaskInput
-from .security import Actor, authorize_case, current_actor, fail, get_db, utc
+from .schemas import DateOnly, HoldInput, Input, IssueInput, IssueLinkInput, Reason, TaskInput
+from .search import cursor_decode, cursor_encode
+from .security import PERMISSIONS, Actor, authorize_case, current_actor, fail, get_db, utc
+from .task_order import bump_visible
+from .time_zones import local_today
 
 router = APIRouter(prefix="/api/v1")
 
@@ -20,6 +25,7 @@ class TaskPatch(Input):
     title: str | None = Field(default=None, min_length=1, max_length=300)
     state: Literal["open", "in_progress", "done", "cancelled"] | None = None
     assigned_to: str | None = None
+    due_date: DateOnly | None = None
 
 
 class IssueReviewInput(Reason):
@@ -69,7 +75,7 @@ def list_holds(case_id: str, limit: int = 50, cursor: str | None = None, actor: 
 
 @router.post("/cases/{case_id}/holds", status_code=201)
 def create_hold(case_id: str, body: HoldInput, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
-    authorize_case(db, actor.user, case_id, "hold")
+    lock_case_action(db, actor.user, case_id, "hold")
     row = Hold(tenant_id=actor.user.tenant_id, case_id=case_id, name=body.name.strip(), reason=_reason(body.reason), state="active", created_by=actor.user.id)
     if not row.name:
         fail(422, "HOLD_NAME_REQUIRED", "Provide a name for the preservation hold.")
@@ -81,7 +87,7 @@ def create_hold(case_id: str, body: HoldInput, request: Request, actor: Actor = 
 
 @router.post("/cases/{case_id}/holds/{hold_id}/activate")
 def activate_hold(case_id: str, hold_id: str, body: Reason, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
-    authorize_case(db, actor.user, case_id, "hold")
+    lock_case_action(db, actor.user, case_id, "hold")
     row = _scoped(db, Hold, actor.user, case_id, hold_id)
     reason = _reason(body.reason)
     if row.state == "active":
@@ -96,7 +102,7 @@ def activate_hold(case_id: str, hold_id: str, body: Reason, request: Request, ac
 
 @router.post("/cases/{case_id}/holds/{hold_id}/release")
 def release_hold(case_id: str, hold_id: str, body: Reason, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
-    authorize_case(db, actor.user, case_id, "hold")
+    lock_case_action(db, actor.user, case_id, "hold")
     row = _scoped(db, Hold, actor.user, case_id, hold_id)
     reason = _reason(body.reason)
     if row.state != "active":
@@ -173,42 +179,68 @@ def add_issue_evidence(case_id: str, issue_id: str, body: IssueLinkInput, reques
 
 
 def task_json(row):
-    return {"id": row.id, "title": row.title, "state": row.state, "assigned_to": row.assigned_to, "created_by": row.created_by, "created_at": utc(row.created_at).isoformat()}
+    return {"id": row.id, "title": row.title, "state": row.state, "assigned_to": row.assigned_to, "created_by": row.created_by, "created_at": utc(row.created_at).isoformat(), "due_date": row.due_date.isoformat() if row.due_date else None}
 
 
 def _assignee(db, user, case_id, user_id):
     if user_id is None:
         return
-    member = db.scalar(select(Member).join(User, Member.user_id == User.id).where(Member.tenant_id == user.tenant_id, Member.case_id == case_id, Member.user_id == user_id, User.tenant_id == user.tenant_id, User.active.is_(True)))
+    member = db.scalar(select(Member).join(User, Member.user_id == User.id).where(Member.tenant_id == user.tenant_id, Member.case_id == case_id, Member.user_id == user_id, Member.role.in_(PERMISSIONS["view"]), User.tenant_id == user.tenant_id, User.active.is_(True)).with_for_update(of=User, key_share=True))
     if member is None:
         fail(404, "NOT_FOUND", "The assigned matter member is unavailable.")
 
 
 @router.get("/cases/{case_id}/tasks")
-def list_tasks(case_id: str, limit: int = 50, cursor: str | None = None, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
+def list_tasks(case_id: str, request: Request, limit: int = Query(50, ge=1, le=200), cursor: str | None = Query(None, max_length=4096), actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
     authorize_case(db, actor.user, case_id)
-    rows, cursor = _page(db, Task, actor.user, case_id, limit, cursor)
-    return {"items": [task_json(row) for row in rows], "next_cursor": cursor}
+    snapshot, after = now(), None
+    today = local_today(actor.user.time_zone, snapshot)
+    scope = {"kind": "matter-tasks-v2", "tenant_id": actor.user.tenant_id, "user_id": actor.user.id, "case_id": case_id, "time_zone": actor.user.time_zone, "today": today.isoformat()}
+    if cursor:
+        payload = cursor_decode(cursor, request.app.state.cursor_secret)
+        try:
+            if not isinstance(payload, dict) or payload.get("scope") != scope:
+                raise ValueError()
+            snapshot = utc(datetime.fromisoformat(payload["snapshot"]))
+            after = payload["after"]
+            if not isinstance(after, str) or not 1 <= len(after) <= 36:
+                raise ValueError()
+        except (KeyError, ValueError, TypeError):
+            fail(422, "TASK_CURSOR_INVALID", "Start the task list again; this cursor belongs to another scope.")
+    # Recheck current membership/account authority in the data statement itself:
+    # either can be revoked after the earlier matter authorization returns.
+    query = select(Task).join(Case, and_(Case.id == Task.case_id, Case.tenant_id == Task.tenant_id)).join(Member, and_(Member.case_id == Case.id, Member.tenant_id == Case.tenant_id, Member.user_id == actor.user.id)).join(User, and_(User.id == Member.user_id, User.tenant_id == Member.tenant_id)).where(
+        Task.tenant_id == actor.user.tenant_id, Task.case_id == case_id, Task.created_at <= snapshot,
+        Case.tenant_id == actor.user.tenant_id, Member.tenant_id == actor.user.tenant_id, User.tenant_id == actor.user.tenant_id,
+        User.active.is_(True), Member.role.in_(PERMISSIONS["view"]),
+    )
+    if after:
+        query = query.where(Task.id > after)
+    rows = list(db.scalars(query.order_by(Task.id).limit(limit + 1)))
+    next_cursor = cursor_encode({"scope": scope, "snapshot": snapshot.isoformat(), "after": rows[limit - 1].id}, request.app.state.cursor_secret) if len(rows) > limit else None
+    return {"items": [task_json(row) for row in rows[:limit]], "next_cursor": next_cursor, "server_today": today.isoformat(), "time_zone": actor.user.time_zone}
 
 
 @router.post("/cases/{case_id}/tasks", status_code=201)
 def create_task(case_id: str, body: TaskInput, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
-    authorize_case(db, actor.user, case_id, "review")
+    lock_case_action(db, actor.user, case_id, "review", (body.assigned_to,))
     _assignee(db, actor.user, case_id, body.assigned_to)
-    row = Task(tenant_id=actor.user.tenant_id, case_id=case_id, title=body.title.strip(), assigned_to=body.assigned_to, created_by=actor.user.id)
+    row = Task(tenant_id=actor.user.tenant_id, case_id=case_id, title=body.title.strip(), assigned_to=body.assigned_to, created_by=actor.user.id, due_date=body.due_date)
     if not row.title:
         fail(422, "TASK_TITLE_REQUIRED", "Provide a task title.")
     db.add(row)
     db.flush()
-    _record(db, actor, request, case_id, "task.created", "task", row, {"assigned_to": row.assigned_to})
+    _record(db, actor, request, case_id, "task.created", "task", row, {"assigned_to": row.assigned_to, "due_date": row.due_date.isoformat() if row.due_date else None})
     return task_json(row)
 
 
 @router.patch("/cases/{case_id}/tasks/{task_id}")
 def update_task(case_id: str, task_id: str, body: TaskPatch, request: Request, actor: Actor = Depends(current_actor), db: Session = Depends(get_db)):
-    authorize_case(db, actor.user, case_id, "review")
+    lock_case_action(db, actor.user, case_id, "review", (body.assigned_to,))
     row = _scoped(db, Task, actor.user, case_id, task_id)
     changes = body.model_dump(exclude_unset=True)
+    before = {key: getattr(row, key) for key in changes}
+    old_assignee, old_state = row.assigned_to, row.state
     if "assigned_to" in changes:
         _assignee(db, actor.user, case_id, changes["assigned_to"])
     for key, value in changes.items():
@@ -219,7 +251,15 @@ def update_task(case_id: str, task_id: str, body: TaskPatch, request: Request, a
             if not value:
                 fail(422, "TASK_TITLE_REQUIRED", "Provide a task title.")
         setattr(row, key, value)
-    _record(db, actor, request, case_id, "task.updated", "task", row, {"fields": sorted(changes)})
+    def audit_value(value):
+        return value.isoformat() if hasattr(value, "isoformat") else value
+
+    after = {key: audit_value(getattr(row, key)) for key in changes}
+    due_changed = "due_date" in changes and before["due_date"] != row.due_date
+    entered_open_work = old_state not in {"open", "in_progress"} and row.state in {"open", "in_progress"}
+    if (due_changed or old_assignee != row.assigned_to or entered_open_work) and (old_state in {"open", "in_progress"} or row.state in {"open", "in_progress"}):
+        bump_visible(db, actor.user.tenant_id, case_id, {old_assignee, row.assigned_to})
+    _record(db, actor, request, case_id, "task.updated", "task", row, {"fields": sorted(changes), "before": {key: audit_value(value) for key, value in before.items()}, "after": after, "due_date_changed": due_changed})
     return task_json(row)
 
 

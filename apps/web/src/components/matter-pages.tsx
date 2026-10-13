@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, bytes, date, label, number, post } from "@/lib/api";
+import {
+  api,
+  bytes,
+  date,
+  getDisplayTimeZone,
+  label,
+  number,
+  post,
+} from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import type {
   AuditEvent,
@@ -995,8 +1003,8 @@ export function TimelinePage({ matter }: { matter: Matter }) {
       <div className="notice subtle">
         <Icon name="clock" size={18} />
         <span>
-          Times shown in UTC. Items without a usable date are excluded from this
-          chronology and remain in the evidence explorer.
+          Times shown in {getDisplayTimeZone()}. Items without a usable date are
+          excluded from this chronology and remain in the evidence explorer.
         </span>
       </div>
       {data.data && data.data.missing_date_count > 0 && (
@@ -1130,7 +1138,7 @@ export function AuditPage({ matter }: { matter: Matter }) {
           <table>
             <thead>
               <tr>
-                <th>Date · UTC</th>
+                <th>Date · {getDisplayTimeZone()}</th>
                 <th>Action</th>
                 <th>Actor</th>
                 <th>Target</th>

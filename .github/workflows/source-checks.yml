@@ -1,8 +1,6 @@
 name: Source checks
 
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
   workflow_call:
@@ -77,8 +75,27 @@ jobs:
       - run: cargo build --locked --release
 
   desktop:
-    runs-on: windows-2025
-    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            runner: windows-2025
+            build: build:windows
+            target: x86_64-pc-windows-msvc
+            distribution: nsis/*-setup.exe
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            build: build:linux
+            target: x86_64-unknown-linux-gnu
+            distribution: deb/*.deb
+          - platform: macos-universal
+            runner: macos-15-intel
+            build: build:macos
+            target: universal-apple-darwin
+            distribution: dmg/*.dmg
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -88,15 +105,55 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.24"
+          python-version: "3.12"
       - run: npm --prefix apps/desktop ci
+      - name: Install Ubuntu system WebView and packaging dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev xvfb xauth
+      - name: Install both Mac architectures
+        if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - run: npm --prefix apps/desktop run build:ui
       - run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
       - run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --all-targets -- -D warnings
       - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
-      - run: npm --prefix apps/desktop run build
+      - run: npm --prefix apps/desktop run ${{ matrix.build }}
+      - name: Verify Windows system WebView runtime
+        if: runner.os == 'Windows'
+        run: uv run --no-project python scripts/verify_desktop.py --platform windows-x64
+      - name: Install and verify Ubuntu DEB and WebView runtime
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum uv run --no-project python scripts/verify_desktop.py --platform linux-x64 --install
+      - name: Verify Universal DMG on Intel
+        if: runner.os == 'macOS'
+        run: uv run --no-project python scripts/verify_desktop.py --platform macos-universal
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: windows-desktop
-          path: apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe
+          name: desktop-${{ matrix.platform }}
+          path: apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.distribution }}
           if-no-files-found: error
           retention-days: 7
+
+  desktop-macos-arm64:
+    needs: desktop
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: desktop-macos-universal
+          path: .release-artifacts/desktop
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.24"
+          python-version: "3.12"
+      - name: Verify the same Universal DMG on Apple Silicon
+        run: uv run --no-project python scripts/verify_desktop.py --platform macos-universal --bundle .release-artifacts/desktop

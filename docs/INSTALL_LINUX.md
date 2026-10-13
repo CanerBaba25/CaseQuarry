@@ -1,6 +1,6 @@
 # Install on Linux
 
-The release's `casequarry-server-VERSION-linux-x64.zip` contains the API/worker wheel, Next standalone web and installer. Use the matching operating-system build; Windows native dependencies cannot be relabeled for Linux. See [shared server installation](SERVER_INSTALL.md) for PostgreSQL, HTTPS, storage, legacy migration and upgrades. Other client computers use the same firm browser URL; the current desktop installer targets Windows.
+The release's `casequarry-server-VERSION-linux-x64.zip` contains the API/worker wheel, Next standalone web and installer. Use the matching operating-system build; Windows native dependencies cannot be relabeled for Linux. See [shared server installation](SERVER_INSTALL.md) for PostgreSQL, HTTPS, storage, legacy migration and upgrades. Other client computers use the same firm browser URL. Ubuntu 24.04 x64 also has a [native DEB desktop client](DESKTOP.md), installed using `sudo apt install ./CaseQuarry_VERSION_amd64.deb`; it connects to an existing shared server.
 
 For source development, install [uv](https://docs.astral.sh/uv/getting-started/installation/), Node24 and PostgreSQL16 or newer. Debian/Ubuntu tools may be under `/usr/lib/postgresql/16/bin`:
 

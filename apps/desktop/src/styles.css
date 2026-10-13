@@ -1,11 +1,13 @@
 :root {
   font-family:
-    Inter,
-    Segoe UI,
-    Arial,
+    "Segoe UI Variable Text",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
     sans-serif;
-  color: #17303d;
-  background: #f6f8f9;
+  color: #192d41;
+  background: #f6f5f2;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -45,7 +47,7 @@ p {
   min-height: 100vh;
 }
 .identity {
-  background: #142a35;
+  background: linear-gradient(112deg, #172b41, #234956);
   color: #f5f7f8;
   padding: 36px 40px;
   display: flex;
@@ -58,7 +60,7 @@ p {
   position: absolute;
   width: 440px;
   height: 440px;
-  border: 1px solid #ffffff07;
+  border: 1px solid #e5ce9e18;
   border-radius: 50%;
   right: -230px;
   bottom: -200px;
@@ -80,21 +82,23 @@ p {
   padding: 50px 0;
 }
 .eyebrow {
-  color: #acbec6;
+  color: #d2b987;
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 2px;
 }
 .identity h1 {
+  font-family: Georgia, Cambria, serif;
   font-size: clamp(30px, 3.7vw, 45px);
+  font-weight: 400;
   line-height: 1.13;
-  letter-spacing: -1.8px;
+  letter-spacing: -0.7px;
   margin: 20px 0;
 }
 .identity-copy > p:not(.eyebrow) {
   font-size: 13px;
   line-height: 1.9;
-  color: #a9bdc7;
+  color: #b9cbd8;
   max-width: 360px;
 }
 .connection-diagram {
@@ -143,7 +147,7 @@ p {
 .identity-footer {
   font-size: 9px;
   letter-spacing: 1px;
-  color: #8ca4af;
+  color: #a6becb;
 }
 .connection {
   padding: 38px 44px;
@@ -180,7 +184,7 @@ h2 {
   margin: 22px 0 12px;
 }
 .intro {
-  color: #70828d;
+  color: #596d81;
   line-height: 1.8;
   font-size: 12px;
   margin-bottom: 28px;
@@ -197,15 +201,15 @@ input[type="url"] {
   border: 1px solid #dce3e7;
   border-radius: 8px;
   background: #fff;
-  color: #17303d;
+  color: #192d41;
   font-size: 13px;
 }
 input::placeholder {
-  color: #91a1ab;
+  color: #64758a;
 }
 .field-help {
   font-size: 10px;
-  color: #80919b;
+  color: #596d81;
   line-height: 1.6;
   margin: 9px 0 18px;
 }
@@ -229,7 +233,7 @@ input::placeholder {
 }
 .development summary {
   font-size: 10px;
-  color: #7a8e98;
+  color: #596d81;
   cursor: pointer;
 }
 .development[open] {
@@ -254,7 +258,7 @@ input::placeholder {
 }
 .primary {
   border: 0;
-  background: #176b67;
+  background: #13736b;
   color: #fff;
   border-radius: 8px;
   width: 100%;
@@ -267,7 +271,7 @@ input::placeholder {
   margin-top: 18px;
 }
 .primary:hover:not(:disabled) {
-  background: #105650;
+  background: #0d5b55;
 }
 .primary span {
   font-size: 17px;
@@ -276,7 +280,7 @@ input::placeholder {
   background: none;
   border: 0;
   padding: 0;
-  color: #6d808b;
+  color: #596d81;
   font-size: 10px;
   text-decoration: underline;
   margin-top: 15px;
@@ -309,7 +313,7 @@ input::placeholder {
   border-top: 1px solid #e1e7ea;
   padding-top: 22px;
   margin-top: 28px;
-  color: #778b96;
+  color: #596d81;
 }
 .server-note > span {
   font-size: 24px;
@@ -326,7 +330,7 @@ input::placeholder {
   margin-top: 5px;
 }
 .connection-footer {
-  color: #8798a1;
+  color: #596d81;
   font-size: 9px;
   line-height: 1.8;
   margin-top: 22px;

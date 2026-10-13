@@ -8,6 +8,8 @@ import { can } from "@/lib/permissions";
 import type { Matter, Member } from "@/lib/types";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { PageHeading, Pagination } from "./matter-pages";
+import { TaskDeadline } from "./task-deadline";
+import deadlineStyles from "./task-deadline.module.css";
 
 type Hold = {
   id: string;
@@ -37,6 +39,7 @@ type Task = {
   title: string;
   state: string;
   assigned_to: string | null;
+  due_date: string | null;
   created_by: string;
   created_at: string;
 };
@@ -62,12 +65,15 @@ export function GovernancePage({
   const resource = useResource<{
     items: (Hold & Issue & Task)[];
     next_cursor: string | null;
+    server_today?: string;
+    time_zone?: string;
   }>(
     `/cases/${matter.id}/${kind}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
   );
   const [create, setCreate] = useState(false),
     [release, setRelease] = useState<Hold | null>(null),
     [issue, setIssue] = useState<Issue | null>(null),
+    [deadlineTask, setDeadlineTask] = useState<Task | null>(null),
     [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false);
   const canManage = can(matter.role, "hold"),
@@ -81,6 +87,7 @@ export function GovernancePage({
     setCreate(false);
     setRelease(null);
     setIssue(null);
+    setDeadlineTask(null);
     setError(null);
   }, [matter.id, kind]);
   const copy = {
@@ -171,7 +178,8 @@ export function GovernancePage({
       <ErrorBox error={resource.error} retry={resource.refresh} />
       {resource.loading && !resource.data ? (
         <Loading />
-      ) : !resource.data?.items.length ? (
+      ) : resource.error && !resource.data ? null : !resource.data?.items
+          .length ? (
         <div className="panel">
           <Empty icon={copy.icon} title={copy.empty} text={copy.description} />
         </div>
@@ -214,6 +222,7 @@ export function GovernancePage({
                 <th>Status</th>
                 <th>Created</th>
                 {kind === "tasks" && <th>Assigned to</th>}
+                {kind === "tasks" && <th>Due date</th>}
                 <th />
               </tr>
             </thead>
@@ -244,18 +253,58 @@ export function GovernancePage({
                       <select
                         aria-label={`Assigned to for ${item.title}`}
                         value={item.assigned_to || ""}
-                        disabled={busy || !canReview}
+                        disabled={busy || !canReview || members.loading}
                         onChange={(event) =>
                           void taskAssignee(item.id, event.target.value || null)
                         }
                       >
                         <option value="">Unassigned</option>
+                        {item.assigned_to &&
+                          !members.data?.items.some(
+                            (member) => member.user_id === item.assigned_to,
+                          ) && (
+                            <option value={item.assigned_to} disabled>
+                              Unavailable assignee
+                            </option>
+                          )}
                         {members.data?.items.map((member) => (
-                          <option key={member.user_id} value={member.user_id}>
+                          <option
+                            key={member.user_id}
+                            value={member.user_id}
+                            disabled={member.active === false}
+                          >
                             {member.name}
+                            {member.active === false ? " (inactive)" : ""}
                           </option>
                         ))}
                       </select>
+                    </td>
+                  )}
+                  {kind === "tasks" && (
+                    <td>
+                      <div className={deadlineStyles.cell}>
+                        <TaskDeadline
+                          value={item.due_date}
+                          today={
+                            resource.data!.server_today ||
+                            new Date().toISOString().slice(0, 10)
+                          }
+                          complete={
+                            !["open", "in_progress"].includes(item.state)
+                          }
+                        />
+                        {canReview && (
+                          <button
+                            type="button"
+                            className="text-link"
+                            aria-label={`Edit due date for ${item.title}`}
+                            disabled={busy}
+                            onClick={() => setDeadlineTask(item)}
+                          >
+                            {item.due_date ? "Change date" : "Set date"}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   )}
                   <td>
@@ -338,6 +387,17 @@ export function GovernancePage({
           }}
         />
       )}
+      {deadlineTask && (
+        <EditTaskDeadline
+          matter={matter}
+          task={deadlineTask}
+          close={() => setDeadlineTask(null)}
+          done={() => {
+            setDeadlineTask(null);
+            resource.refresh();
+          }}
+        />
+      )}
       {issue && (
         <IssueMatrix
           matter={matter}
@@ -393,6 +453,8 @@ function CreateGovernance({
                     assigned_to:
                       new FormData(event.currentTarget).get("assigned_to") ||
                       null,
+                    due_date:
+                      new FormData(event.currentTarget).get("due_date") || null,
                   }
                 : {}),
             });
@@ -446,14 +508,30 @@ function CreateGovernance({
         ) : (
           <>
             <label>
+              Due date
+              <input
+                name="due_date"
+                type="date"
+                max="9999-12-31"
+                aria-label="Due date"
+                aria-describedby="create-task-date-hint"
+              />
+              <small id="create-task-date-hint" className={deadlineStyles.hint}>
+                Optional manual deadline. Your timezone controls dashboard date
+                labels.
+              </small>
+            </label>
+            <label>
               Assign task to
               <select name="assigned_to" defaultValue="">
                 <option value="">Unassigned</option>
-                {members.data?.items.map((member) => (
-                  <option key={member.user_id} value={member.user_id}>
-                    {member.name}
-                  </option>
-                ))}
+                {members.data?.items
+                  .filter((member) => member.active !== false)
+                  .map((member) => (
+                    <option key={member.user_id} value={member.user_id}>
+                      {member.name}
+                    </option>
+                  ))}
               </select>
             </label>
             <ErrorBox error={members.error} />
@@ -475,6 +553,76 @@ function CreateGovernance({
           <button className="button primary" disabled={busy}>
             {busy ? "Saving…" : "Save record"}
             <Icon name="arrow" size={16} />
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function EditTaskDeadline({
+  matter,
+  task,
+  close,
+  done,
+}: {
+  matter: Matter;
+  task: Task;
+  close: () => void;
+  done: () => void;
+}) {
+  const [value, setValue] = useState(task.due_date || "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  return (
+    <Modal title="Update task deadline" close={close}>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setBusy(true);
+          setError(null);
+          try {
+            await api(`/cases/${matter.id}/tasks/${task.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ due_date: value || null }),
+            });
+            done();
+          } catch (error) {
+            setError(error);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <p className={deadlineStyles.title}>{task.title}</p>
+        <ErrorBox error={error} />
+        <label>
+          Due date
+          <input
+            type="date"
+            aria-label="Due date"
+            aria-describedby="edit-task-date-hint"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            max="9999-12-31"
+            disabled={busy}
+          />
+          <small id="edit-task-date-hint" className={deadlineStyles.hint}>
+            Leave empty to remove the deadline. Your timezone controls dashboard
+            date labels.
+          </small>
+        </label>
+        <div className="form-actions">
+          <button
+            type="button"
+            className="button secondary"
+            disabled={busy}
+            onClick={close}
+          >
+            Cancel
+          </button>
+          <button type="submit" className="button primary" disabled={busy}>
+            {busy ? "Saving…" : "Save deadline"}
           </button>
         </div>
       </form>

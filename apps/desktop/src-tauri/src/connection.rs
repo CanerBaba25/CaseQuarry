@@ -8,6 +8,15 @@ pub struct Connection {
     pub allow_loopback_http: bool,
 }
 
+pub fn trusted_settings_context(label: &str, url: &Url) -> bool {
+    label == "connection"
+        && url.username().is_empty()
+        && url.password().is_none()
+        && url.port().is_none()
+        && ((url.scheme() == "https" && url.host_str() == Some("tauri.localhost"))
+            || (url.scheme() == "tauri" && url.host_str() == Some("localhost")))
+}
+
 impl Connection {
     pub fn validate(input: &str, allow_loopback_http: bool) -> Result<Self, String> {
         let value = input.trim();
@@ -130,6 +139,28 @@ mod tests {
         io::{Read, Write},
         net::TcpListener,
     };
+
+    #[test]
+    fn native_commands_require_the_local_settings_origin_and_label() {
+        for address in ["https://tauri.localhost/", "tauri://localhost/index.html"] {
+            let url = Url::parse(address).unwrap();
+            assert!(trusted_settings_context("connection", &url));
+            assert!(!trusted_settings_context("firm-workspace", &url));
+        }
+        for address in [
+            "https://cases.example.com/",
+            "http://tauri.localhost/",
+            "https://sub.tauri.localhost/",
+            "tauri://other/",
+            "https://tauri.localhost:8443/",
+            "https://user@tauri.localhost/",
+        ] {
+            assert!(!trusted_settings_context(
+                "connection",
+                &Url::parse(address).unwrap()
+            ));
+        }
+    }
 
     #[test]
     fn accepts_https_origins_and_normalizes_default_port() {

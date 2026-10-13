@@ -7,12 +7,12 @@ import hashlib
 import json
 import subprocess
 import sys
-import tomllib
 import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.release_source import allowed
+from scripts.release_version import release_version
 
 
 def checksum(path: Path) -> None:
@@ -28,24 +28,37 @@ def checksum(path: Path) -> None:
 
 
 def verify(directory: Path) -> None:
-    version = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    version = release_version()
     source = list(directory.glob("*-source.zip"))
-    installers = list((directory / "desktop").glob("*-setup.exe"))
+    installers = [path for path in (directory / "desktop").iterdir() if path.suffix in {".exe", ".dmg", ".deb"}]
     servers = list((directory / "server").glob("*.zip"))
-    if len(source) != 1 or len(installers) != 1 or len(servers) != 2:
-        raise RuntimeError("Release requires one source ZIP, one Windows installer and two server platform ZIPs")
+    if len(source) != 1 or len(installers) != 3 or len(servers) != 2:
+        raise RuntimeError("Release requires one source ZIP, three desktop installers and two server platform ZIPs")
+    expected_installers = {
+        f"CaseQuarry_{version}_x64-setup.exe",
+        f"CaseQuarry_{version}_universal.dmg",
+        f"CaseQuarry_{version}_amd64.deb",
+    }
+    if {path.name for path in installers} != expected_installers:
+        raise RuntimeError("Desktop packages must cover Windows x64, macOS Universal and Ubuntu x64")
     platforms = set()
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     for path in source + installers + servers:
         if version not in path.name:
             raise RuntimeError("Asset version differs from project version: " + path.name)
         checksum(path)
-        if path.suffix == ".exe":
+        if path in installers:
             with path.open("rb") as handle:
-                if handle.read(2) != b"MZ":
+                if path.suffix == ".exe" and handle.read(2) != b"MZ":
                     raise RuntimeError("Windows installer lacks executable header")
+                if path.suffix == ".deb" and handle.read(8) != b"!<arch>\n":
+                    raise RuntimeError("Ubuntu installer lacks DEB archive header")
+                if path.suffix == ".dmg":
+                    handle.seek(-512, 2)
+                    if handle.read(4) != b"koly":
+                        raise RuntimeError("Mac installer lacks UDIF disk-image trailer")
             if path.stat().st_size < 500_000:
-                raise RuntimeError("Windows installer is unexpectedly small")
+                raise RuntimeError("Desktop installer is unexpectedly small")
             continue
         with zipfile.ZipFile(path) as package:
             if package.testzip() is not None:
@@ -76,7 +89,11 @@ def verify(directory: Path) -> None:
                 platforms.add(manifest["platform"])
     if platforms != {"windows-x64", "linux-x64"}:
         raise RuntimeError("Server packages must cover Windows and Linux x64")
-    print(f"Verified CaseQuarry {version}: source, Windows desktop, Windows/Linux server packages and checksums")
+    for category, primary in [(directory / "desktop", installers), (directory / "server", servers)]:
+        expected = {path.name for path in primary} | {path.name + ".sha256" for path in primary}
+        if {path.name for path in category.iterdir()} != expected:
+            raise RuntimeError("Unexpected files in the " + category.name + " release asset directory")
+    print(f"Verified CaseQuarry {version}: source, Windows/macOS/Ubuntu desktops, Windows/Linux servers and checksums (12 assets)")
 
 
 if __name__ == "__main__":

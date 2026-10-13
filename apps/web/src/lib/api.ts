@@ -97,23 +97,63 @@ export function post<T>(
 export function number(value: number | undefined | null): string {
   return new Intl.NumberFormat("en-US").format(value || 0);
 }
-export function date(value: string | undefined | null, time = false): string {
+let displayTimeZone = "UTC";
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+const supportedTimeZones = new Map<string, boolean>();
+
+export function timeZoneSupported(timeZone: string): boolean {
+  const cached = supportedTimeZones.get(timeZone);
+  if (cached !== undefined) return cached;
+  let supported = false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone });
+    supported = true;
+  } catch {}
+  if (supportedTimeZones.size >= 32) supportedTimeZones.clear();
+  supportedTimeZones.set(timeZone, supported);
+  return supported;
+}
+
+export function setDisplayTimeZone(timeZone?: string): void {
+  displayTimeZone = timeZone || "UTC";
+}
+
+export function getDisplayTimeZone(timeZone = displayTimeZone): string {
+  return timeZoneSupported(timeZone) ? timeZone : "UTC";
+}
+
+export function date(
+  value: string | undefined | null,
+  time = false,
+  timeZone = displayTimeZone,
+): string {
   if (!value) return "Date unavailable";
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    ...(time
-      ? {
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZoneName: "short",
-          timeZone: "UTC",
-        }
-      : { timeZone: "UTC" }),
-  }).format(parsed);
+  if (dateOnly && parsed.toISOString().slice(0, 10) !== value) return value;
+  const zone = dateOnly ? "UTC" : getDisplayTimeZone(timeZone);
+  const includeTime = time && !dateOnly;
+  const key = `${zone}:${includeTime}`;
+  let formatter = dateFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      timeZone: zone,
+      ...(includeTime
+        ? {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZoneName: "short",
+          }
+        : {}),
+    });
+    if (dateFormatters.size >= 16) dateFormatters.clear();
+    dateFormatters.set(key, formatter);
+  }
+  return formatter.format(parsed);
 }
 export function bytes(value: number): string {
   if (value < 1024) return `${value} B`;

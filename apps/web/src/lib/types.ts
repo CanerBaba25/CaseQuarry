@@ -5,6 +5,7 @@ export type User = {
   tenant_id: string;
   role: string;
   csrf_token: string;
+  time_zone?: string;
   active?: boolean;
   mfa_enabled?: boolean;
 };
@@ -207,6 +208,7 @@ export type Member = {
   name: string;
   email: string;
   role: string;
+  active?: boolean;
 };
 export type ExportRecord = {
   id: string;

@@ -1,14 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { date, number, post } from "@/lib/api";
+import { date, getDisplayTimeZone, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import type { User } from "@/lib/types";
 import { Badge, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { PageHeading } from "./matter-pages";
 import ProviderSettings from "./provider-settings";
 
-export default function AccountSecurity({ user }: { user: User }) {
+export default function AccountSecurity({
+  user,
+  preferences,
+}: {
+  user: User;
+  preferences?: React.ReactNode;
+}) {
   const status = useResource<{ enabled: boolean; method: string }>(
     "/auth/mfa/status",
   );
@@ -34,6 +40,7 @@ export default function AccountSecurity({ user }: { user: User }) {
         title="Protect the way in."
         text="An authenticator adds a second step to signing in to your private workspace."
       />
+      {preferences}
       <div className="account-security-grid">
         <section className="panel security-profile">
           <span className="avatar light">
@@ -49,6 +56,10 @@ export default function AccountSecurity({ user }: { user: User }) {
             <div>
               <dt>Matter access</dt>
               <dd>Granted separately per matter</dd>
+            </div>
+            <div>
+              <dt>Timezone</dt>
+              <dd>{user.time_zone || "UTC"}</dd>
             </div>
             <div>
               <dt>Sign-in</dt>
@@ -132,8 +143,8 @@ export default function AccountSecurity({ user }: { user: User }) {
           <div>
             <h2>Active sign-ins</h2>
             <p className="muted">
-              Up to 100 active sessions for your account. Dates are shown in
-              UTC.
+              Up to 100 active sessions for your account. Times are shown in{" "}
+              {getDisplayTimeZone(user.time_zone || "UTC")}.
             </p>
           </div>
           <button
@@ -152,8 +163,12 @@ export default function AccountSecurity({ user }: { user: User }) {
               <thead>
                 <tr>
                   <th>Session</th>
-                  <th>Signed in · UTC</th>
-                  <th>Expires · UTC</th>
+                  <th>
+                    Signed in · {getDisplayTimeZone(user.time_zone || "UTC")}
+                  </th>
+                  <th>
+                    Expires · {getDisplayTimeZone(user.time_zone || "UTC")}
+                  </th>
                   <th>
                     <span className="sr-only">Session action</span>
                   </th>

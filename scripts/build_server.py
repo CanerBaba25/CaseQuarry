@@ -8,13 +8,14 @@ import platform
 import shutil
 import subprocess
 import tempfile
-import tomllib
 import zipfile
 from pathlib import Path
 
 if __package__:
+    from .release_version import release_version
     from .server_runtime_licenses import preserve_runtime_sources
 else:
+    from release_version import release_version
     from server_runtime_licenses import preserve_runtime_sources
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,7 +48,7 @@ def build(args):
     actual = "windows-x64" if os.name == "nt" else "linux-x64" if platform.system() == "Linux" else None
     if actual != args.platform or platform.machine().lower() not in {"amd64", "x86_64"}:
         raise RuntimeError("Build on the requested platform; native Node dependencies cannot be relabeled across operating systems.")
-    version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf8"))["project"]["version"]
+    version = release_version()
     if not args.skip_web_build:
         run(["npm.cmd" if os.name == "nt" else "npm", "--prefix", "apps/web", "run", "build"], env={**os.environ, "CASEQUARRY_API_INTERNAL_URL": "http://127.0.0.1:8000", "NEXT_TELEMETRY_DISABLED": "1"})
     standalone = ROOT / "apps/web/.next/standalone"

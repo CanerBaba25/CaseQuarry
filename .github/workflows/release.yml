@@ -36,10 +36,12 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: uv sync --locked
+      - name: Read validated release version
+        run: uv run python scripts/release_version.py --github-env
       - run: npm --prefix apps/web ci
       - run: npm --prefix apps/web run build
       - run: uv run python scripts/build_server.py --platform windows-x64 --output-dir .release-artifacts/server --skip-web-build
-      - run: uv run python scripts/verify_server_ci.py --archive .release-artifacts/server/casequarry-server-0.3.0-windows-x64.zip
+      - run: uv run python scripts/verify_server_ci.py --archive .release-artifacts/server/casequarry-server-${{ env.CASEQUARRY_RELEASE_VERSION }}-windows-x64.zip
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: server-windows-x64
@@ -79,10 +81,12 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: uv sync --locked
+      - name: Read validated release version
+        run: uv run python scripts/release_version.py --github-env
       - run: npm --prefix apps/web ci
       - run: npm --prefix apps/web run build
       - run: uv run python scripts/build_server.py --platform linux-x64 --output-dir .release-artifacts/server --skip-web-build
-      - run: uv run python scripts/verify_server_ci.py --archive .release-artifacts/server/casequarry-server-0.3.0-linux-x64.zip
+      - run: uv run python scripts/verify_server_ci.py --archive .release-artifacts/server/casequarry-server-${{ env.CASEQUARRY_RELEASE_VERSION }}-linux-x64.zip
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: server-linux-x64
@@ -110,12 +114,14 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           uv sync --locked
+          uv run python scripts/release_version.py --github-env
           uv run python -c 'import os,tomllib; from pathlib import Path; version=tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]; assert os.environ["RELEASE_TAG"] == "v" + version, "Tag must match project version"'
           uv run python scripts/tasks.py release
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
-          name: windows-desktop
+          pattern: desktop-*
           path: .release-artifacts/desktop
+          merge-multiple: true
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           pattern: server-*
@@ -123,10 +129,10 @@ jobs:
           merge-multiple: true
       - name: Verify distribution contents and checksums
         run: uv run python scripts/verify_release.py .release-artifacts
-      - name: Publish verified development preview
+      - name: Publish verified installable release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$RELEASE_TAG" .release-artifacts/*-source.zip .release-artifacts/*.zip.sha256 .release-artifacts/desktop/* .release-artifacts/server/* --verify-tag --prerelease --title "CaseQuarry $RELEASE_TAG — Web and desktop preview" --notes-file RELEASE_NOTES.md
+          gh release create "$RELEASE_TAG" .release-artifacts/*-source.zip .release-artifacts/*.zip.sha256 .release-artifacts/desktop/* .release-artifacts/server/* --verify-tag --latest --title "CaseQuarry $RELEASE_TAG — Web and desktop" --notes-file RELEASE_NOTES.md
