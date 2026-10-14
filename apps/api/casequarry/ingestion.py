@@ -8,7 +8,7 @@ import zipfile
 from datetime import timedelta
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 
 from . import audit
 from .models import (
@@ -198,6 +198,18 @@ def error_message(code):
     )
 
 
+def set_record_state(batch, item, state, error):
+    previous = item.parser_state
+    counts = {**empty_counts(), **(batch.counts or {})}
+    if previous != state:
+        if previous in counts and previous != "stored":
+            counts[previous] = max(0, counts[previous] - 1)
+        if state in counts and state != "stored":
+            counts[state] += 1
+    batch.counts = counts
+    item.parser_state, item.parser_error = state, error
+
+
 def index_participants(db, item, email):
     if item.item_type != "email" or not email:
         return
@@ -304,6 +316,7 @@ def append_reprocessing(db, settings, storage, batch, item, parsed, expected_ver
     batch.errors = [entry for entry in batch.errors if entry.get("evidence_id") != item.id]
     if parsed.error:
         add_error(batch, item.filename, parsed.error, item.id)
+    db.execute(delete(Participant).where(Participant.tenant_id == batch.tenant_id, Participant.case_id == batch.case_id, Participant.evidence_id == item.id))
     index_participants(db, item, parsed.email)
     user = db.get(User, batch.submitted_by, populate_existing=True)
     audit.record(db, user, batch.case_id, "evidence.reprocessed", "evidence", item.id, {"old_text_version": expected_version, "text_version": version, "old_text_sha256": old_hash, "text_sha256": text_hash, "state": parsed.state})
@@ -522,11 +535,11 @@ def ingest_tree(
     item, parsed = put_record(db, settings, storage, batch, path, filename, record_key, parent_id, source_offset, original_path)
     if quota and quota["remaining"] is not None:
         quota["remaining"] -= db.info.get("tick_processed", 0) - processed_before
-    if parsed.state in {"quarantined", "failed", "locked"}:
+    if parsed.state in {"quarantined", "failed", "locked"} or parsed.error == "SCANNER_UNAVAILABLE":
         return item
     if depth >= settings.max_archive_depth and (parsed.attachments or filename.lower().endswith(".zip")):
         add_error(batch, filename, "NESTING_LIMIT", item.id)
-        item.parser_state, item.parser_error = "partial", "NESTING_LIMIT"
+        set_record_state(batch, item, "partial", "NESTING_LIMIT")
         db.commit()
         return item
     children = parsed.attachments
@@ -561,12 +574,11 @@ def ingest_tree(
                         depth + 1,
                         budget,
                     )
-        except CaseStorageLimit:
+        except (CaseStorageLimit, BatchYield, LeaseLost):
             raise
         except (ArchiveError, zipfile.BadZipFile, RuntimeError) as error:
             code = str(error) if isinstance(error, ArchiveError) else "ARCHIVE_PARSE_FAILED"
-            item.parser_state, item.parser_error = "quarantined", code
-            batch.counts = {**batch.counts, "quarantined": batch.counts.get("quarantined", 0) + 1}
+            set_record_state(batch, item, "quarantined", code)
             add_error(batch, filename, code, item.id)
             db.commit()
     for index, (name, data) in enumerate(children):
@@ -580,8 +592,7 @@ def ingest_tree(
             or budget["entries"] > settings.max_archive_entries
         ):
             add_error(batch, name, "ATTACHMENT_SIZE_LIMIT", item.id)
-            batch.counts = {**batch.counts, "partial": batch.counts.get("partial", 0) + 1}
-            item.parser_state, item.parser_error = "partial", "ATTACHMENT_SIZE_LIMIT"
+            set_record_state(batch, item, "partial", "ATTACHMENT_SIZE_LIMIT")
             db.commit()
             break
         child_key, _, _ = storage.store_bytes(batch.tenant_id, batch.case_id, data)
@@ -638,7 +649,7 @@ def _run_batch_owned(database, settings, storage, batch_id, owner, heartbeat, ma
                 parent = ingest_tree(db, settings, storage, batch, path, name, f"file/{index}", budget={"entries": 0, "bytes": 0, "quota": quota}, original_path=file.get("original_path", name))
                 if parent is None:
                     return
-                if name.lower().endswith(".mbox"):
+                if name.lower().endswith(".mbox") and parent.parser_state not in {"quarantined", "failed", "locked"} and parent.parser_error != "SCANNER_UNAVAILABLE":
                     offset = int(batch.checkpoint.get("mbox_offset", 0)) if index == start_index else 0
                     for source_offset, next_offset, data in iter_mbox(
                         path, offset, settings.max_upload_bytes

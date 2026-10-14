@@ -12,7 +12,7 @@ from . import audit
 from .case_domain import lock_case_action
 from .ingestion import empty_counts
 from .models import Custodian, ImportBatch, LoginSession, Original, Source, UploadSession, new_id, now
-from .schemas import Reason, UploadInput
+from .schemas import Reason, UploadInput, contains_nul
 from .security import Actor, authorize_case, current_actor, fail, get_db, utc
 from .storage import file_hash
 
@@ -41,6 +41,8 @@ def get_batch(db, user, case_id, batch_id, permission="view"):
 
 
 def ensure_source(db, user, case_id, source_id=None, source_label="Uploaded evidence", custodian_name=None):
+    if contains_nul((source_id, source_label, custodian_name)):
+        fail(422, "VALIDATION_ERROR", "Text fields cannot contain NUL characters.")
     if source_id:
         source = db.scalar(select(Source).where(Source.id == source_id, Source.case_id == case_id, Source.tenant_id == user.tenant_id))
         if not source:
@@ -157,6 +159,7 @@ async def submit_import(case_id: str, request: Request, files: list[UploadFile] 
         finally:
             temporary.unlink(missing_ok=True)
             await file.close()
+    lock_upload_action(db, actor, case_id)
     case.updated_at = now()
     batch = enqueue(db, actor.user, case_id, source, uploaded, request.state.request_id, idempotency)
     db.commit()

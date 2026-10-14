@@ -8,6 +8,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from . import audit
+from .case_domain import lock_case_action
 from .evidence_routes import apply_review
 from .models import Evidence, Member, Original, ReviewSet, ReviewSetItem, User, now
 from .schemas import Reason, ReviewInput
@@ -200,7 +201,7 @@ def create_assignment(
     actor: Actor = Depends(current_actor),
     db=Depends(get_db),
 ):
-    authorize_case(db, actor.user, case_id, "manage")
+    lock_case_action(db, actor.user, case_id, "manage", (body.assignee_id,))
     authorize_case(db, actor.user, case_id, "review")
     if bool(body.evidence_ids) == bool(body.review_set_id):
         fail(422, "ASSIGNMENT_SCOPE_REQUIRED", "Choose either evidence IDs or a review set.")
@@ -353,7 +354,7 @@ def transition(
     actor: Actor = Depends(current_actor),
     db=Depends(get_db),
 ):
-    _case, member = authorize_case(db, actor.user, case_id, "review")
+    _case, member = lock_case_action(db, actor.user, case_id, "review")
     row = get_assignment(db, actor.user, case_id, assignment_id)
     if row.version != body.expected_version:
         fail(

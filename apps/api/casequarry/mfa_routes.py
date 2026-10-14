@@ -11,7 +11,7 @@ from sqlalchemy import update
 from . import audit
 from .models import LoginSession
 from .schemas import Input
-from .security import Actor, current_actor, fail, get_db, password_valid
+from .security import Actor, current_actor, fail, get_db, lock_user, password_valid
 
 router = APIRouter(prefix="/api/v1/auth/mfa")
 
@@ -54,6 +54,12 @@ def valid_mfa(storage, user, code):
     return bool(payload and pyotp.TOTP(payload["secret"]).verify(code or "", valid_window=1))
 
 
+def lock_actor(db, actor):
+    lock_user(db, actor.user)
+    if not actor.user.active:
+        fail(401, "ACCOUNT_DISABLED", "This account is unavailable.")
+
+
 @router.get("/status")
 def status(actor: Actor = Depends(current_actor)):
     return {"enabled": actor.user.mfa_enabled, "method": "totp", "issuer": "CaseQuarry"}
@@ -61,6 +67,7 @@ def status(actor: Actor = Depends(current_actor)):
 
 @router.post("/enroll")
 def enroll(body: PasswordInput, request: Request, actor: Actor = Depends(current_actor), db=Depends(get_db)):
+    lock_actor(db, actor)
     if actor.user.mfa_enabled:
         fail(409, "MFA_ALREADY_ENABLED", "Disable the existing authenticator before enrolling another.")
     if not password_valid(body.password, actor.user.password_hash):
@@ -75,6 +82,7 @@ def enroll(body: PasswordInput, request: Request, actor: Actor = Depends(current
 
 @router.post("/confirm")
 def confirm(body: CodeInput, request: Request, actor: Actor = Depends(current_actor), db=Depends(get_db)):
+    lock_actor(db, actor)
     payload = read_secret(request.app.state.storage, actor.user.mfa_secret)
     if not payload or datetime.fromisoformat(payload["created_at"]) + timedelta(minutes=10) < datetime.now(UTC):
         fail(409, "MFA_ENROLLMENT_EXPIRED", "Start authenticator enrollment again.")
@@ -89,6 +97,7 @@ def confirm(body: CodeInput, request: Request, actor: Actor = Depends(current_ac
 
 @router.post("/disable")
 def disable(body: DisableInput, request: Request, actor: Actor = Depends(current_actor), db=Depends(get_db)):
+    lock_actor(db, actor)
     if not actor.user.mfa_enabled:
         fail(409, "MFA_NOT_ENABLED", "No authenticator is enabled.")
     if not password_valid(body.password, actor.user.password_hash) or not valid_mfa(request.app.state.storage, actor.user, body.code):

@@ -4,7 +4,7 @@ import { uiText } from "@/lib/i18n";
 import Link from "next/link";
 import { useState } from "react";
 import { date, uiLabel as label, number, post } from "@/lib/api";
-import { useResource } from "@/lib/hooks";
+import { useMountedRef, useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import { evidenceUrl } from "@/lib/search-scope";
 import type { Evidence, Matter, Member, User } from "@/lib/types";
@@ -215,6 +215,7 @@ export function AssignmentCreateModal({
   close: () => void;
   done: () => void;
 }) {
+  const live = useMountedRef();
   const members = useResource<{ items: Member[] }>(`/cases/${caseId}/members`),
     sets = useResource<{
       items: { id: string; name: string; count: number }[];
@@ -245,11 +246,11 @@ export function AssignmentCreateModal({
                         .filter(Boolean),
                   }),
             });
-            done();
+            if (live.current) done();
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >
@@ -320,7 +321,10 @@ export function AssignmentCreateModal({
               {uiText("Unassigned · eligible reviewers may claim")}
             </option>
             {members.data?.items
-              .filter((member) => can(member.role, "review"))
+              .filter(
+                (member) =>
+                  member.active !== false && can(member.role, "review"),
+              )
               .map((member) => (
                 <option key={member.user_id} value={member.user_id}>
                   {member.name} · {label(member.role)}
@@ -382,6 +386,7 @@ function AssignmentWorkspace({
   );
   const [action, setAction] = useState<string | null>(null),
     [evidence, setEvidence] = useState<string | null>(null);
+  const [inspectorBlocked, setInspectorBlocked] = useState(false);
   const row = detail.data,
     manager = can(matter.role, "manage"),
     owner = row?.assignee_id === user.id,
@@ -469,6 +474,7 @@ function AssignmentWorkspace({
                   <button
                     key={item.id}
                     className={`assignment-evidence ${evidence === item.id ? "selected" : ""}`}
+                    disabled={inspectorBlocked && evidence !== item.id}
                     onClick={() => setEvidence(item.id)}
                   >
                     <Icon
@@ -504,6 +510,7 @@ function AssignmentWorkspace({
               </div>
               {evidence && (
                 <EvidenceInspector
+                  key={`${matter.id}:${evidence}`}
                   caseId={matter.id}
                   id={evidence}
                   canReview={can(matter.role, "review")}
@@ -512,6 +519,7 @@ function AssignmentWorkspace({
                   close={() => setEvidence(null)}
                   changed={refresh}
                   open={setEvidence}
+                  navigationBlocked={setInspectorBlocked}
                 />
               )}
             </div>
@@ -547,6 +555,7 @@ function AssignmentAction({
   close: () => void;
   done: () => void;
 }) {
+  const live = useMountedRef();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null);
   const actionTitle = uiText(
@@ -571,11 +580,11 @@ function AssignmentAction({
               expected_version: row.version,
               reason: form.get("reason"),
             });
-            done();
+            if (live.current) done();
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >

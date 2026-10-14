@@ -27,10 +27,14 @@ def request_data(job, sources, instructions, api_key):
         url = selected["endpoint"]
         headers["Authorization"] = "Bearer " + api_key
         body = {"model": job.model, "instructions": instructions, "input": [{"role": "user", "content": text}], "stream": False, "store": False, "max_output_tokens": MAX_OUTPUT_TOKENS, "text": {"format": {"type": "json_schema", "name": "casequarry_source_quotes", "strict": True, "schema": SCHEMA}}}
-    elif job.provider == "xai":
+    elif job.provider in {"xai", "kimi"}:
         url = selected["endpoint"]
         headers["Authorization"] = "Bearer " + api_key
         body = {"model": job.model, "messages": [{"role": "system", "content": instructions}, {"role": "user", "content": text}], "stream": False, "max_tokens": MAX_OUTPUT_TOKENS, "response_format": {"type": "json_schema", "json_schema": {"name": "casequarry_source_quotes", "strict": True, "schema": SCHEMA}}}
+        if job.provider == "kimi":
+            body["max_completion_tokens"] = body.pop("max_tokens")
+            if job.model in {"kimi-k2.5", "kimi-k2.6"}:
+                body["thinking"] = {"type": "disabled"}
     elif job.provider == "gemini":
         url = selected["endpoint"] + job.model + ":generateContent"
         headers["x-goog-api-key"] = api_key
@@ -77,12 +81,12 @@ def parse_response(identifier, value):
                     fail(503, "AI_PROVIDER_RESPONSE_INVALID", "The provider refused or returned unsupported content.")
                 text.append(block.get("text", ""))
         usage = _usage(value.get("usage"))
-    elif identifier == "xai":
+    elif identifier in {"xai", "kimi"}:
         choices = value.get("choices", [])
         if len(choices) != 1 or choices[0].get("finish_reason") != "stop":
             fail(503, "AI_PROVIDER_RESPONSE_INVALID", "The provider response was incomplete.")
         message = choices[0].get("message", {})
-        if message.get("role") != "assistant" or message.get("tool_calls") or message.get("refusal"):
+        if message.get("role") != "assistant" or message.get("tool_calls") or message.get("function_call") or message.get("refusal"):
             fail(503, "AI_PROVIDER_RESPONSE_INVALID", "The provider refused or attempted an unavailable action.")
         text = [message.get("content", "")]
         usage = _usage(value.get("usage"))

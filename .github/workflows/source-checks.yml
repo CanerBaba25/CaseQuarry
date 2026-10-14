@@ -133,6 +133,7 @@ jobs:
           key: native-v1-${{ matrix.platform }}-${{ runner.os }}-${{ runner.arch }}-${{ env.CASEQUARRY_CACHE_IMAGE_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'apps/desktop/src-tauri/Cargo.lock', 'apps/desktop/src-tauri/Cargo.toml') }}-${{ github.sha }}
           restore-keys: |
             native-v1-${{ matrix.platform }}-${{ runner.os }}-${{ runner.arch }}-${{ env.CASEQUARRY_CACHE_IMAGE_VERSION }}-${{ hashFiles('rust-toolchain.toml', 'apps/desktop/src-tauri/Cargo.lock', 'apps/desktop/src-tauri/Cargo.toml') }}-
+            native-v1-${{ matrix.platform }}-${{ runner.os }}-${{ runner.arch }}-${{ env.CASEQUARRY_CACHE_IMAGE_VERSION }}-
       - name: Rebuild current application source and assets
         run: uv run --no-project python scripts/prepare_desktop_cache.py --clean ${{ matrix.platform }}
       - run: npm --prefix apps/desktop run build:ui

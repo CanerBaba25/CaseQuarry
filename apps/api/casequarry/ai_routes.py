@@ -68,6 +68,10 @@ class AIInput(Input):
     style: Literal["brief", "detailed", "table", "executive"] = "brief"
     confirmed_external: bool = False
     reason: str = Field(default="", max_length=2000)
+    expected_provider: Literal["openai", "gemini", "xai", "anthropic", "kimi"] | None = None
+    expected_policy_revision: int | None = Field(default=None, ge=0, strict=True)
+    expected_credential_revision: int | None = Field(default=None, ge=0, strict=True)
+    expected_firm_policy_revision: int | None = Field(default=None, ge=0, strict=True)
 
 
 class QuoteFinding(Input):
@@ -281,8 +285,13 @@ def _enqueue(case_id, body, task, request, actor, db):
             fail(422, "AI_EXTERNAL_CONFIRMATION_REQUIRED", "Confirm that this selected evidence may leave the server and state the purpose; provider charges may apply.")
         identifier = policy["provider"]
         row = credential(db, actor.user, identifier)
-        decrypt_key(request.app.state.settings, row)
         firm = require_firm_policy(db, actor.user, request.app.state.settings, identifier)
+        expected = (body.expected_provider, body.expected_policy_revision, body.expected_credential_revision, body.expected_firm_policy_revision)
+        if any(value is None for value in expected):
+            fail(422, "AI_CONFIRMATION_REQUIRED", "Confirm the displayed provider, matter policy, credential and firm policy revisions before external processing.")
+        if expected != (identifier, policy["revision"], row.revision, firm["revision"]):
+            fail(409, "AI_CONFIRMATION_STALE", "Provider configuration changed after confirmation. Review the current provider, model and policies before confirming again.")
+        decrypt_key(request.app.state.settings, row)
         model = row.model
         scope.update(confirmed_external=True, external_reason=body.reason.strip(), credential_id=row.id, credential_revision=row.revision, firm_policy_revision=firm["revision"], transmission_attempted=False, input_byte_limit=128 * 1024, max_output_tokens=2048)
     job = AIJob(tenant_id=actor.user.tenant_id, case_id=case_id, requested_by=actor.user.id, task=task, question=body.question, style=body.style, provider=identifier, provider_endpoint=endpoint, model=model, prompt_version=PROMPT_VERSION, policy_revision=policy["revision"], evidence_ids=ids, scope={"case_id": case_id, **scope}, coverage={"matched_items": count, "selected_items": len(ids), "processed_items": 0, "retrieved_spans": 0, "sampled": count > len(ids)})

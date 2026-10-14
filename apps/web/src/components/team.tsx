@@ -3,7 +3,7 @@ import { uiText } from "@/lib/i18n";
 
 import { useState } from "react";
 import { api, uiLabel as label, post } from "@/lib/api";
-import { useResource } from "@/lib/hooks";
+import { useMountedRef, useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import type { Matter, User } from "@/lib/types";
 import { Badge, ErrorBox, Icon, Loading, Modal } from "./ui";
@@ -136,6 +136,7 @@ function AddMember({
   close: () => void;
   done: () => void;
 }) {
+  const live = useMountedRef();
   const users = useResource<{ items: User[] }>(
     user.role === "firm_admin" ? "/users" : null,
   );
@@ -159,6 +160,7 @@ function AddMember({
             password: data.get("password"),
             role: "reviewer",
           }));
+        if (!live.current) return;
         setCreated(account);
         userId = account.id;
       }
@@ -166,11 +168,11 @@ function AddMember({
         user_id: userId,
         role: data.get("role"),
       });
-      done();
+      if (live.current) done();
     } catch (error) {
-      setError(error);
+      if (live.current) setError(error);
     } finally {
-      setBusy(false);
+      if (live.current) setBusy(false);
     }
   }
   return (
@@ -318,6 +320,7 @@ function RemoveMember({
   member: Member;
   done: () => void;
 }) {
+  const live = useMountedRef();
   const [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false);
   return (
@@ -332,11 +335,11 @@ function RemoveMember({
             method: "DELETE",
             body: JSON.stringify({ reason: data.get("reason") }),
           });
-          done();
+          if (live.current) done();
         } catch (error) {
-          setError(error);
+          if (live.current) setError(error);
         } finally {
-          setBusy(false);
+          if (live.current) setBusy(false);
         }
       }}
     >

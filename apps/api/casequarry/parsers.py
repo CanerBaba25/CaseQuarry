@@ -9,6 +9,7 @@ from datetime import UTC
 from email import policy
 from email.parser import BytesParser
 from email.utils import getaddresses, parsedate_to_datetime
+from itertools import chain
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -153,13 +154,18 @@ def parse_spreadsheet(path: Path, filename: str, settings) -> Parsed:
         try:
             parts, length = [], 0
             for sheet in workbook:
-                parts.append(f"Sheet: {sheet.title}")
-                for row in sheet.iter_rows(values_only=True):
-                    line = "\t".join("" if value is None else str(value) for value in row)
-                    length += len(line)
-                    if length > settings.max_extracted_chars:
-                        return Parsed("spreadsheet", filename, "\n".join(parts), "partial", "TEXT_LIMIT")
-                    parts.append(line)
-            return Parsed("spreadsheet", filename, text="\n".join(parts))
+                lines = chain(
+                    (f"Sheet: {sheet.title}",),
+                    ("\t".join("" if value is None else str(value) for value in row) for row in sheet.iter_rows(values_only=True)),
+                )
+                for line in lines:
+                    fragment = ("\n" if parts else "") + line
+                    remaining = settings.max_extracted_chars - length
+                    if len(fragment) > remaining:
+                        parts.append(fragment[:remaining])
+                        return Parsed("spreadsheet", filename, "".join(parts), "partial", "TEXT_LIMIT")
+                    parts.append(fragment)
+                    length += len(fragment)
+            return Parsed("spreadsheet", filename, text="".join(parts))
         finally:
             workbook.close()

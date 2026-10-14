@@ -2,7 +2,7 @@
 import { uiText, type MessageKey } from "@/lib/i18n";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   bytes,
@@ -12,7 +12,7 @@ import {
   number,
   post,
 } from "@/lib/api";
-import { useResource } from "@/lib/hooks";
+import { useMountedRef, useResource } from "@/lib/hooks";
 import type {
   AuditEvent,
   ExportRecord,
@@ -381,6 +381,9 @@ export function SourcesPage({
   );
   const [actionError, setActionError] = useState<unknown>(null),
     [actionBusy, setActionBusy] = useState(false);
+  const batchScope = useRef(activeBatch);
+  batchScope.current = activeBatch;
+  const live = useMountedRef();
   const active =
     imports.data?.items.some((item) =>
       ["pending", "queued", "running", "processing", "stored"].includes(
@@ -405,16 +408,19 @@ export function SourcesPage({
   }, [selected.data, selected.refresh]);
   async function action(name: string) {
     if (!activeBatch) return;
+    const submittedBatch = activeBatch;
     setActionBusy(true);
     setActionError(null);
     try {
       await post(`/cases/${matter.id}/imports/${activeBatch}/${name}`);
+      if (!live.current || batchScope.current !== submittedBatch) return;
       selected.refresh();
       imports.refresh();
     } catch (error) {
-      setActionError(error);
+      if (live.current && batchScope.current === submittedBatch)
+        setActionError(error);
     } finally {
-      setActionBusy(false);
+      if (live.current) setActionBusy(false);
     }
   }
   return (
@@ -724,6 +730,7 @@ function ImportModal({
   close: () => void;
   imported: (id: string) => void;
 }) {
+  const live = useMountedRef();
   const [files, setFiles] = useState<File[]>([]),
     [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false),
@@ -742,11 +749,11 @@ function ImportModal({
         batch_id: string;
         state: string;
       }>(`/cases/${matter.id}/imports`, { method: "POST", body: data });
-      imported(batch.batch_id || batch.job_id);
+      if (live.current) imported(batch.batch_id || batch.job_id);
     } catch (error) {
-      setError(error);
+      if (live.current) setError(error);
     } finally {
-      setBusy(false);
+      if (live.current) setBusy(false);
     }
   }
   return (
@@ -773,6 +780,7 @@ function ImportModal({
           onDragLeave={() => setDragging(false)}
           onDrop={(event) => {
             event.preventDefault();
+            if (busy) return;
             setDragging(false);
             setFiles(Array.from(event.dataTransfer.files));
           }}
@@ -881,6 +889,7 @@ function SourceModal({
   close: () => void;
   added: () => void;
 }) {
+  const live = useMountedRef();
   const [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false);
   return (
@@ -895,11 +904,11 @@ function SourceModal({
               `/cases/${matter.id}/sources`,
               Object.fromEntries(new FormData(event.currentTarget)),
             );
-            added();
+            if (live.current) added();
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >

@@ -53,7 +53,7 @@ def preserve_archive_notices(source, destination):
     with tarfile.open(source, "r:*") as archive:
         for member in archive:
             path = PurePosixPath(member.name)
-            if path.is_absolute() or ".." in path.parts:
+            if path.is_absolute() or ".." in path.parts or "\\" in member.name or ":" in member.name:
                 raise RuntimeError("Unsafe path in upstream source archive")
             if not member.isfile() or not path.name.upper().startswith(("LICENSE", "LICENCE", "COPYING", "COPYRIGHT", "NOTICE", "PATENTS", "FTL.TXT")):
                 continue

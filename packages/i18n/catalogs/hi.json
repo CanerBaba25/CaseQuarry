@@ -1559,5 +1559,6 @@
   "Untagged": "बिना टैग",
   "Prior source version": "स्रोत का पिछला संस्करण",
   "Duplicates": "डुप्लिकेट",
-  "File upload": "फ़ाइल अपलोड"
+  "File upload": "फ़ाइल अपलोड",
+  "Models available through the Moonshot API.": "Moonshot API के माध्यम से उपलब्ध मॉडल।"
 }

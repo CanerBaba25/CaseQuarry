@@ -77,8 +77,10 @@ class LocalPostgres:
         protect(self.root)
         password = secrets.token_urlsafe(48)
         pwfile = self.root / "initial-password"
+        created_password = False
         try:
             with pwfile.open("x", encoding="ascii") as output:
+                created_password = True
                 output.write(password + "\n")
             protect(pwfile)
             result = subprocess.run([self.tool("initdb"), "-D", str(self.data), "-U", "cq_local_manager", "--pwfile", str(pwfile), "--auth-host=scram-sha-256", "--auth-local=scram-sha-256", "--encoding=UTF8", "--no-locale", "--data-checksums"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=self.flags, check=False)
@@ -87,7 +89,8 @@ class LocalPostgres:
             self.marker.write_text(json.dumps({"format": 1, "port": port, "manager_password": password}), encoding="utf8")
             protect(self.marker)
         finally:
-            pwfile.unlink(missing_ok=True)
+            if created_password:
+                pwfile.unlink(missing_ok=True)
 
     def running(self):
         return subprocess.run([self.tool("pg_ctl"), "status", "-D", str(self.data)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=self.flags, check=False).returncode == 0

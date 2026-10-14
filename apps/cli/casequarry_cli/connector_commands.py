@@ -94,6 +94,8 @@ def imap_import(ctx: typer.Context, path: Annotated[Path, typer.Option()], sourc
         if path.is_symlink() or path.stat().st_size > 1_048_576:
             fail("Choose a bounded, regular acquisition manifest.", 2)
         manifest = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            fail("The acquisition manifest must be a JSON object.", 2)
         rows = manifest.get("items", [])
         if manifest.get("format") != "casequarry-imap-acquisition-v1" or manifest.get("state") != "completed" or not 1 <= len(rows) <= 200:
             fail("Use a completed IMAP acquisition manifest containing 1 to 200 exact originals.", 2)

@@ -22,7 +22,7 @@ TypeScript/React for the interface, Python for its API and document processing, 
 Rust for streaming integrity checks and the native desktop client. PostgreSQL stores
 the shared firm data; browsers and desktop clients connect to the same firm server.
 
-> **Release 0.6.0.** Installable Windows, macOS and Linux desktop clients and Windows/Linux web-server
+> **Release 0.7.0.** Installable Windows, macOS and Linux desktop clients and Windows/Linux web-server
 > packages, with 13 interface languages, task priorities, PostgreSQL firm sync and optional provider connections.
 > Production capacity and the two-million-email scale target remain unvalidated.
 
@@ -32,7 +32,7 @@ _Actual application view using synthetic records. Counts come from persisted API
 
 ## What you can do
 
-| Workflow    | Available in 0.6.0                                                                                                      |
+| Workflow    | Available in 0.7.0                                                                                                      |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Preserve    | SHA-256 originals, source paths, MBOX offsets, duplicates and attachment families                                       |
 | Import      | Resumable uploads, bounded OCR, durable jobs and retries that preserve extraction history                               |
@@ -43,7 +43,7 @@ _Actual application view using synthetic records. Counts come from persisted API
 | Disclose    | Irreversible text/PDF redactions, independent approval, sequential Bates numbers and CSV/DAT/OPT loadfiles              |
 | Export      | Metadata and reviewed native ZIP packages, with fresh scope and hash verification                                       |
 | Secure      | Tenant/matter roles, password/session controls, administrator controls, MFA and audit chains                            |
-| Assist      | Optional local or OpenAI/Gemini/Grok/Claude source quotations with verified citations and human review                  |
+| Assist      | Optional local or OpenAI/Gemini/Grok/Claude/Kimi source quotations with verified citations and human review                  |
 | Collaborate | Shared PostgreSQL firm server, automatic refresh and versioned review/task decisions                                    |
 | Operate     | Browser and native Windows/macOS/Linux clients, server packages, authenticated CLI, integrity tools and backups         |
 
@@ -102,9 +102,9 @@ Choose the assets on the [Releases page](https://github.com/CanerBaba25/CaseQuar
 
 | Download                              | Use it for                                             |
 | ------------------------------------- | ------------------------------------------------------ |
-| `CaseQuarry_0.6.0_x64-setup.exe`      | Install the Windows desktop client on each workstation |
-| `CaseQuarry_0.6.0_universal.dmg`      | Install on an Apple Silicon or Intel MacBook           |
-| `CaseQuarry_0.6.0_amd64.deb`          | Install the Linux client on Ubuntu 24.04 x64           |
+| `CaseQuarry_0.7.0_x64-setup.exe`      | Install the Windows desktop client on each workstation |
+| `CaseQuarry_0.7.0_universal.dmg`      | Install on an Apple Silicon or Intel MacBook           |
+| `CaseQuarry_0.7.0_amd64.deb`          | Install the Linux client on Ubuntu 24.04 x64           |
 | `casequarry-server-*-windows-x64.zip` | Install the shared web/API server on Windows           |
 | `casequarry-server-*-linux-x64.zip`   | Install the shared web/API server on Linux             |
 | `*-source.zip`                        | Build, inspect or modify the application               |
@@ -155,7 +155,9 @@ backup, run `uv sync --locked`, then `uv run python scripts/tasks.py migrate` be
 Version 0.6.0 adds `0008_task_priorities` and `0009_user_language` after
 `0007_task_versions`; startup refuses stale schemas. Existing tasks receive normal
 priority and existing accounts start in English. Reload open web/desktop workspaces
-after upgrading the server. See the [task API](docs/TASK_API.md).
+after upgrading the server. Version 0.7.0 adds no further migration; older saved
+CLI profiles require a fresh sign-in, and cloud API callers must send the confirmed
+provider/revision snapshot. See the [task API](docs/TASK_API.md).
 Existing SQLite installations require the documented guarded transfer to an empty
 PostgreSQL database. Keep the original database and a verified recovery backup.
 
@@ -213,10 +215,12 @@ the larger benchmark has not yet been repeated with the new extraction pipeline.
 Percentiles use 15 queries; these results are not a production SLA or a multi-million
 capacity claim. See [benchmark scope and method](docs/BENCHMARKS.md).
 
-The complete local Python suite passed **505 tests**, with PostgreSQL checks enabled
+The complete local Python integration run passed **619 tests**, with PostgreSQL checks enabled
 and no skipped tests. Coverage includes task conflicts and delayed commits,
 timezone boundaries, permission revocation, concurrent uploads, session expiration,
-last-lead races, legal holds and upgrades.
+last-lead races, legal holds, upgrades, Kimi consent, import recovery and CLI file safety.
+A final focused CLI run passed 50 checks, including concurrent profile saves,
+delayed logout and unavailable-keyring recovery; these overlap the integration run.
 The evidence-query improvement preserved **39 complete comparison responses** and
 passed **16 focused projection/detail checks** across SQLite and PostgreSQL.
 The Rust integrity component passed **11 tests**, and the native desktop client
@@ -225,12 +229,16 @@ checks also cover all 13 interface languages and 143 translated menu labels.
 Real-browser checks cover evidence import/search,
 review and production approvals, shared task refresh, account isolation, provider
 controls, the redesigned dashboard, timezone persistence and 375px mobile views.
+Twelve focused interface suites cover 79 behavior scenarios, including delayed
+responses, draft preservation, immutable redaction selections and exact date scopes.
+Eight additional browser audit stages verify the fixes against PostgreSQL; two
+navigation checks confirm that setup and sign-in retain text during slow redirects.
 Nine multilingual workflow stages cover all 13 languages, preserved drafts,
 Chinese and Hindi mobile views, original diagnostics and account isolation.
 Native release checks install and launch the Ubuntu package and exercise the same
 universal Mac app on Intel and Apple Silicon runners.
 Controlled HTTP responses exercise all
-four provider transports; live vendor accounts and model quality remain unvalidated.
+five provider transports; live vendor accounts and model quality remain unvalidated.
 GitHub verifies linting, PostgreSQL migrations and Python/web/Rust/desktop builds.
 Verification suites and synthetic QA harnesses are maintained locally and excluded
 from the public source distribution.

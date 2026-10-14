@@ -95,9 +95,16 @@ def configure(args):
     data.mkdir(parents=True, exist_ok=True)
     protect(data)
     config = data / ".env"
-    created = init_environment(config)
-    if created:
-        values = dotenv_values(config)
+    if not config.exists():
+        url = os.environ.get(args.database_env) if args.database_env else None
+        if args.database_env and not url:
+            raise RuntimeError("The selected PostgreSQL environment variable is not set; credentials must not be passed on the command line.")
+        # Retain the same private secrets if cluster provisioning is interrupted.
+        # The final configuration must never advertise an unfinished bootstrap.
+        pending = data / ".env.pending"
+        init_environment(pending)
+        protect(pending)
+        values = dotenv_values(pending)
         port = args.postgres_port or (55432 if os.name == "nt" else 5432)
         if not args.postgres_port:
             with socket.socket() as listener:
@@ -106,19 +113,34 @@ def configure(args):
                 except OSError:
                     listener.bind(("127.0.0.1", 0))
                     port = listener.getsockname()[1]
-        if args.database_env:
-            url = os.environ.get(args.database_env)
-            if not url:
-                raise RuntimeError("The selected PostgreSQL environment variable is not set; credentials must not be passed on the command line.")
-        else:
+        if not args.database_env:
             cluster = LocalPostgres(data, args.postgres_bin, data / "postgres")
             cluster.initialize(port)
             url = cluster.provision_database(values["POSTGRES_PASSWORD"])
         changes = {"CASEQUARRY_DATABASE_URL": url, "CASEQUARRY_STORAGE_ROOT": str(data / "storage"), "CASEQUARRY_WORKER_MODE": "external", "CASEQUARRY_ENVIRONMENT": "development" if args.loopback_development else "production", "CASEQUARRY_ALLOW_INSECURE_LOCAL_COOKIES": "true" if args.loopback_development else "false"}
-        original = config.read_text(encoding="utf8")
+        original = pending.read_text(encoding="utf8")
         lines = [line for line in original.splitlines() if line.split("=", 1)[0] not in changes]
-        config.write_text("\n".join(lines + [key + "=" + value for key, value in changes.items()]) + "\n", encoding="utf8")
-        protect(config)
+        temporary = data / (".env.pending-" + uuid.uuid4().hex)
+        owns_temporary = False
+        try:
+            with temporary.open("x", encoding="utf8") as stream:
+                owns_temporary = True
+                protect(temporary)
+                stream.write("\n".join(lines + [key + "=" + value for key, value in changes.items()]) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            temporary.replace(pending)
+        finally:
+            if owns_temporary:
+                temporary.unlink(missing_ok=True)
+        if make_url(Settings(_env_file=pending).database_url).get_backend_name() != "postgresql":
+            raise RuntimeError("Server installations require PostgreSQL.")
+        # Hard-link publication is atomic and refuses to replace another config.
+        try:
+            os.link(pending, config)
+        except FileExistsError as error:
+            raise RuntimeError("Server configuration appeared during setup; review it before retrying.") from error
+        pending.unlink()
     settings = Settings(_env_file=config)
     if make_url(settings.database_url).get_backend_name() != "postgresql":
         raise RuntimeError("Server installations require PostgreSQL. Preserve and explicitly migrate an existing SQLite installation before cutover.")
@@ -136,7 +158,10 @@ def stop_children(children):
             if os.name == "nt":
                 subprocess.run(["taskkill", "/PID", str(child.pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
             else:
-                os.killpg(child.pid, signal.SIGTERM)
+                try:
+                    os.killpg(child.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
     for child in children:
         try:
             child.wait(timeout=10)
@@ -174,14 +199,20 @@ def serve(args):
     run_id = uuid.uuid4().hex
     stop_marker = data / ("stop-" + run_id)
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    owns_marker = False
     try:
+        try:
+            with marker.open("x", encoding="utf8") as stream:
+                owns_marker = True
+                json.dump({"run_id": run_id, "supervisor_pid": os.getpid(), "web_port": args.web_port}, stream)
+            protect(marker)
+        except FileExistsError as error:
+            raise RuntimeError("An existing supervisor marker must be stopped or reviewed before starting another server.") from error
         commands = [("api", [sys.executable, "-m", "uvicorn", "casequarry.main:app", "--host", "127.0.0.1", "--port", "8000", "--no-access-log", "--no-proxy-headers"]), ("worker", [sys.executable, "-m", "casequarry.worker"]), ("web", [node, PACKAGE / manifest["web_entry"]])]
         for name, arguments in commands:
             log = (data / f"{name}.log").open("a", encoding="utf8")
             logs.append(log)
             children.append(subprocess.Popen([str(value) for value in arguments], cwd=data, env=environment, stdout=log, stderr=subprocess.STDOUT, creationflags=flags, start_new_session=os.name != "nt"))
-        marker.write_text(json.dumps({"run_id": run_id, "supervisor_pid": os.getpid(), "web_port": args.web_port}), encoding="utf8")
-        protect(marker)
         for url in ["http://127.0.0.1:8000/api/v1/health", f"http://127.0.0.1:{args.web_port}/login"]:
             deadline = time.monotonic() + 60
             while time.monotonic() < deadline:
@@ -206,7 +237,8 @@ def serve(args):
         stop_children(children)
         for log in logs:
             log.close()
-        marker.unlink(missing_ok=True)
+        if owns_marker:
+            marker.unlink(missing_ok=True)
         stop_marker.unlink(missing_ok=True)
 
 

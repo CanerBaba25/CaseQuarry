@@ -1559,5 +1559,6 @@
   "Untagged": "Senza tag",
   "Prior source version": "Versione precedente della fonte",
   "Duplicates": "Duplicati",
-  "File upload": "Caricamento file"
+  "File upload": "Caricamento file",
+  "Models available through the Moonshot API.": "Modelli disponibili tramite l’API Moonshot."
 }

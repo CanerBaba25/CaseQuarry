@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from . import audit
+from .account_routes import require_admin
 from .models import Setting, Tenant, User, now
 from .schemas import LoginInput, SetupInput, UserInput
 from .security import (
@@ -16,6 +17,7 @@ from .security import (
     digest,
     fail,
     get_db,
+    lock_user,
     password_valid,
     user_json,
     utc,
@@ -71,6 +73,9 @@ def authenticate(body, request, db):
     valid = password_valid(body.password, encoded)
     if not user or not user.active or not valid:
         fail(401, "INVALID_CREDENTIALS", "Email, password or authentication code is incorrect.")
+    lock_user(db, user)
+    if not user.active or user.password_hash != encoded:
+        fail(401, "INVALID_CREDENTIALS", "Email, password or authentication code is incorrect.")
     if user.mfa_enabled:
         from .mfa_routes import valid_mfa
         if not valid_mfa(request.app.state.storage, user, body.totp_code):
@@ -102,8 +107,8 @@ def logout(request: Request, response: Response, actor: Actor = Depends(current_
     actor.session.revoked = True
     audit.record(db, actor.user, None, "auth.logout", "session", actor.session.id, request_id=request.state.request_id)
     db.commit()
-    response.delete_cookie("cq_session", path="/")
-    response.delete_cookie("cq_csrf", path="/")
+    # A delayed response must not delete cookies issued by a newer sign-in,
+    # including a sign-in in another tab. The captured session is revoked above.
     return {"ok": True}
 
 
@@ -127,9 +132,20 @@ def create_user(body: UserInput, request: Request, actor: Actor = Depends(curren
         fail(422, "EMAIL_INVALID", "Enter a valid email address.")
     if db.scalar(select(User.id).where(User.email == body.email.strip().lower())):
         fail(409, "USER_EXISTS", "This email is already registered.")
-    user = User(tenant_id=actor.user.tenant_id, email=body.email.strip().lower(), name=body.name, password_hash=PASSWORDS.hash(body.password), role=body.role)
+    encoded = PASSWORDS.hash(body.password)
+    require_admin(db, actor, lock=True)
+    if db.scalar(select(User.id).where(User.email == body.email.strip().lower())):
+        fail(409, "USER_EXISTS", "This email is already registered.")
+    user = User(tenant_id=actor.user.tenant_id, email=body.email.strip().lower(), name=body.name, password_hash=encoded, role=body.role)
     db.add(user)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        # Different tenant locks cannot serialize the globally unique email.
+        if db.scalar(select(User.id).where(User.email == body.email.strip().lower())):
+            fail(409, "USER_EXISTS", "This email is already registered.")
+        raise
     audit.record(db, actor.user, None, "user.created", "user", user.id, {"role": user.role}, request.state.request_id)
     db.commit()
     return user_json(user)

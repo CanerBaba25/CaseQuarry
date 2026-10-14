@@ -2,8 +2,15 @@
 import { uiMessage, uiText, type InterfaceMessage } from "@/lib/i18n";
 
 import { useState } from "react";
-import { api, date, uiLabel as label, number, post } from "@/lib/api";
-import { useResource } from "@/lib/hooks";
+import {
+  api,
+  date,
+  getDisplayTimeZone,
+  uiLabel as label,
+  number,
+  post,
+} from "@/lib/api";
+import { useMountedRef, useResource } from "@/lib/hooks";
 import type { AuditEvent, User } from "@/lib/types";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { PageHeading, Pagination } from "./matter-pages";
@@ -161,6 +168,7 @@ function AccountModal({
   close: () => void;
   done: (revoked: number | null) => void;
 }) {
+  const live = useMountedRef();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null);
   return (
@@ -193,7 +201,7 @@ function AccountModal({
                   }),
                 },
               );
-              done(result.sessions_revoked);
+              if (live.current) done(result.sessions_revoked);
             } else {
               await post("/users", {
                 name: form.get("name"),
@@ -201,12 +209,12 @@ function AccountModal({
                 password: form.get("password"),
                 role: form.get("role"),
               });
-              done(null);
+              if (live.current) done(null);
             }
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >
@@ -370,7 +378,7 @@ function SystemAudit() {
           <table>
             <thead>
               <tr>
-                <th>{uiText("Date · UTC")}</th>
+                <th>{uiText("Date · {0}", { "0": getDisplayTimeZone() })}</th>
                 <th>{uiText("Action")}</th>
                 <th>{uiText("Actor")}</th>
                 <th>{uiText("Target")}</th>

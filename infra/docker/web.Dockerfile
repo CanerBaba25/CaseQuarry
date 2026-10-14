@@ -1,12 +1,13 @@
 FROM node:24-alpine AS dependencies
-WORKDIR /app
+WORKDIR /app/apps/web
 COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci
 
 FROM node:24-alpine AS build
-WORKDIR /app
-COPY --from=dependencies /app/node_modules ./node_modules
+WORKDIR /app/apps/web
+COPY --from=dependencies /app/apps/web/node_modules ./node_modules
 COPY apps/web ./
+COPY packages /app/packages
 ARG CASEQUARRY_API_INTERNAL_URL=http://api:8000
 ENV CASEQUARRY_API_INTERNAL_URL=$CASEQUARRY_API_INTERNAL_URL NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
@@ -14,9 +15,9 @@ RUN npm run build
 FROM node:24-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
-COPY --from=build --chown=node:node /app/.next/standalone ./
-COPY --from=build --chown=node:node /app/.next/static ./.next/static
-COPY --from=build --chown=node:node /app/public ./public
+COPY --from=build --chown=node:node /app/apps/web/.next/standalone ./
+COPY --from=build --chown=node:node /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build --chown=node:node /app/apps/web/public ./apps/web/public
 USER node
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["node", "apps/web/server.js"]

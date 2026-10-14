@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { number } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
-import { bucketRange, evidenceUrl } from "@/lib/search-scope";
+import { dateBucketFilters, evidenceUrl } from "@/lib/search-scope";
 import type { Matter, Source } from "@/lib/types";
 import { Empty, ErrorBox, Icon, Loading } from "./ui";
 import { PageHeading, Pagination } from "./matter-pages";
@@ -121,16 +121,17 @@ export default function CommunicationAnalytics({ matter }: { matter: Matter }) {
   const items = resource.data?.items || [],
     maximum = Math.max(1, ...items.map((item) => item.count));
   const selectedFilters = scopeFilters(scope);
-  const link = (key: string) =>
-    evidenceUrl(
+  const link = (key: string) => {
+    return evidenceUrl(
       matter.id,
       {
-        ...selectedFilters,
-        ...bucketRange(key, grouping),
+        ...(dateBucketFilters(selectedFilters, key, grouping) ||
+          selectedFilters),
         item_types: ["email"],
       },
       true,
     );
+  };
   return (
     <>
       <PageHeading

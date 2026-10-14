@@ -23,6 +23,87 @@ from sqlalchemy.engine import make_url
 
 ROOT = Path(__file__).resolve().parents[1]
 
+CLI_LOCK_PROBE = '''
+import json
+import sys
+import time
+from pathlib import Path
+import typer
+from casequarry_cli import client
+
+def forbidden(*args, **kwargs):
+    raise RuntimeError("Profile-lock verification must not access credentials or HTTP")
+
+client.secure_keyring = forbidden
+for name in ("get_keyring", "get_password", "set_password", "delete_password"):
+    setattr(client.keyring, name, forbidden)
+client.httpx.request = forbidden
+client.httpx.Client.request = forbidden
+client.config_path = lambda: Path(sys.argv[2]) / "profiles.json"
+started = time.monotonic()
+try:
+    with client.profile_store_lock(timeout=0.2 if sys.argv[1] == "contend" else 1):
+        if sys.argv[1] == "owner":
+            Path(sys.argv[3]).write_text("locked")
+            sys.stdin.buffer.read(1)
+        print(json.dumps({"acquired": True}))
+except typer.Exit as error:
+    print(json.dumps({"blocked": True, "exit_code": error.exit_code, "elapsed_seconds": time.monotonic() - started}))
+'''
+
+
+def verify_cli_profile_lock(python, directory, env):
+    """Exercise the installed CLI lock with owned processes and private files."""
+    clean_env = {key: value for key, value in env.items() if not key.startswith("CASEQUARRY_") and key not in {"PYTHONPATH", "PYTHONHOME"}}
+    results = []
+    with tempfile.TemporaryDirectory(prefix="cli-profile-lock-", dir=directory) as temporary:
+        profile = Path(temporary)
+        command = [str(python), "-I", "-c", CLI_LOCK_PROBE]
+        options = {"env": clean_env, "cwd": profile, "stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "creationflags": subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0}
+
+        def probe(mode):
+            result = subprocess.run([*command, mode, str(profile)], timeout=10, **options)
+            if result.returncode:
+                raise RuntimeError(f"Installed CLI lock probe failed: {result.stdout.decode(errors='replace')} {result.stderr.decode(errors='replace')}")
+            return json.loads(result.stdout), result.stderr.decode(errors="replace").strip()
+
+        for exit_mode in ("normal", "terminated"):
+            ready = profile / (exit_mode + ".ready")
+            owner = subprocess.Popen([*command, "owner", str(profile), str(ready)], stdin=subprocess.PIPE, **options)
+            try:
+                deadline = time.monotonic() + 10
+                while not ready.exists() and owner.poll() is None and time.monotonic() < deadline:
+                    time.sleep(0.02)
+                if not ready.exists():
+                    raise RuntimeError("Installed CLI lock owner did not become ready")
+                blocked, diagnostic = probe("contend")
+                elapsed = blocked.get("elapsed_seconds", 0)
+                if not blocked.get("blocked") or blocked.get("exit_code") != 7 or not 0.15 <= elapsed < 3:
+                    raise RuntimeError("Installed CLI profile lock did not enforce bounded cross-process exclusion")
+                if exit_mode == "normal":
+                    output, errors = owner.communicate(input=b"\n", timeout=5)
+                    if owner.returncode or errors or json.loads(output) != {"acquired": True}:
+                        raise RuntimeError("Installed CLI profile lock owner did not exit cleanly")
+                else:
+                    owner.terminate()
+                    owner.communicate(timeout=5)
+                acquired, errors = probe("acquire")
+                if acquired != {"acquired": True} or errors:
+                    raise RuntimeError("Installed CLI profile lock remained held after its owner exited")
+                results.append({"owner_exit": exit_mode, "excluded": True, "bounded_wait_seconds": round(elapsed, 3), "reacquired": True, "contention_diagnostic": diagnostic})
+            except Exception as error:
+                if owner.poll() is None:
+                    owner.kill()
+                output, errors = owner.communicate(timeout=5)
+                if output or errors:
+                    error.add_note(f"Owned CLI lock probe diagnostics: {output.decode(errors='replace')} {errors.decode(errors='replace')}")
+                raise
+            finally:
+                if owner.poll() is None:
+                    owner.kill()
+                owner.communicate(timeout=5)
+    return {"platform": sys.platform, "checks": results, "credential_or_http_access": False}
+
 
 def free_port():
     with socket.socket() as listener:
@@ -80,6 +161,9 @@ def verify(args):
             subprocess.run([sys.executable, str(controller), "verify"], env=env, check=True)
             subprocess.run([sys.executable, str(controller), "install", "--data-dir", str(data), "--database-env", "CASEQUARRY_PACKAGE_DATABASE_URL", "--loopback-development"], env=env, check=True)
             report["checks"].append("Artifact hashes, isolated runtime install and actual PostgreSQL static migrations")
+            installed_python = data / "runtime" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+            report["cli_profile_lock"] = verify_cli_profile_lock(installed_python, directory, env)
+            report["checks"].append("Installed CLI profile-store OS lock: bounded process exclusion and reacquisition after normal and abrupt owner exit")
             port = free_port()
             with (report_path.parent / "services.log").open("w", encoding="utf8") as log:
                 child = subprocess.Popen([sys.executable, str(controller), "start", "--data-dir", str(data), "--web-port", str(port)], env=env, stdout=log, stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)

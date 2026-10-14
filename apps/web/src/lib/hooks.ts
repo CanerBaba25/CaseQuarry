@@ -4,6 +4,17 @@ import type { SetStateAction } from "react";
 import { api, ApiError } from "./api";
 import type { RefreshScope } from "./sync";
 
+export function useMountedRef() {
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
+  return live;
+}
+
 export function useResource<T>(path: string | null) {
   const [data, setData] = useState<T | null>(null);
   const [dataPath, setDataPath] = useState<string | null>(null);

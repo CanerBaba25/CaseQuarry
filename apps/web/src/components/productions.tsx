@@ -4,8 +4,8 @@ import { uiText } from "@/lib/i18n";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { bytes, uiLabel as label, number, post } from "@/lib/api";
-import { useResource } from "@/lib/hooks";
+import { bytes, csrfToken, uiLabel as label, number, post } from "@/lib/api";
+import { useMountedRef, useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import type { EvidenceDetail, Matter, User } from "@/lib/types";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
@@ -406,6 +406,7 @@ function RedactionRequest({
   close: () => void;
   done: (id: string) => void;
 }) {
+  const live = useMountedRef();
   const [draftId, setDraftId] = useState(initialId),
     [id, setId] = useState(initialId),
     [kind, setKind] = useState<"text" | "pdf">("text"),
@@ -419,8 +420,13 @@ function RedactionRequest({
   const content = useResource<{ text: string; artifact_version: number }>(
     id && kind === "text" ? `/cases/${caseId}/evidence/${id}/content` : null,
   );
+  const [selectedContent, setSelectedContent] = useState<{
+    text: string;
+    artifact_version: number;
+  } | null>(null);
+  const sourceContent = selectedContent || content.data;
   const textRef = useRef<HTMLTextAreaElement>(null),
-    text = content.data?.text || "",
+    text = sourceContent?.text || "",
     characters = Array.from(text);
   return (
     <Modal title={uiText("Request a sanitized redaction")} close={close} wide>
@@ -429,17 +435,19 @@ function RedactionRequest({
           {uiText("Evidence ID")}
           <input
             value={draftId}
+            disabled={busy}
             onChange={(event) => setDraftId(event.target.value)}
           />
         </label>
         <button
           type="button"
           className="button secondary"
-          disabled={!draftId.trim()}
+          disabled={busy || !draftId.trim()}
           onClick={() => {
             setId(draftId.trim());
             setRanges([]);
             setRegions([]);
+            setSelectedContent(null);
             setError(null);
           }}
         >
@@ -450,6 +458,8 @@ function RedactionRequest({
       {(item.loading || content.loading) && <Loading />}
       {item.data && (
         <form
+          inert={busy}
+          aria-busy={busy}
           onSubmit={async (event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
@@ -465,16 +475,16 @@ function RedactionRequest({
                   ...(kind === "text"
                     ? {
                         ranges,
-                        expected_text_version: content.data?.artifact_version,
+                        expected_text_version: sourceContent?.artifact_version,
                       }
                     : { regions }),
                 },
               );
-              done(result.id);
+              if (live.current) done(result.id);
             } catch (error) {
-              setError(error);
+              if (live.current) setError(error);
             } finally {
-              setBusy(false);
+              if (live.current) setBusy(false);
             }
           }}
         >
@@ -491,6 +501,7 @@ function RedactionRequest({
                 setKind(event.target.value as "text" | "pdf");
                 setRanges([]);
                 setRegions([]);
+                setSelectedContent(null);
               }}
             >
               <option value="text">{uiText("UTF-8 extracted text")}</option>
@@ -503,7 +514,7 @@ function RedactionRequest({
             <>
               <label>
                 {uiText("Immutable extracted text · version")}{" "}
-                {content.data?.artifact_version || "—"}
+                {sourceContent?.artifact_version || "—"}
                 <textarea
                   className="redaction-source-text"
                   ref={textRef}
@@ -518,7 +529,11 @@ function RedactionRequest({
                 disabled={!text || ranges.length >= 200}
                 onClick={() => {
                   const field = textRef.current;
-                  if (!field || field.selectionEnd <= field.selectionStart) {
+                  if (
+                    !field ||
+                    !sourceContent ||
+                    field.selectionEnd <= field.selectionStart
+                  ) {
                     setError(
                       new Error(
                         "Select the exact source text you want to redact first.",
@@ -531,6 +546,10 @@ function RedactionRequest({
                       .length,
                     end: Array.from(text.slice(0, field.selectionEnd)).length,
                   };
+                  setSelectedContent({
+                    text: sourceContent.text,
+                    artifact_version: sourceContent.artifact_version,
+                  });
                   setRanges([...ranges, range]);
                   setError(null);
                 }}
@@ -560,9 +579,11 @@ function RedactionRequest({
                       aria-label={uiText("Remove text range {0}", {
                         "0": index + 1,
                       })}
-                      onClick={() =>
-                        setRanges(ranges.filter((_, i) => i !== index))
-                      }
+                      onClick={() => {
+                        const remaining = ranges.filter((_, i) => i !== index);
+                        setRanges(remaining);
+                        if (!remaining.length) setSelectedContent(null);
+                      }}
                     >
                       <Icon name="close" size={15} />
                     </button>
@@ -709,6 +730,7 @@ function ProductionRequest({
   close: () => void;
   done: (id: string) => void;
 }) {
+  const live = useMountedRef();
   const [redactionCursor, setRedactionCursor] = useState<string | null>(null),
     [availableRedactions, setAvailableRedactions] = useState<Redaction[]>([]);
   const sets = useResource<{
@@ -775,11 +797,11 @@ function ProductionRequest({
                 confirmed: form.get("confirmed") === "on",
               },
             );
-            done(result.id);
+            if (live.current) done(result.id);
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >
@@ -927,6 +949,7 @@ function Confirmation({
   close: () => void;
   done: () => void;
 }) {
+  const live = useMountedRef();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null);
   return (
@@ -942,11 +965,11 @@ function Confirmation({
               reason: form.get("reason"),
               ...(approve ? { confirmed: form.get("confirmed") === "on" } : {}),
             });
-            done();
+            if (live.current) done();
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >
@@ -1115,6 +1138,7 @@ function SanitizedPreview({ caseId, row }: { caseId: string; row: Redaction }) {
     [error, setError] = useState<unknown>(null);
   useEffect(() => {
     const controller = new AbortController();
+    const submittedSession = csrfToken();
     let url: string | null = null;
     setSource(null);
     setError(null);
@@ -1124,8 +1148,9 @@ function SanitizedPreview({ caseId, row }: { caseId: string; row: Redaction }) {
       signal: controller.signal,
     })
       .then(async (response) => {
+        controller.signal.throwIfAborted();
         if (!response.ok) {
-          if (response.status === 401)
+          if (response.status === 401 && csrfToken() === submittedSession)
             window.dispatchEvent(new Event("cq:unauthorized"));
           const data = await response.json().catch(() => ({}));
           throw new Error(
@@ -1134,7 +1159,9 @@ function SanitizedPreview({ caseId, row }: { caseId: string; row: Redaction }) {
           );
         }
         if (row.kind === "text") return response.text();
-        url = URL.createObjectURL(await response.blob());
+        const data = await response.blob();
+        controller.signal.throwIfAborted();
+        url = URL.createObjectURL(data);
         return url;
       })
       .then((value) => {

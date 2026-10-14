@@ -15,6 +15,7 @@ PROVIDERS = {
     "gemini": {"name": "Google Gemini API", "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/"},
     "xai": {"name": "xAI Grok API", "endpoint": "https://api.x.ai/v1/chat/completions"},
     "anthropic": {"name": "Anthropic Claude API", "endpoint": "https://api.anthropic.com/v1/messages"},
+    "kimi": {"name": "Kimi API (Moonshot)", "endpoint": "https://api.moonshot.ai/v1/chat/completions"},
 }
 MODEL_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,199}")
 CLOUD_WARNINGS = [
@@ -26,7 +27,7 @@ CLOUD_WARNINGS = [
 
 def provider(identifier):
     if identifier not in PROVIDERS:
-        fail(503, "REMOTE_AI_UNAVAILABLE", "Choose an implemented cloud provider: openai, gemini, xai or anthropic.")
+        fail(503, "REMOTE_AI_UNAVAILABLE", "Choose an implemented cloud provider: openai, gemini, xai, anthropic or kimi.")
     return PROVIDERS[identifier]
 
 

@@ -25,7 +25,13 @@ uv run casequarry audit verify --case CASE_ID
 
 Passwords are prompted with hidden input. `auth login --password-stdin` reads one line without echoing it. Bearer sessions are stored in the OS keyring; profile JSON contains server/email only. Tokens are never printed. A secure OS keyring is required for persistent login; there is no plaintext fallback.
 
+Version 0.7.0 binds each stored session to its server origin and account, and publishes profile metadata atomically. After upgrading from an earlier version, run `auth login` again for each saved profile; older unbound credentials are refused. Interrupted profile saves fail closed rather than sending a token to a different server. Explicit `CASEQUARRY_TOKEN` use remains an operator-supplied session.
+
+Local profile updates are serialized with an operating-system lock, so simultaneous sign-ins retain both profiles. Sign-out revokes its captured bearer and removes the matching stored credential; a newer sign-in completed while that request was pending is preserved. Network requests do not hold the local store lock.
+
 Imports are sent in bounded groups of 25 files. Folder uploads preserve paths relative to the selected folder; local absolute paths are not sent. `--wait` polls at one-second intervals for up to ten minutes per batch; timeout does not cancel a running server job. MBOX is submitted as one file and parsed as a stream by the worker. Bounded Outlook MSG extraction is supported; unsupported PST/OST and other adapters are preserved/reported by the backend and cannot be represented as successful searchable imports.
+
+Folder inventory skips symbolic links and Windows junctions, including directory aliases below a recursive selection. Original downloads create their destination exclusively and refuse an existing file, including one created while a download is in progress.
 
 Local integrity helpers work without an API session. Build the optional Rust helper with `cargo build --release --locked`; `--engine auto` uses that fixed binary when present and otherwise uses bounded Python streaming. `--engine rust` requires the binary. These commands preserve input bytes:
 
@@ -57,5 +63,7 @@ uv run cq api request PUT /cases/CASE_ID/upload-sessions/UPLOAD_ID/parts/0 --dat
 ```
 
 `api request` provides authenticated JSON access to implemented public API routes, including routes without a dedicated shortcut. It accepts a bounded JSON document or binary request part, preserves normal dry-run behavior, disables redirects and redacts sensitive response keys. Use dedicated original/export download commands for binary responses. Store credential-bearing JSON files only in private locations, exclude them from version control, and remove them after use.
+
+Cloud requests through `api request` require the explicit provider and revision snapshot described in the [cloud API contract](CLOUD_AI_GUIDE.md#api-contract). Read and review that configuration before confirming it; do not automatically fetch new revisions and retry a stale confirmation. The dedicated `ai ask` shortcut uses local mode.
 
 Do not put real evidence or credentials in shell arguments when avoidable, transcripts or public tickets. CLI output is intended for authorized local users and may contain explicitly requested evidence metadata/text.

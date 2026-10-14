@@ -12,7 +12,7 @@ from .languages import Language
 from .mfa_routes import valid_mfa
 from .models import Audit, Case, LoginSession, Member, Tenant, User, now
 from .schemas import Input, Reason
-from .security import PASSWORDS, Actor, current_actor, fail, get_db, password_valid, user_json, utc
+from .security import PASSWORDS, Actor, current_actor, fail, get_db, lock_user, password_valid, user_json, utc
 from .time_zones import names as time_zone_names
 from .time_zones import validate as validate_time_zone
 
@@ -187,10 +187,18 @@ def change_password(
         fail(401, "INVALID_CREDENTIALS", "Password or authenticator code is incorrect.")
     if body.current_password == body.new_password:
         fail(422, "PASSWORD_UNCHANGED", "Choose a different password.")
+    encoded = PASSWORDS.hash(body.new_password)
+    lock_user(db, actor.user)
+    if not actor.user.active:
+        fail(401, "ACCOUNT_DISABLED", "This account is unavailable.")
+    if actor.user.password_hash != previous:
+        fail(409, "PASSWORD_VERSION_CONFLICT", "Your password changed during this request. Sign in again.")
+    if actor.user.mfa_enabled and not valid_mfa(request.app.state.storage, actor.user, body.totp_code):
+        fail(401, "INVALID_CREDENTIALS", "Password or authenticator code is incorrect.")
     changed = db.execute(
         update(User)
         .where(User.id == actor.user.id, User.password_hash == previous)
-        .values(password_hash=PASSWORDS.hash(body.new_password))
+        .values(password_hash=encoded)
     )
     if changed.rowcount != 1:
         fail(409, "PASSWORD_VERSION_CONFLICT", "Your password changed during this request. Sign in again.")

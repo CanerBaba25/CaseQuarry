@@ -20,10 +20,10 @@ import {
   number,
   post,
 } from "@/lib/api";
-import { useResource } from "@/lib/hooks";
+import { useMountedRef, useResource } from "@/lib/hooks";
 import type { RefreshScope } from "@/lib/sync";
 import { can } from "@/lib/permissions";
-import { bucketRange, filtersFromParams } from "@/lib/search-scope";
+import { dateBucketFilters, filtersFromParams } from "@/lib/search-scope";
 import type {
   Evidence,
   EvidenceDetail,
@@ -123,6 +123,7 @@ export default function Explorer({
   const [dialog, setDialog] = useState<
     "saved" | "set" | "bulk" | "export" | "assign" | null
   >(null);
+  const [inspectorBlocked, setInspectorBlocked] = useState(false);
   const sources = useResource<{ items: Source[] }>(
       `/cases/${matter.id}/sources`,
     ),
@@ -158,6 +159,7 @@ export default function Explorer({
     setHistory([]);
     setSelected([]);
     setSelectedId(evidenceId || null);
+    setDialog(null);
     setSpec(next);
   }, [matter.id, reviewOnly, emailOnly, evidenceId, routeQuery, routeScope]);
   useEffect(() => {
@@ -267,6 +269,12 @@ export default function Explorer({
       tag: "tags",
     } as Record<string, string>
   )[spec.group_by || ""];
+  const dateGrouping = ["month", "year", "day"].includes(spec.group_by || "");
+  const importDateScope = Boolean(
+    dateGrouping &&
+    spec.filters.date_field === "imported_at" &&
+    (spec.filters.date_from || spec.filters.date_to),
+  );
   return (
     <div className="explorer-shell">
       <div className="explorer-heading">
@@ -806,26 +814,26 @@ export default function Explorer({
                     disabled={
                       !item.key ||
                       item.key === "Unknown" ||
-                      item.key === "Untagged"
+                      item.key === "Untagged" ||
+                      importDateScope
                     }
                     title={
                       !item.key || item.key === "Unknown"
                         ? uiText(
                             "Missing metadata cannot be drilled down in this preview. These items remain in the evidence results.",
                           )
-                        : undefined
+                        : importDateScope
+                          ? `${uiText("Date field")}: ${uiText("Imported timestamp")}`
+                          : undefined
                     }
                     onClick={() => {
-                      if (
-                        ["month", "year", "day"].includes(spec.group_by || "")
-                      ) {
-                        update({
-                          filters: {
-                            ...spec.filters,
-                            ...bucketRange(item.key, spec.group_by!),
-                            date_field: "sent_at",
-                          },
-                        });
+                      if (dateGrouping) {
+                        const filters = dateBucketFilters(
+                          spec.filters,
+                          item.key,
+                          spec.group_by!,
+                        );
+                        if (filters) update({ filters });
                       } else
                         filter(
                           groupField,
@@ -986,6 +994,9 @@ export default function Explorer({
                       <td>
                         <button
                           className="evidence-open"
+                          disabled={
+                            inspectorBlocked && selectedId !== item.evidence_id
+                          }
                           onClick={() => setSelectedId(item.evidence_id)}
                         >
                           <span className={`evidence-kind ${item.type}`}>
@@ -1113,6 +1124,7 @@ export default function Explorer({
             }}
             changed={() => setVersion((value) => value + 1)}
             open={setSelectedId}
+            navigationBlocked={setInspectorBlocked}
             navigation={
               selectedPosition >= 0 && result
                 ? {
@@ -1144,8 +1156,9 @@ export default function Explorer({
           </aside>
         )}
       </div>
-      {dialog && (
+      {dialog && !routeChanged && (
         <ExplorerActionModal
+          key={JSON.stringify([matter.id, dialog, selected, spec])}
           kind={dialog}
           caseId={matter.id}
           selected={selected}
@@ -1190,6 +1203,7 @@ export function EvidenceInspector({
   changed,
   open,
   navigation,
+  navigationBlocked,
 }: {
   caseId: string;
   id: string;
@@ -1205,6 +1219,7 @@ export function EvidenceInspector({
     previous: string | null;
     next: string | null;
   };
+  navigationBlocked?: (blocked: boolean) => void;
 }) {
   const path = usePathname(),
     params = useSearchParams(),
@@ -1213,6 +1228,12 @@ export function EvidenceInspector({
   const canReview = allowReview && !version,
     canManage = allowManage && !version;
   const reviewScope = `${caseId}:${id}:${version || "current"}`;
+  const reviewGeneration = useRef({ scope: reviewScope, revision: 0 });
+  if (reviewGeneration.current.scope !== reviewScope)
+    reviewGeneration.current = {
+      scope: reviewScope,
+      revision: reviewGeneration.current.revision + 1,
+    };
   const activeReviewScope = useRef<string | null>(reviewScope);
   activeReviewScope.current = reviewScope;
   useEffect(() => {
@@ -1313,6 +1334,7 @@ export function EvidenceInspector({
     if (!data) return;
     const submittedDraftRevision = tagDraft.current.revision;
     const submittedScope = reviewScope;
+    const submittedGeneration = reviewGeneration.current.revision;
     setBusy(true);
     setError(null);
     setMessage("");
@@ -1324,7 +1346,11 @@ export function EvidenceInspector({
           expected_version: data.review_version,
         },
       );
-      if (activeReviewScope.current !== submittedScope) return;
+      if (
+        activeReviewScope.current !== submittedScope ||
+        reviewGeneration.current.revision !== submittedGeneration
+      )
+        return;
       detail.setData((current) =>
         current &&
         current.id === reviewed.id &&
@@ -1343,12 +1369,19 @@ export function EvidenceInspector({
       changed();
       setMessage("Review saved in the audit record.");
     } catch (error) {
-      if (activeReviewScope.current === submittedScope) {
+      if (
+        activeReviewScope.current === submittedScope &&
+        reviewGeneration.current.revision === submittedGeneration
+      ) {
         setError(error);
         detail.refresh();
       }
     } finally {
-      if (activeReviewScope.current === submittedScope) setBusy(false);
+      if (
+        activeReviewScope.current === submittedScope &&
+        reviewGeneration.current.revision === submittedGeneration
+      )
+        setBusy(false);
     }
   }
   function people(value: unknown): string {
@@ -1369,6 +1402,10 @@ export function EvidenceInspector({
   const unsaved = Boolean(
     note.trim() || (tagDraft.current.dirty && tags !== data?.tags.join(", ")),
   );
+  useEffect(() => {
+    navigationBlocked?.(busy || unsaved);
+    return () => navigationBlocked?.(false);
+  }, [busy, unsaved, navigationBlocked]);
   return (
     <aside
       className="evidence-inspector"
@@ -1379,6 +1416,7 @@ export function EvidenceInspector({
         <button
           className="icon-button"
           aria-label={uiText("Close evidence inspector")}
+          disabled={busy || unsaved}
           onClick={close}
         >
           <Icon name="close" size={18} />
@@ -1462,6 +1500,7 @@ export function EvidenceInspector({
               <select
                 value={version || "current"}
                 aria-label={uiText("Extracted text version")}
+                disabled={busy || unsaved}
                 onChange={(event) =>
                   versionRouter.push(
                     `/app/matters/${caseId}/evidence/${id}${event.target.value === "current" ? "" : `?version=${event.target.value}`}`,
@@ -1522,6 +1561,10 @@ export function EvidenceInspector({
                   <Link
                     className="button secondary compact"
                     href={`/app/matters/${caseId}/productions?evidence_id=${id}`}
+                    aria-disabled={busy || unsaved}
+                    onClick={(event) => {
+                      if (busy || unsaved) event.preventDefault();
+                    }}
                   >
                     {uiText("Redact")}
                   </Link>
@@ -1542,16 +1585,37 @@ export function EvidenceInspector({
                   className="button ghost compact"
                   disabled={busy}
                   onClick={async () => {
+                    const submittedGeneration =
+                      reviewGeneration.current.revision;
+                    const submittedScope = reviewScope;
                     setBusy(true);
                     setError(null);
                     try {
-                      setVerified(
-                        await post(`/cases/${caseId}/evidence/${id}/verify`),
-                      );
+                      const result = await post<{
+                        valid: boolean;
+                        expected_sha256: string;
+                        actual_sha256: string;
+                      }>(`/cases/${caseId}/evidence/${id}/verify`);
+                      if (
+                        activeReviewScope.current === submittedScope &&
+                        reviewGeneration.current.revision ===
+                          submittedGeneration
+                      )
+                        setVerified(result);
                     } catch (error) {
-                      setError(error);
+                      if (
+                        activeReviewScope.current === submittedScope &&
+                        reviewGeneration.current.revision ===
+                          submittedGeneration
+                      )
+                        setError(error);
                     } finally {
-                      setBusy(false);
+                      if (
+                        activeReviewScope.current === submittedScope &&
+                        reviewGeneration.current.revision ===
+                          submittedGeneration
+                      )
+                        setBusy(false);
                     }
                   }}
                 >
@@ -1796,6 +1860,7 @@ export function EvidenceInspector({
                       {data.attachments.map((item) => (
                         <button
                           key={item.evidence_id}
+                          disabled={busy || unsaved}
                           onClick={() => open(item.evidence_id)}
                         >
                           <Icon name="file" size={18} />
@@ -1814,6 +1879,7 @@ export function EvidenceInspector({
                   {(data.parent_id || data.parent_item_id) && (
                     <button
                       className="button secondary compact"
+                      disabled={busy || unsaved}
                       onClick={() =>
                         open((data.parent_id || data.parent_item_id)!)
                       }
@@ -2142,6 +2208,9 @@ export function EvidenceInspector({
                     onSubmit={async (event) => {
                       event.preventDefault();
                       if (!note.trim()) return;
+                      const submittedScope = reviewScope;
+                      const submittedGeneration =
+                        reviewGeneration.current.revision;
                       setBusy(true);
                       setError(null);
                       try {
@@ -2152,14 +2221,30 @@ export function EvidenceInspector({
                             ...(noteSpan ? { span_id: noteSpan } : {}),
                           },
                         );
+                        if (
+                          activeReviewScope.current !== submittedScope ||
+                          reviewGeneration.current.revision !==
+                            submittedGeneration
+                        )
+                          return;
                         setNote("");
                         setNoteSpan(null);
                         detail.refresh();
                         setMessage("Note saved.");
                       } catch (error) {
-                        setError(error);
+                        if (
+                          activeReviewScope.current === submittedScope &&
+                          reviewGeneration.current.revision ===
+                            submittedGeneration
+                        )
+                          setError(error);
                       } finally {
-                        setBusy(false);
+                        if (
+                          activeReviewScope.current === submittedScope &&
+                          reviewGeneration.current.revision ===
+                            submittedGeneration
+                        )
+                          setBusy(false);
                       }
                     }}
                   >
@@ -2282,6 +2367,7 @@ function ExplorerActionModal({
   close: () => void;
   done: () => void;
 }) {
+  const live = useMountedRef();
   const [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false),
     [download, setDownload] = useState<{ id: string; state: string } | null>(
@@ -2354,21 +2440,23 @@ function ExplorerActionModal({
           reason: form.get("reason"),
         });
       if (kind === "export") {
-        setDownload(
-          await post(`/cases/${caseId}/exports`, {
+        const result = await post<{ id: string; state: string }>(
+          `/cases/${caseId}/exports`,
+          {
             format: form.get("format"),
             ...(selected.length
               ? { evidence_ids: selected }
               : { query_spec: { ...spec, cursor: null } }),
             reason: form.get("reason"),
             confirmed: form.get("confirmed") === "on",
-          }),
+          },
         );
-      } else done();
+        if (live.current) setDownload(result);
+      } else if (live.current) done();
     } catch (error) {
-      setError(error);
+      if (live.current) setError(error);
     } finally {
-      setBusy(false);
+      if (live.current) setBusy(false);
     }
   }
   return (

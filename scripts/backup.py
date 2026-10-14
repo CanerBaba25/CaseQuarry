@@ -104,9 +104,12 @@ def create_backup(
             source.backup(target)
             if target.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                 raise ValueError("SQLite snapshot failed integrity verification")
+        created_output = False
         try:
+            destination = output.open("xb")
+            created_output = True
             with (
-                output.open("xb") as destination,
+                destination,
                 (scratch / "manifest.jsonl").open("w", encoding="utf-8") as manifest,
             ):
                 if os.name != "nt":
@@ -160,7 +163,8 @@ def create_backup(
                 destination.flush()
                 os.fsync(destination.fileno())
         except Exception:
-            output.unlink(missing_ok=True)
+            if created_output:
+                output.unlink(missing_ok=True)
             raise
     digest, encrypted_bytes = digest_file(output)
     return {

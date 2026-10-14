@@ -2,6 +2,7 @@
 import { uiText } from "@/lib/i18n";
 
 import { useEffect, useRef, useState } from "react";
+import { csrfToken } from "@/lib/api";
 import { ErrorBox, Icon, Loading } from "./ui";
 
 type Region = {
@@ -40,6 +41,7 @@ export default function PdfRegionSelector({
   const current = preview?.key === key ? preview : null;
   useEffect(() => {
     const controller = new AbortController();
+    const submittedSession = csrfToken();
     let url: string | null = null;
     setError(null);
     setAnchor(null);
@@ -53,8 +55,9 @@ export default function PdfRegionSelector({
       },
     )
       .then(async (response) => {
+        controller.signal.throwIfAborted();
         if (!response.ok) {
-          if (response.status === 401)
+          if (response.status === 401 && csrfToken() === submittedSession)
             window.dispatchEvent(new Event("cq:unauthorized"));
           const result = await response.json().catch(() => ({}));
           throw new Error(

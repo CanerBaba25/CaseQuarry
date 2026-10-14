@@ -1008,6 +1008,10 @@ a:focus-visible {
   height: 100%;
   margin: 0;
 }
+.dropzone:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 .dropzone.dragging {
   background: color-mix(in srgb, var(--accent) 20%, var(--surface));
   border-color: var(--accent);
@@ -1313,7 +1317,7 @@ a:focus-visible {
   left: 250px;
   top: -60px;
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast);
   padding: 12px;
   z-index: 150;
 }

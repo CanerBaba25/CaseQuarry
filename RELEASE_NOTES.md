@@ -1,5 +1,85 @@
 # Release notes
 
+## 0.7.0 — October 14, 2026
+
+Kimi provider support and fixes across authentication, evidence processing, review,
+the CLI and server packaging. Retains all 13 interface languages and the existing web/server
+and Windows, universal Mac and Ubuntu desktop distribution formats.
+
+### Kimi provider
+
+- Save a personal Kimi Open Platform API key and compatible model through provider
+  settings. Keys remain encrypted and scoped to the requesting account.
+- Firm approval, matter consent and the confirmed provider/revision snapshot are
+  required before selected extracted passages can leave the server.
+- Requests use Moonshot's fixed global endpoint and structured responses, with
+  bounded input/output, citation verification and no automatic paid retries.
+- The same provider settings are available in browser and desktop workspaces and
+  all 13 interface languages. Saving a key performs no vendor request.
+
+### Fixed
+
+- Authentication checks current password, account and authenticator state before
+  issuing a session. Authenticator changes serialize, and a delayed logout cannot
+  remove a newer sign-in. Administrator creation rechecks current authority.
+- Explicitly unassigning evidence now works. Inactive reviewers are rejected, and
+  assignment changes use the shared matter/user locking order.
+- JSON, URL and multipart text reject embedded NUL characters before PostgreSQL
+  queries. Maximum inclusive dates return a validation response instead of an overflow.
+- ZIP imports preserve worker yield and lease-loss signals. Blocked container
+  scans stop family expansion; partial-state counters remain consistent. Reprocessing
+  replaces obsolete current participant links without changing originals.
+- Search cursors retain the database's exact Unicode sort key, avoiding skipped or
+  repeated items. Spreadsheet limits include sheet titles and line separators.
+- Cloud jobs bind confirmation to the displayed provider and policy/credential
+  revisions. Changed configuration requires a new confirmation before queueing.
+- Delayed UI requests respect their active session, dialog, page and selection.
+  Traffic chart links preserve the selected date range. Keyboard focus, dark-theme
+  skip links and long task titles remain usable.
+- Setup and sign-in wait for their canonical route before accepting input, so a
+  slow initial redirect cannot clear text already typed into the form.
+- Text redaction ranges stay bound to the displayed extraction version; a refreshed
+  source cannot reinterpret old offsets against new text. Evidence navigation and
+  export dialogs retain the correct draft and confirmed scope.
+- CLI credentials are bound to server/account metadata, native JSON uses UTF-8,
+  manifest validation matches Rust types, downloads refuse existing files, and
+  folder inventories skip symbolic links and Windows junctions.
+- Docker web builds include shared language modules. Initial server setup retains
+  private bootstrap secrets for recovery; startup claims exclusive supervisor
+  ownership before launching application processes.
+- Backup and PostgreSQL setup cleanup remove only files created by that invocation,
+  preserving a competing process's pre-existing files.
+
+### Validation
+
+The complete local Python integration run passed 619 tests with PostgreSQL checks
+enabled, no skipped tests and two existing Starlette deprecation warnings. Some
+legacy fixtures intentionally use SQLite. The final focused CLI run passed 50
+overlapping checks, including the last unavailable-keyring recovery fix.
+Kimi's focused checks use controlled HTTP responses and isolated PostgreSQL;
+no live provider account or paid request was tested.
+
+The Rust integrity component passed 11 tests, the native client passed ten, and
+the rebuilt Windows application verified all 13 languages and 143 native menu
+labels. Its local installer passed install, launch and uninstall with existing
+device state preserved. Web typechecking and production builds passed; 12 focused
+interface suites passed 79 behavior scenarios and all 25 baseline browser workflows
+passed. Eight additional browser audit stages and two slow-auth-navigation checks
+passed against PostgreSQL with no runtime errors. Cross-platform installation and
+packaged server checks remain release gates.
+
+### Upgrade
+
+No new database migration follows `0009_user_language`. Preserve a verified backup,
+upgrade the server and reload clients. Run `cq auth login` again for saved CLI
+profiles created by earlier versions; unbound stored credentials are rejected.
+Direct cloud-job API callers must send the four confirmed snapshot fields in the
+[cloud contract](docs/CLOUD_AI_GUIDE.md#api-contract). Local jobs are unchanged.
+
+Windows remains unsigned and Mac remains non-notarized. Docker execution and live
+vendor accounts are outside the current validation environment; the documented
+production-scale limits remain.
+
 ## 0.6.0 — October 13, 2026
 
 Daily task triage and a multilingual interface for the website and desktop client.

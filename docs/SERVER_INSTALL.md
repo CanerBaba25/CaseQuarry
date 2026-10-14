@@ -26,6 +26,8 @@ uv run --no-project --python 3.12 python server.py start --data-dir "$HOME/.loca
 
 `install.ps1` is the Windows installation wrapper. Use `--postgres-bin` when tools are outside standard locations, or `--postgres-port` to select a free private database port. For an operator-managed database, set a private environment variable containing the PostgreSQL URL and add `--database-env VARIABLE_NAME` to installation. Do not place credentials in command-line arguments. The installer checks hashes, creates an isolated Python environment, installs locked dependencies, generates private setup/provider-encryption secrets, and applies static migrations. It does not create a firm or administrator automatically.
 
+If initial database provisioning fails, correct the prerequisite and rerun the same installation command with the same data directory. Private `.env.pending` retains bootstrap secrets across retries; the final `.env` is published only after database provisioning and configuration succeed. Preserve that pending file during recovery so an already-created database role keeps the same password. Existing `.env` files are never replaced by initial setup.
+
 The controller starts API on loopback8000, web on loopback3000 and a standalone worker. It waits for API/web readiness and stops its owned application processes together if a component fails. `server.py stop --data-dir PATH` requests a clean supervisor stop; PostgreSQL data and its persistent server remain. `server.py status` reports configuration/supervisor presence without secrets. Keep the private `.env`, particularly the provider encryption key, with the recovery material. Never upload it to GitHub or copy it into clients.
 
 Use `--loopback-development` only for an isolated local validation installation. Normal installation selects production cookie handling and requires an HTTPS proxy for firm access. Runtime `verify` checks every manifest file. An unsigned download still requires validating the GitHub Release checksum and publisher before installation.
@@ -57,6 +59,8 @@ For an upgrade, stop services, take that coordinated backup, install the new ver
 The 0.3 → 0.4 upgrade applies `0005_task_due_dates` and `0006_user_time_zones` after `0004_firm_sync_providers`. Existing tasks keep an unset due date, and existing accounts start with the UTC time zone. These are calendar/display preferences, not computed legal deadlines. The installer applies both migrations before services start. In a source installation, run `uv run python -m casequarry.database migrate` with the same private `.env` after the verified backup. Compare retained row IDs, original hashes and audit chains and check the schema status before restarting API/worker.
 
 The 0.5 → 0.6 upgrade applies `0008_task_priorities` and `0009_user_language` after `0007_task_versions`. Existing tasks receive normal priority without changing their versions, timestamps or audit events; existing accounts start in English. The packaged installer applies these migrations before services start. Source installations use the migration command above. Reload connected clients afterward and restart older My work pagination from the first page.
+
+The 0.6.0 → 0.7.0 upgrade adds no database migration. Reload clients after restarting services. Saved CLI profiles need a fresh sign-in, and direct cloud-job API callers must send the confirmed provider/revision snapshot; see the [CLI reference](CLI_REFERENCE.md) and [cloud contract](CLOUD_AI_GUIDE.md#api-contract).
 
 ## Compose deployment
 

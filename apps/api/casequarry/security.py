@@ -6,7 +6,7 @@ from secrets import compare_digest, token_urlsafe
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from .models import Case, LoginSession, Member, User, now
@@ -47,6 +47,14 @@ def password_valid(password: str, encoded: str) -> bool:
 def get_db(request: Request):
     with request.app.state.db.sessions() as session:
         yield session
+
+
+def lock_user(db: Session, user: User) -> User:
+    """Serialize credential changes and replace any earlier authentication snapshot."""
+    if db.bind.dialect.name == "sqlite":
+        db.execute(update(User).where(User.id == user.id, User.tenant_id == user.tenant_id).values(active=User.active))
+    db.refresh(user, with_for_update={"key_share": True})
+    return user
 
 
 @dataclass

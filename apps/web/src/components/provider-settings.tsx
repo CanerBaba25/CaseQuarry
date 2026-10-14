@@ -1,8 +1,8 @@
 "use client";
 import { uiText, type InterfaceMessage, type MessageKey } from "@/lib/i18n";
 
-import { useState } from "react";
-import { api, date } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { api, date, getDisplayTimeZone } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import type { User } from "@/lib/types";
 import { Badge, ErrorBox, Icon, Loading, Modal } from "./ui";
@@ -28,6 +28,11 @@ export const providers = [
     name: "Claude",
     description: "Models available through the Anthropic API.",
   },
+  {
+    id: "kimi",
+    name: "Kimi API (Moonshot)",
+    description: "Models available through the Moonshot API.",
+  },
 ] as const;
 export function providerName(id: string) {
   if (id === "none") return uiText("Not configured");
@@ -44,6 +49,16 @@ type Credential = {
   revoked: boolean;
   updated_at: string | null;
 };
+function useDialogLifetime() {
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
+  return live;
+}
 export type CloudPolicy = {
   enabled: boolean;
   effective_enabled: boolean;
@@ -128,7 +143,9 @@ export default function ProviderSettings({ user }: { user: User }) {
                   </div>
                   {credential?.updated_at && (
                     <div>
-                      <dt>{uiText("Updated · UTC")}</dt>
+                      <dt>
+                        {uiText("Updated")} · {getDisplayTimeZone()}
+                      </dt>
                       <dd>{date(credential.updated_at, true)}</dd>
                     </div>
                   )}
@@ -238,6 +255,7 @@ function CredentialEditor({
   close: () => void;
   done: () => void;
 }) {
+  const live = useDialogLifetime();
   const [key, setKey] = useState("");
   const [model, setModel] = useState(credential.model || "");
   const [busy, setBusy] = useState(false);
@@ -263,12 +281,14 @@ function CredentialEditor({
                 ...(key ? { api_key: key } : {}),
               }),
             });
-            setKey("");
-            done();
+            if (live.current) {
+              setKey("");
+              done();
+            }
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >
@@ -332,6 +352,7 @@ function RemoveCredential({
   close: () => void;
   done: () => void;
 }) {
+  const live = useDialogLifetime();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   return (
@@ -352,11 +373,11 @@ function RemoveCredential({
               method: "DELETE",
               body: JSON.stringify({ reason: form.get("reason") }),
             });
-            done();
+            if (live.current) done();
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >
@@ -395,6 +416,7 @@ function FirmPolicyEditor({
   close: () => void;
   done: () => void;
 }) {
+  const live = useDialogLifetime();
   const [enabled, setEnabled] = useState(policy.enabled);
   const [allowed, setAllowed] = useState(policy.allowed_providers);
   const [busy, setBusy] = useState(false);
@@ -418,11 +440,11 @@ function FirmPolicyEditor({
                 expected_revision: policy.revision,
               }),
             });
-            done();
+            if (live.current) done();
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >

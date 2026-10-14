@@ -1559,5 +1559,6 @@
   "Untagged": "Etiketsiz",
   "Prior source version": "Önceki kaynak sürümü",
   "Duplicates": "Yinelenenler",
-  "File upload": "Dosya yükleme"
+  "File upload": "Dosya yükleme",
+  "Models available through the Moonshot API.": "Moonshot API üzerinden kullanılabilen modeller."
 }

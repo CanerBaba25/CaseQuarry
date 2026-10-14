@@ -1559,5 +1559,6 @@
   "Untagged": "无标签",
   "Prior source version": "旧版来源",
   "Duplicates": "重复项",
-  "File upload": "文件上传"
+  "File upload": "文件上传",
+  "Models available through the Moonshot API.": "通过 Moonshot API 提供的模型。"
 }

@@ -2,9 +2,9 @@
 import { uiText } from "@/lib/i18n";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, date, uiLabel as label, number, post } from "@/lib/api";
-import { useResource } from "@/lib/hooks";
+import { useMountedRef, useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import type { Matter, SearchSpec } from "@/lib/types";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
@@ -24,6 +24,12 @@ type Policy = {
   revision: number;
   credential_revision?: number | null;
   firm_policy_revision?: number;
+};
+type ExternalConfirmation = {
+  expected_provider: string;
+  expected_policy_revision: number;
+  expected_credential_revision: number;
+  expected_firm_policy_revision: number;
 };
 type Citation = {
   evidence_id: string;
@@ -312,6 +318,8 @@ export function LocalModelPolicy({ matter }: { matter: Matter }) {
 }
 
 export default function SourceAssistant({ matter }: { matter: Matter }) {
+  const live = useMountedRef();
+  const reviewGeneration = useRef(0);
   const policy = useResource<Policy>(`/cases/${matter.id}/ai/policy`),
     jobs = useResource<{ items: Job[] }>(`/cases/${matter.id}/ai/jobs`);
   const [jobId, setJobId] = useState<string | null>(null),
@@ -319,11 +327,22 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
     [busy, setBusy] = useState(false),
     [review, setReview] = useState<Finding | null>(null),
     [decision, setDecision] = useState("accept");
-  const [externalConfirmed, setExternalConfirmed] = useState(false);
+  const [externalConfirmation, setExternalConfirmation] =
+    useState<ExternalConfirmation | null>(null);
   const selected = useResource<Job>(
     jobId ? `/cases/${matter.id}/ai/jobs/${jobId}` : null,
   );
   const external = providers.some((item) => item.id === policy.data?.provider);
+  const externalConfirmed = Boolean(
+    externalConfirmation &&
+    policy.data &&
+    externalConfirmation.expected_provider === policy.data.provider &&
+    externalConfirmation.expected_policy_revision === policy.data.revision &&
+    externalConfirmation.expected_credential_revision ===
+      policy.data.credential_revision &&
+    externalConfirmation.expected_firm_policy_revision ===
+      policy.data.firm_policy_revision,
+  );
   const active =
     selected.data &&
     ["pending", "queued", "running", "processing"].includes(
@@ -331,10 +350,12 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
     );
   useEffect(() => {
     setJobId(null);
+    reviewGeneration.current += 1;
+    setReview(null);
     setError(null);
   }, [matter.id]);
   useEffect(() => {
-    setExternalConfirmed(false);
+    setExternalConfirmation(null);
   }, [
     matter.id,
     policy.data?.provider,
@@ -353,8 +374,10 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
   }, [active, selected.refresh, jobs.refresh]);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (external && !externalConfirmed) return;
     const form = new FormData(event.currentTarget);
-    setExternalConfirmed(false);
+    const confirmedConfiguration = externalConfirmation;
+    setExternalConfirmation(null);
     const ids = String(form.get("evidence_ids") || "")
       .split(",")
       .map((id) => id.trim())
@@ -386,6 +409,7 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
           ? {
               confirmed_external: form.get("confirmed_external") === "on",
               reason: String(form.get("external_reason") || ""),
+              ...confirmedConfiguration,
             }
           : {}),
       });
@@ -456,7 +480,7 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
                   target instanceof HTMLSelectElement) &&
                 target.name !== "confirmed_external"
               )
-                setExternalConfirmed(false);
+                setExternalConfirmation(null);
             }}
           >
             <ErrorBox error={error} />
@@ -529,9 +553,24 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
                     name="confirmed_external"
                     type="checkbox"
                     checked={externalConfirmed}
-                    onChange={(event) =>
-                      setExternalConfirmed(event.target.checked)
-                    }
+                    onChange={(event) => {
+                      const configured = policy.data;
+                      setExternalConfirmation(
+                        event.target.checked &&
+                          configured &&
+                          typeof configured.credential_revision === "number" &&
+                          typeof configured.firm_policy_revision === "number"
+                          ? {
+                              expected_provider: configured.provider,
+                              expected_policy_revision: configured.revision,
+                              expected_credential_revision:
+                                configured.credential_revision,
+                              expected_firm_policy_revision:
+                                configured.firm_policy_revision,
+                            }
+                          : null,
+                      );
+                    }}
                     required
                     disabled={busy || !policy.data?.effective_enabled}
                   />
@@ -546,7 +585,11 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
             )}
             <button
               className="button primary"
-              disabled={busy || !policy.data?.effective_enabled}
+              disabled={
+                busy ||
+                !policy.data?.effective_enabled ||
+                (external && !externalConfirmed)
+              }
             >
               {busy
                 ? uiText("Requesting job…")
@@ -715,6 +758,7 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
                             className="button secondary compact"
                             disabled={!can(matter.role, "review")}
                             onClick={() => {
+                              reviewGeneration.current += 1;
                               setReview(finding);
                               setDecision(
                                 finding.source_acceptance_allowed === false
@@ -791,12 +835,16 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
       {review && (
         <Modal
           title={uiText("Review a source quotation")}
-          close={() => setReview(null)}
+          close={() => {
+            reviewGeneration.current += 1;
+            setReview(null);
+          }}
         >
           <form
             onSubmit={async (event) => {
               event.preventDefault();
               const form = new FormData(event.currentTarget);
+              const submittedReview = reviewGeneration.current;
               setBusy(true);
               setError(null);
               try {
@@ -804,12 +852,22 @@ export default function SourceAssistant({ matter }: { matter: Matter }) {
                   `/cases/${matter.id}/ai/findings/${review.id}/review`,
                   { decision, reason: form.get("reason") },
                 );
+                if (
+                  !live.current ||
+                  submittedReview !== reviewGeneration.current
+                )
+                  return;
+                reviewGeneration.current += 1;
                 setReview(null);
                 selected.refresh();
               } catch (error) {
-                setError(error);
+                if (
+                  live.current &&
+                  submittedReview === reviewGeneration.current
+                )
+                  setError(error);
               } finally {
-                setBusy(false);
+                if (live.current) setBusy(false);
               }
             }}
           >

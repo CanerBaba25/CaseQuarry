@@ -2,7 +2,7 @@ import re
 from datetime import date
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 
 from .languages import Language
 
@@ -16,8 +16,29 @@ def _date_only(value):
 DateOnly = Annotated[date, BeforeValidator(_date_only)]
 
 
+def contains_nul(value):
+    pending = [value]
+    while pending:
+        current = pending.pop()
+        if isinstance(current, str) and "\x00" in current:
+            return True
+        if isinstance(current, dict):
+            pending.extend(current.keys())
+            pending.extend(current.values())
+        elif isinstance(current, (list, tuple)):
+            pending.extend(current)
+    return False
+
+
 class Input(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def representable_text(cls, value):
+        if contains_nul(value):
+            raise ValueError("Text fields cannot contain NUL characters.")
+        return value
 
 
 class LoginInput(Input):

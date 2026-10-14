@@ -24,7 +24,7 @@ from .schemas import Input, Reason
 from .security import Actor, current_actor, fail, get_db
 
 router = APIRouter(prefix="/api/v1")
-ProviderID = Literal["openai", "gemini", "xai", "anthropic"]
+ProviderID = Literal["openai", "gemini", "xai", "anthropic", "kimi"]
 
 
 class CredentialInput(Input):
@@ -35,7 +35,7 @@ class CredentialInput(Input):
 
 class CloudPolicyInput(Reason):
     enabled: bool
-    allowed_providers: list[ProviderID] = Field(default_factory=list, max_length=4)
+    allowed_providers: list[ProviderID] = Field(default_factory=list, max_length=len(PROVIDERS))
     confirmed: bool = False
     expected_revision: int | None = Field(default=None, ge=0)
 

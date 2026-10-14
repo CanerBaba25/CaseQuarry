@@ -72,3 +72,41 @@ export function bucketRange(key: string, grouping: string) {
   last.setUTCDate(last.getUTCDate() - 1);
   return { date_from: first, date_to: last.toISOString().slice(0, 10) };
 }
+
+export function dateBucketFilters(
+  filters: SearchSpec["filters"],
+  key: string,
+  grouping: string,
+): SearchSpec["filters"] | null {
+  // Date groups use source timestamps. A single date-field filter cannot also
+  // retain an independent imported-at interval, so that drill-down is disabled.
+  if (
+    filters.date_field === "imported_at" &&
+    (filters.date_from || filters.date_to)
+  )
+    return null;
+  const range = bucketRange(key, grouping);
+  if (!range.date_from || !range.date_to) return null;
+  const from = String(filters.date_from || range.date_from);
+  const to = String(filters.date_to || range.date_to);
+  // The API interprets timestamps without an offset as UTC, independently of
+  // the viewer's device zone. Date.parse otherwise treats them as local time.
+  const instant = (value: string) =>
+    Date.parse(
+      value.length > 10 &&
+        !/(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(value.slice(10))
+        ? `${value}Z`
+        : value,
+    );
+  const lower = instant(from);
+  const upper = instant(to) + (/^\d{4}-\d{2}-\d{2}$/.test(to) ? 86_400_000 : 0);
+  const bucketLower = Date.parse(range.date_from);
+  const bucketUpper = Date.parse(range.date_to) + 86_400_000;
+  if (!Number.isFinite(lower) || !Number.isFinite(upper)) return null;
+  return {
+    ...filters,
+    date_field: "sent_at",
+    date_from: lower >= bucketLower ? from : range.date_from,
+    date_to: upper <= bucketUpper ? to : range.date_to,
+  };
+}

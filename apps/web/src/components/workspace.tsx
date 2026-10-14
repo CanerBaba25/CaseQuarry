@@ -8,6 +8,7 @@ import { version as applicationVersion } from "../../package.json";
 import {
   ApiError,
   api,
+  csrfToken,
   date,
   getDisplayTimeZone,
   number,
@@ -92,6 +93,10 @@ export default function Workspace() {
   const [palette, setPalette] = useState(false),
     [navOpen, setNavOpen] = useState(false),
     [dark, setDark] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const logoutPending = useRef(false);
+  const currentUser = useRef(user);
+  currentUser.current = user;
   const [commandKey, setCommandKey] = useState("Ctrl");
   const [includeArchived, setIncludeArchived] = useState(false);
   const [matterFilter, setMatterFilter] = useState("");
@@ -263,7 +268,12 @@ export default function Workspace() {
     } catch {}
   }
 
-  if (booting)
+  // Route replacement is asynchronous. Keep the form unmounted until its
+  // canonical route commits, so navigation cannot erase live typed input.
+  if (
+    booting ||
+    (!bootError && !user && pathname !== (setup ? "/setup" : "/login"))
+  )
     return (
       <div className="boot">
         <Logo />
@@ -431,13 +441,32 @@ export default function Workspace() {
             <button
               className="icon-button"
               aria-label={uiText("Sign out")}
+              disabled={signingOut}
+              aria-busy={signingOut}
               onClick={async () => {
+                if (logoutPending.current) return;
+                logoutPending.current = true;
+                setSigningOut(true);
+                const actor = user.id;
+                const submittedSession = csrfToken();
                 try {
                   await post("/auth/logout");
+                  if (
+                    currentUser.current?.id !== actor ||
+                    csrfToken() !== submittedSession
+                  )
+                    return;
                   setUser(null);
                   router.replace("/login");
                 } catch (error) {
-                  setBootError(error);
+                  if (
+                    currentUser.current?.id === actor &&
+                    csrfToken() === submittedSession
+                  )
+                    setBootError(error);
+                } finally {
+                  logoutPending.current = false;
+                  setSigningOut(false);
                 }
               }}
             >
@@ -1090,6 +1119,13 @@ function MatterCard({ matter }: { matter: Matter }) {
 function CreateMatter({ created }: { created: (id: string) => void }) {
   const [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false);
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -1099,11 +1135,11 @@ function CreateMatter({ created }: { created: (id: string) => void }) {
         "/cases",
         Object.fromEntries(new FormData(event.currentTarget)),
       );
-      created(matter.id);
+      if (live.current) created(matter.id);
     } catch (error) {
-      setError(error);
+      if (live.current) setError(error);
     } finally {
-      setBusy(false);
+      if (live.current) setBusy(false);
     }
   }
   return (

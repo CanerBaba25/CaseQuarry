@@ -20,7 +20,7 @@ from rich.console import Console
 from rich.table import Table
 
 from . import __version__
-from .client import API, Options, fail, logout, profiles, save_login
+from .client import API, Options, fail, profiles, save_login
 from .connector_commands import app as connectors
 from .native import native_available
 from .workflow_commands import register as register_workflows
@@ -254,11 +254,8 @@ def auth_logout(ctx: typer.Context) -> None:
     if ctx.obj.dry_run:
         show({"dry_run": True, "action": "logout", "profile": ctx.obj.profile}, ctx.obj)
         return
-    try:
-        API(ctx.obj).request("POST", "/auth/logout")
-    finally:
-        logout(ctx.obj.profile)
-    typer.echo("Signed out; local credential cleared.")
+    cleared = API(ctx.obj).logout()
+    typer.echo("Signed out; local credential cleared." if cleared else "Signed out the captured session; a newer local sign-in was preserved.")
 
 
 @auth.command("whoami")
@@ -328,17 +325,29 @@ def case_restore(ctx: typer.Context, case_id: str) -> None:
 
 
 def import_paths(path: Path, recursive: bool) -> list[Path]:
-    if path.is_symlink():
-        fail("Symbolic-link import paths are refused.", 2)
+    if path.is_symlink() or path.is_junction():
+        fail("Symbolic-link and junction import paths are refused.", 2)
     if path.is_file():
         return [path]
     if not path.is_dir():
         fail("Import path does not exist.", 4)
-    return sorted(
-        item
-        for item in (path.rglob("*") if recursive else path.iterdir())
-        if item.is_file() and not item.is_symlink()
-    )
+    root = path.resolve()
+    pending, files = [path], []
+    try:
+        while pending:
+            directory = pending.pop()
+            if directory.is_symlink() or directory.is_junction() or not directory.resolve().is_relative_to(root):
+                continue
+            for item in directory.iterdir():
+                if item.is_symlink() or item.is_junction() or not item.resolve().is_relative_to(root):
+                    continue
+                if item.is_file():
+                    files.append(item)
+                elif recursive and item.is_dir():
+                    pending.append(item)
+    except OSError:
+        fail("Cannot inventory the selected import directory. Check access and try again.", 7)
+    return sorted(files)
 
 
 @ingest.command("plan")
@@ -619,7 +628,13 @@ def evidence_download(
     destination = output_dir / f"{item_id}.original"
     if destination.exists():
         fail("Destination exists; use a different --output-dir.", 5)
-    destination.write_bytes(response.content)
+    try:
+        with destination.open("xb") as stream:
+            stream.write(response.content)
+    except FileExistsError:
+        fail("Destination exists; use a different --output-dir.", 5)
+    except OSError:
+        fail("Cannot save the downloaded original. Check the destination and available storage.", 7)
     typer.echo(f"Saved original to {destination}")
 
 

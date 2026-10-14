@@ -20,7 +20,7 @@ def parse_date(value: str, inclusive_end=False):
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         parsed = parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
         return parsed + timedelta(days=1) if inclusive_end and len(value) == 10 else parsed
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, OverflowError):
         fail(422, "INVALID_DATE", "Use an ISO 8601 date or timestamp.")
 
 
@@ -348,7 +348,7 @@ def run_search(db, tenant_id, case_id, spec, secret, extra_conditions=None, scop
         else [expression.desc(), Evidence.id.desc()]
     )
     rows = db.execute(
-        select(Evidence, Original, func.substr(Evidence.text, 1, 300))
+        select(Evidence, Original, func.substr(Evidence.text, 1, 300), expression)
         .options(
             load_only(
                 Evidence.id, Evidence.item_type, Evidence.title, Evidence.date_utc,
@@ -369,12 +369,9 @@ def run_search(db, tenant_id, case_id, spec, secret, extra_conditions=None, scop
     ).all()
     next_cursor = None
     if len(rows) > spec.page_size:
-        item, original, _ = rows[spec.page_size - 1]
-        value = original.byte_size if attribute == "byte_size" else getattr(item, attribute)
+        item, _original, _snippet, value = rows[spec.page_size - 1]
         if attribute in {"date_utc", "created_at"}:
             value = utc(value or date_min).isoformat()
-        elif attribute in {"title", "sender"}:
-            value = value.lower()
         next_cursor = cursor_encode(
             {"query": fingerprint, "snapshot": snapshot.isoformat(), "value": value, "id": item.id}, secret
         )
@@ -394,7 +391,7 @@ def run_search(db, tenant_id, case_id, spec, secret, extra_conditions=None, scop
         "total_hits": total,
         "total_hits_relation": "eq",
         "next_cursor": next_cursor,
-        "items": [evidence_json(item, original, snippet) for item, original, snippet in rows[: spec.page_size]],
+        "items": [evidence_json(item, original, snippet) for item, original, snippet, _sort_value in rows[: spec.page_size]],
         "facets": facets,
         "groups": groups,
         "coverage": {

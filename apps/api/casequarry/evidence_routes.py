@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import func, select, update
 
 from . import audit
+from .case_domain import lock_case_action
 from .case_routes import source_json
 from .models import (
     Annotation,
@@ -19,6 +20,7 @@ from .models import (
     SavedSearch,
     Source,
     Span,
+    User,
 )
 from .schemas import AnnotationInput, BulkReviewInput, ReviewInput, ReviewSetInput, SavedInput, SearchInput
 from .search import compile_query, evidence_json, run_search, search_conditions
@@ -487,11 +489,19 @@ def original_download(
 
 
 def apply_review(db, user, case_id, item, body, request_id, *, assignment_authorized=False):
-    authorize_case(db, user, case_id, "review")
+    if assignment_authorized:
+        # Assignment routes already hold the matter/user locks before taking
+        # evidence row locks. Preserve that lock order and avoid repeated fences.
+        authorize_case(db, user, case_id, "review")
+    else:
+        lock_case_action(db, user, case_id, "review", (body.assigned_to,))
     changes = body.model_dump(exclude_none=True, exclude={"expected_version", "note"})
+    assigning = "assigned_to" in body.model_fields_set
+    if assigning:
+        changes["assigned_to"] = body.assigned_to
     if not changes and not body.note:
         fail(422, "REVIEW_EMPTY", "Choose a review change or write a note.")
-    if body.assigned_to is not None and not assignment_authorized:
+    if assigning and not assignment_authorized:
         authorize_case(db, user, case_id, "manage")
         from .workflow_models import ActiveAllocation
 
@@ -515,8 +525,9 @@ def apply_review(db, user, case_id, item, body, request_id, *, assignment_author
     ):
         authorize_case(db, user, case_id, "privilege")
     if body.assigned_to and not db.scalar(
-        select(Member.id).where(
-            Member.user_id == body.assigned_to, Member.case_id == case_id, Member.tenant_id == user.tenant_id
+        select(Member.id).join(User, User.id == Member.user_id).where(
+            Member.user_id == body.assigned_to, Member.case_id == case_id, Member.tenant_id == user.tenant_id,
+            User.tenant_id == user.tenant_id, User.active.is_(True),
         )
     ):
         fail(404, "NOT_FOUND", "The assigned reviewer is not a member of this matter.")

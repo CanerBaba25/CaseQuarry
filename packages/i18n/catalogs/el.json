@@ -1559,5 +1559,6 @@
   "Untagged": "Χωρίς ετικέτα",
   "Prior source version": "Προηγούμενη έκδοση πηγής",
   "Duplicates": "Διπλότυπα",
-  "File upload": "Μεταφόρτωση αρχείου"
+  "File upload": "Μεταφόρτωση αρχείου",
+  "Models available through the Moonshot API.": "Μοντέλα διαθέσιμα μέσω του API της Moonshot."
 }

@@ -30,6 +30,7 @@ export async function api<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const submittedSession = csrfToken();
   const headers = new Headers(options.headers);
   if (options.body && !(options.body instanceof FormData))
     headers.set("Content-Type", "application/json");
@@ -37,7 +38,7 @@ export async function api<T>(
     options.method &&
     !["GET", "HEAD", "OPTIONS"].includes(options.method.toUpperCase())
   ) {
-    headers.set("X-CSRF-Token", csrfToken());
+    headers.set("X-CSRF-Token", submittedSession);
   }
   const response = await fetch(`/api/v1${path}`, {
     ...options,
@@ -51,6 +52,9 @@ export async function api<T>(
   } catch {
     body = null;
   }
+  // Cancellation may interrupt the response body after fetch already resolved.
+  // An obsolete response must not expire a newer account or become null data.
+  options.signal?.throwIfAborted();
   if (!response.ok) {
     const data = (body ?? {}) as {
       error?: { message?: string; error_code?: string; request_id?: string };
@@ -76,6 +80,7 @@ export async function api<T>(
       response.status === 401 &&
       path !== "/me" &&
       typeof window !== "undefined" &&
+      csrfToken() === submittedSession &&
       !["INVALID_CREDENTIALS", "MFA_CODE_INVALID"].includes(
         data.error?.error_code || data.error_code || "",
       )

@@ -4,7 +4,7 @@ import { uiText } from "@/lib/i18n";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError, date, uiLabel as label, number, post } from "@/lib/api";
-import { useResource } from "@/lib/hooks";
+import { useMountedRef, useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import type { Matter, Member } from "@/lib/types";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
@@ -71,6 +71,8 @@ export function GovernancePage({
   matter: Matter;
   kind: Kind;
 }) {
+  const viewRevision = useRef(0);
+  const live = useMountedRef();
   const [cursor, setCursor] = useState<string | null>(null),
     [history, setHistory] = useState<(string | null)[]>([]);
   const rawResource = useResource<{
@@ -94,6 +96,7 @@ export function GovernancePage({
     ...rawResource,
     data: invalidTaskPage ? null : rawResource.data,
     refresh: () => {
+      viewRevision.current += 1;
       if (invalidTaskPage) {
         setCursor(null);
         setHistory([]);
@@ -115,6 +118,7 @@ export function GovernancePage({
     kind === "tasks" ? `/cases/${matter.id}/members` : null,
   );
   useEffect(() => {
+    viewRevision.current += 1;
     setCursor(null);
     setHistory([]);
     setCreate(false);
@@ -165,7 +169,15 @@ export function GovernancePage({
       icon: "review",
     },
   }[kind];
-  function taskUpdated(updated: TaskDetail) {
+  function taskUpdated(
+    updated: TaskDetail,
+    submittedView = viewRevision.current,
+  ) {
+    if (!live.current) return;
+    if (submittedView !== viewRevision.current) {
+      rawResource.refresh();
+      return;
+    }
     resource.setData((current) =>
       current
         ? {
@@ -183,6 +195,7 @@ export function GovernancePage({
     resource.refresh();
   }
   async function taskState(task: Task, state: string) {
+    const submittedView = viewRevision.current;
     setBusy(true);
     setError(null);
     try {
@@ -193,15 +206,18 @@ export function GovernancePage({
           body: JSON.stringify({ state, expected_version: task.version }),
         },
       );
-      taskUpdated(updated);
+      taskUpdated(updated, submittedView);
     } catch (error) {
-      setError(error);
-      resource.refresh();
+      if (live.current) {
+        if (submittedView === viewRevision.current) setError(error);
+        rawResource.refresh();
+      }
     } finally {
-      setBusy(false);
+      if (live.current) setBusy(false);
     }
   }
   async function taskAssignee(task: Task, assigned_to: string | null) {
+    const submittedView = viewRevision.current;
     setBusy(true);
     setError(null);
     try {
@@ -212,12 +228,14 @@ export function GovernancePage({
           body: JSON.stringify({ assigned_to, expected_version: task.version }),
         },
       );
-      taskUpdated(updated);
+      taskUpdated(updated, submittedView);
     } catch (error) {
-      setError(error);
-      resource.refresh();
+      if (live.current) {
+        if (submittedView === viewRevision.current) setError(error);
+        rawResource.refresh();
+      }
     } finally {
-      setBusy(false);
+      if (live.current) setBusy(false);
     }
   }
   return (
@@ -475,6 +493,7 @@ export function GovernancePage({
         previous={
           !invalidTaskPage && history.length
             ? () => {
+                viewRevision.current += 1;
                 const pages = [...history];
                 setCursor(pages.pop() || null);
                 setHistory(pages);
@@ -484,6 +503,7 @@ export function GovernancePage({
         next={
           !invalidTaskPage && resource.data?.next_cursor
             ? () => {
+                viewRevision.current += 1;
                 setHistory([...history, cursor]);
                 setCursor(resource.data!.next_cursor);
               }
@@ -874,6 +894,7 @@ function ReleaseHold({
   close: () => void;
   done: () => void;
 }) {
+  const live = useMountedRef();
   const [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false);
   return (
@@ -888,11 +909,11 @@ function ReleaseHold({
             await post(`/cases/${matter.id}/holds/${hold.id}/release`, {
               reason: form.get("reason"),
             });
-            done();
+            if (live.current) done();
           } catch (error) {
-            setError(error);
+            if (live.current) setError(error);
           } finally {
-            setBusy(false);
+            if (live.current) setBusy(false);
           }
         }}
       >

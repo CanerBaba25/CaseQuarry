@@ -1559,5 +1559,6 @@
   "Untagged": "未加標籤",
   "Prior source version": "來源的先前版本",
   "Duplicates": "重複項目",
-  "File upload": "檔案上傳"
+  "File upload": "檔案上傳",
+  "Models available through the Moonshot API.": "透過 Moonshot API 提供的模型。"
 }

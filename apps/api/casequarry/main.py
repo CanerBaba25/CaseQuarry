@@ -37,6 +37,7 @@ from .config import Settings
 from .database import Database
 from .models import ImportBatch, Member, Setting, Tenant, now
 from .request_limits import IMPORT_ROUTE, RequestSizeLimit, body_limit
+from .schemas import contains_nul
 from .security import PASSWORDS, Actor, authorize_case, current_actor, digest, get_db
 from .storage import Storage
 from .worker import worker_loop
@@ -156,7 +157,17 @@ def create_app(settings: Settings | None = None):
                 limited = len(bucket) >= maximum
                 if not limited:
                     bucket.append(current)
-        if limited:
+        if contains_nul((request.scope.get("path", ""), request.query_params.multi_items())):
+            response = JSONResponse(
+                {
+                    "error_code": "VALIDATION_ERROR",
+                    "message": "Path and query text cannot contain NUL characters.",
+                    "request_id": request.state.request_id,
+                    "retryable": False,
+                },
+                status_code=422,
+            )
+        elif limited:
             response = JSONResponse(
                 {
                     "error_code": "RATE_LIMITED",

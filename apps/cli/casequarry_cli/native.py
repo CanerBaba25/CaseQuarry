@@ -43,13 +43,15 @@ def run_native(command: str, arguments: list[str]) -> dict[str, Any]:
             [str(binary_path()), command, *arguments],
             shell=False,
             capture_output=True,
-            text=True,
             timeout=600,
         )
     except (OSError, subprocess.TimeoutExpired):
         fail("Native verification could not complete; check the built binary and input limits.", 7)
     try:
-        payload = json.loads(result.stdout if result.stdout.strip() else result.stderr)
+        output = result.stdout if result.stdout.strip() else result.stderr
+        payload = json.loads(output.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("Expected a structured result")
     except ValueError:
         fail("Native verifier returned an invalid structured result.", 7)
     if result.returncode not in {0, 8}:
@@ -169,10 +171,17 @@ def verify_manifest(path: Path, root: Path, engine: str = "auto") -> dict:
         with path.open("rb") as source:
             data = json.loads(source.read(64 * 1024 * 1024 + 1))
         items = data["items"]
-        if data["schema_version"] != "casequarry-hash-manifest-v1" or len(items) > 20_000:
+        if data["schema_version"] != "casequarry-hash-manifest-v1" or not isinstance(items, list) or len(items) > 20_000:
             fail("Unsupported manifest version or item limit.", 2)
         failed = []
         for item in items:
+            if (
+                not isinstance(item, dict)
+                or any(not isinstance(item.get(field), str) for field in ("evidence_id", "package_path", "sha256"))
+                or type(item.get("byte_size")) is not int
+                or not 0 <= item["byte_size"] <= 2**64 - 1
+            ):
+                raise ValueError("Invalid native manifest item")
             target = package_path(root, item["package_path"])
             if not verify_file(target, item["sha256"], item["byte_size"], "python")["valid"]:
                 failed.append(item["evidence_id"])
