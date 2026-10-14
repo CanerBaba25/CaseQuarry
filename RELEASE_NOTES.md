@@ -49,6 +49,8 @@ and Windows, universal Mac and Ubuntu desktop distribution formats.
   ownership before launching application processes.
 - Backup and PostgreSQL setup cleanup remove only files created by that invocation,
   preserving a competing process's pre-existing files.
+- Native compiler-cache reuse clears old installer bundles before packaging a new
+  version, retaining dependency objects and rejecting duplicate distributions.
 
 ### Validation
 

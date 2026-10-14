@@ -29,12 +29,31 @@ def identify() -> None:
     print("Compiler cache runner image: " + image)
 
 
+def validate_bundle(path: Path, target: Path) -> None:
+    resolved = path.resolve()
+    if resolved != path or not resolved.is_relative_to(target):
+        raise RuntimeError("Refusing to clean a redirected or out-of-target bundle directory")
+    for part in (path, *path.parents):
+        if part == target:
+            break
+        if (part.is_symlink() or (hasattr(part, "is_junction") and part.is_junction())
+                or (part.exists() and not part.is_dir())):
+            raise RuntimeError("Refusing to clean an unexpected bundle directory")
+
+
 def clean(platform: str, dry_run: bool = False) -> None:
     target = ROOT / "apps/desktop/src-tauri/target"
     resolved = target.resolve()
     if (resolved != target or not resolved.is_relative_to(ROOT) or target.is_symlink()
+            or (target.exists() and not target.is_dir())
             or (hasattr(target, "is_junction") and target.is_junction())):
         raise RuntimeError("Refusing to clean a redirected or out-of-workspace build directory")
+    bundle_targets = [target, *(target / architecture for architecture in TARGETS[platform])]
+    if platform == "macos-universal":
+        bundle_targets.append(target / "universal-apple-darwin")
+    bundles = [directory / "release/bundle" for directory in bundle_targets]
+    for bundle in bundles:
+        validate_bundle(bundle, target)
     cargo = shutil.which("cargo")
     if not cargo:
         raise RuntimeError("Rust Cargo is required on PATH")
@@ -46,7 +65,15 @@ def clean(platform: str, dry_run: bool = False) -> None:
     for architecture in [None, *TARGETS[platform]]:
         command = arguments if architecture is None else [*arguments, "--target", architecture]
         subprocess.run(command, check=True, cwd=ROOT)
-    print("Checked app-package output scope" if dry_run else "Removed only the app package's host/build outputs")
+    # Cargo package cleanup does not remove Tauri installers from older versions.
+    for bundle in bundles:
+        validate_bundle(bundle, target)
+        if bundle.is_dir():
+            if dry_run:
+                print("Would remove generated bundle directory: " + str(bundle))
+            else:
+                shutil.rmtree(bundle)
+    print("Checked app-package output scope" if dry_run else "Removed only the app package's host/build outputs and generated bundles")
 
 
 if __name__ == "__main__":
