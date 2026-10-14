@@ -22,8 +22,8 @@ TypeScript/React for the interface, Python for its API and document processing, 
 Rust for streaming integrity checks and the native desktop client. PostgreSQL stores
 the shared firm data; browsers and desktop clients connect to the same firm server.
 
-> **Release 0.7.0.** Installable Windows, macOS and Linux desktop clients and Windows/Linux web-server
-> packages, with 13 interface languages, task priorities, PostgreSQL firm sync and optional provider connections.
+> **Release 0.8.0.** Installable Windows, macOS and Linux desktop clients and Windows/Linux web-server
+> packages, with custodian hold notices, optional signed evidence ZIPs, 13 interface languages and PostgreSQL firm sync.
 > Production capacity and the two-million-email scale target remain unvalidated.
 
 ![CaseQuarry workspace showing a real synthetic matter, evidence counts and review progress](docs/assets/workspace.png)
@@ -32,20 +32,20 @@ _Actual application view using synthetic records. Counts come from persisted API
 
 ## What you can do
 
-| Workflow    | Available in 0.7.0                                                                                                      |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Preserve    | SHA-256 originals, source paths, MBOX offsets, duplicates and attachment families                                       |
-| Import      | Resumable uploads, bounded OCR, durable jobs and retries that preserve extraction history                               |
-| Search      | Boolean/phrase/field/date search, exact sender/recipient filters, facets, grouping and pagination                       |
-| Investigate | Email readers, scoped traffic charts, communication maps, threads, timelines and candidate comparisons                  |
-| Review      | Versioned decisions, exclusive work assignments, review queues, tags, notes and saved scope snapshots                   |
-| Organize    | Matters, members, custodians, sources, issues, task priorities/deadlines, searchable personal worklists and legal holds |
-| Disclose    | Irreversible text/PDF redactions, independent approval, sequential Bates numbers and CSV/DAT/OPT loadfiles              |
-| Export      | Metadata and reviewed native ZIP packages, with fresh scope and hash verification                                       |
-| Secure      | Tenant/matter roles, password/session controls, administrator controls, MFA and audit chains                            |
-| Assist      | Optional local or OpenAI/Gemini/Grok/Claude/Kimi source quotations with verified citations and human review                  |
-| Collaborate | Shared PostgreSQL firm server, automatic refresh and versioned review/task decisions                                    |
-| Operate     | Browser and native Windows/macOS/Linux clients, server packages, authenticated CLI, integrity tools and backups         |
+| Workflow    | Available in 0.8.0                                                                                                  |
+| ----------- | ------------------------------------------------------------------------------------------------------------------- |
+| Preserve    | SHA-256 originals, source paths, MBOX offsets, duplicates and attachment families                                   |
+| Import      | Resumable uploads, bounded OCR, durable jobs and retries that preserve extraction history                           |
+| Search      | Boolean/phrase/field/date search, exact sender/recipient filters, facets, grouping and pagination                   |
+| Investigate | Email readers, scoped traffic charts, communication maps, threads, timelines and candidate comparisons              |
+| Review      | Versioned decisions, exclusive work assignments, review queues, tags, notes and saved scope snapshots               |
+| Organize    | Matters, members, custodians, sources, issues, task priorities/deadlines, worklists, legal holds and notice records |
+| Disclose    | Irreversible text/PDF redactions, independent approval, sequential Bates numbers and CSV/DAT/OPT loadfiles          |
+| Export      | Reviewed native ZIPs and approved productions, with optional Ed25519 signatures and offline package verification    |
+| Secure      | Tenant/matter roles, password/session controls, administrator controls, MFA and audit chains                        |
+| Assist      | Optional local or OpenAI/Gemini/Grok/Claude/Kimi source quotations with verified citations and human review         |
+| Collaborate | Shared PostgreSQL firm server, automatic refresh and versioned review/task decisions                                |
+| Operate     | Browser and native Windows/macOS/Linux clients, server packages, authenticated CLI, integrity tools and backups     |
 
 ### A clearer daily workspace
 
@@ -76,6 +76,26 @@ the recipient still needs matter access. Evidence rows refresh when another conn
 workstation saves a review. Listing queries retrieve short snippets without loading
 each document's full extracted body and metadata.
 
+### Hold notices and signed evidence packages
+
+Record each custodian's preservation notice, its exact issued text, acknowledgement
+and reminders alongside the legal hold. The register shows full counts and overdue
+reminders, retains conflicts for resolution and freezes issued text. Released holds
+retain their history. Issuance and acknowledgement are manual staff records; the
+application does not send email or authenticate the custodian's response.
+
+![Custodian hold-notice register with synthetic notice history](docs/assets/hold-notices.png)
+
+An operator can configure a dedicated Ed25519 signing key for native and production
+ZIPs. Recipients verify the complete file inventory, hashes and signature offline
+using a separately trusted public key. Existing unsigned exports remain available
+when signing is unconfigured. See [hold notices](docs/HOLD_NOTICES.md) and
+[signed packages](docs/SIGNED_EXPORTS.md).
+
+The [repository comparison](docs/FEATURE_COMPARISON.md) records the inspected
+FreeEed, OpenArchiver, eDiscovery, Mike and LegalMemory features and prioritizes
+further work, including incremental mailbox collection, PST and structured review.
+
 ### Supported inputs
 
 **Email:** EML, MBOX and bounded Outlook MSG. **Documents:** PDF, TXT, Markdown, HTML, CSV, JSON, DOCX,
@@ -102,9 +122,9 @@ Choose the assets on the [Releases page](https://github.com/CanerBaba25/CaseQuar
 
 | Download                              | Use it for                                             |
 | ------------------------------------- | ------------------------------------------------------ |
-| `CaseQuarry_0.7.0_x64-setup.exe`      | Install the Windows desktop client on each workstation |
-| `CaseQuarry_0.7.0_universal.dmg`      | Install on an Apple Silicon or Intel MacBook           |
-| `CaseQuarry_0.7.0_amd64.deb`          | Install the Linux client on Ubuntu 24.04 x64           |
+| `CaseQuarry_0.8.0_x64-setup.exe`      | Install the Windows desktop client on each workstation |
+| `CaseQuarry_0.8.0_universal.dmg`      | Install on an Apple Silicon or Intel MacBook           |
+| `CaseQuarry_0.8.0_amd64.deb`          | Install the Linux client on Ubuntu 24.04 x64           |
 | `casequarry-server-*-windows-x64.zip` | Install the shared web/API server on Windows           |
 | `casequarry-server-*-linux-x64.zip`   | Install the shared web/API server on Linux             |
 | `*-source.zip`                        | Build, inspect or modify the application               |
@@ -157,7 +177,11 @@ Version 0.6.0 adds `0008_task_priorities` and `0009_user_language` after
 priority and existing accounts start in English. Reload open web/desktop workspaces
 after upgrading the server. Version 0.7.0 adds no further migration; older saved
 CLI profiles require a fresh sign-in, and cloud API callers must send the confirmed
-provider/revision snapshot. See the [task API](docs/TASK_API.md).
+provider/revision snapshot. Version 0.8.0 adds `0010_manual_hold_notices` after
+`0009_user_language`, creating an empty notice register without changing existing
+holds or evidence. Reload connected clients after migration. Signing requires an
+explicit operator-managed key; upgrading creates none. See the
+[server upgrade guide](docs/SERVER_INSTALL.md) and [task API](docs/TASK_API.md).
 Existing SQLite installations require the documented guarded transfer to an empty
 PostgreSQL database. Keep the original database and a verified recovery backup.
 
@@ -190,6 +214,8 @@ Python fallback. It never downloads a processor while handling evidence.
 - Search, retrieval, jobs and exports enforce tenant and matter permissions.
 - Privilege, review and integrity safeguards restrict native exports, including
   content embedded in parent email or archive families.
+- Optional Ed25519 ZIP signatures authenticate the complete manifest relative to
+  an independently trusted public key. They supply no independent timestamp.
 - Audit chains detect inconsistency within the stored chain; they are not independent
   signed attestations.
 
@@ -215,31 +241,29 @@ the larger benchmark has not yet been repeated with the new extraction pipeline.
 Percentiles use 15 queries; these results are not a production SLA or a multi-million
 capacity claim. See [benchmark scope and method](docs/BENCHMARKS.md).
 
-The complete local Python integration run passed **619 tests**, with PostgreSQL checks enabled
-and no skipped tests. Coverage includes task conflicts and delayed commits,
-timezone boundaries, permission revocation, concurrent uploads, session expiration,
-last-lead races, legal holds, upgrades, Kimi consent, import recovery and CLI file safety.
-A final focused CLI run passed 50 checks, including concurrent profile saves,
-delayed logout and unavailable-keyring recovery; these overlap the integration run.
-The evidence-query improvement preserved **39 complete comparison responses** and
-passed **16 focused projection/detail checks** across SQLite and PostgreSQL.
-The Rust integrity component passed **11 tests**, and the native desktop client
-passed **ten Rust tests** and an actual WebView2 runtime diagnostic. Native Windows
-checks also cover all 13 interface languages and 143 translated menu labels.
-Real-browser checks cover evidence import/search,
-review and production approvals, shared task refresh, account isolation, provider
-controls, the redesigned dashboard, timezone persistence and 375px mobile views.
-Twelve focused interface suites cover 79 behavior scenarios, including delayed
-responses, draft preservation, immutable redaction selections and exact date scopes.
-Eight additional browser audit stages verify the fixes against PostgreSQL; two
-navigation checks confirm that setup and sign-in retain text during slow redirects.
-Nine multilingual workflow stages cover all 13 languages, preserved drafts,
-Chinese and Hindi mobile views, original diagnostics and account isolation.
-Native release checks install and launch the Ubuntu package and exercise the same
-universal Mac app on Intel and Apple Silicon runners.
-Controlled HTTP responses exercise all
-five provider transports; live vendor accounts and model quality remain unvalidated.
-GitHub verifies linting, PostgreSQL migrations and Python/web/Rust/desktop builds.
+Local validation passed **730 Python integration cases across full and targeted
+runs**, with PostgreSQL checks enabled and no skipped cases. Some legacy fixtures
+intentionally use SQLite. Coverage includes signed packages and hostile archives,
+notice transitions and permissions, populated upgrades, task conflicts, timezones,
+uploads, authentication, provider consent, import recovery and CLI file safety.
+Four final packaging checks verify source-copy layouts and clean wheel/source
+distributions, including builds from a workspace containing private-state canaries.
+The installed CLI signing probe also has nine focused contract checks.
+
+The website passed its production build, typecheck and **93 interface behavior
+checks**. Seven new real-PostgreSQL browser stages cover notice conflicts, immutable
+text, reminder history, complete pagination counts, a 375px dark layout, released
+hold controls and an actual signed ZIP download verified offline. Earlier browser
+coverage includes evidence import/search, approvals, shared task refresh, account
+isolation, language changes and provider controls.
+
+The rebuilt Windows client passed all **13 languages and 143 native menu labels**.
+The Rust integrity component passed 11 tests and the native client passed ten;
+formatting and compiler lint checks passed. The release workflow checks Windows
+and Ubuntu installation, the universal Mac app on Intel and Apple Silicon, and
+installed Windows/Linux web/API/worker/CLI packages against PostgreSQL.
+Controlled HTTP responses exercise all five provider transports; live vendor
+accounts and model quality remain unvalidated.
 Verification suites and synthetic QA harnesses are maintained locally and excluded
 from the public source distribution.
 
@@ -248,10 +272,10 @@ from the public source distribution.
 | Audience               | Guides                                                                                                                                                                       |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Install                | [Firm server](docs/SERVER_INSTALL.md), [Desktop client](docs/DESKTOP.md), [Windows](docs/INSTALL_WINDOWS.md), [macOS](docs/INSTALL_MACOS.md), [Linux](docs/INSTALL_LINUX.md) |
-| Review evidence        | [Reviewer guide](docs/REVIEWER_GUIDE.md), [CLI reference](docs/CLI_REFERENCE.md), [Task API](docs/TASK_API.md)                                                               |
+| Review evidence        | [Reviewer guide](docs/REVIEWER_GUIDE.md), [Hold notices](docs/HOLD_NOTICES.md), [CLI reference](docs/CLI_REFERENCE.md), [Task API](docs/TASK_API.md)                         |
 | Acquire files and mail | [Supported adapters and limits](docs/ADAPTERS.md)                                                                                                                            |
 | Administer             | [Administrator guide](docs/ADMIN_GUIDE.md), [Language settings](docs/LANGUAGES.md), [Backup and recovery](docs/BACKUP_RECOVERY.md)                                           |
-| Assess controls        | [Threat model](docs/THREAT_MODEL.md), [Data handling](docs/DATA_HANDLING.md), [Evidence integrity](docs/EVIDENCE_INTEGRITY.md)                                               |
+| Assess controls        | [Threat model](docs/THREAT_MODEL.md), [Data handling](docs/DATA_HANDLING.md), [Evidence integrity](docs/EVIDENCE_INTEGRITY.md), [Signed packages](docs/SIGNED_EXPORTS.md)    |
 | Assess optional models | [Provider connections](docs/CLOUD_AI_GUIDE.md), [Analysis safety and runtime policy](docs/AI_SAFETY.md)                                                                      |
 | Understand the code    | [Architecture](docs/ARCHITECTURE.md), [Feature comparison](docs/FEATURE_COMPARISON.md), [Release notes](RELEASE_NOTES.md)                                                    |
 

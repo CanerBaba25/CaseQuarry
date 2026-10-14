@@ -14,6 +14,13 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session, load_only
 
 from . import audit
+from .manifest_signing import (
+    SIGNATURE_NAME,
+    SigningKeyError,
+    load_private_signing_key,
+    sign_manifest,
+    signing_metadata,
+)
 from .models import Evidence, Export, Occurrence, Original, ReviewSet, ReviewSetItem, Source, User, now
 from .schemas import ExportInput
 from .search import search_conditions
@@ -35,6 +42,8 @@ def canonical_json(value):
 
 def export_json(job: Export):
     counts = {key: value for key, value in job.counts.items() if key != "manifest_storage_key"}
+    if job.state == "completed":
+        counts.setdefault("manifest_signing", signing_metadata(None))
     return {
         "id": job.id, "job_id": job.id, "case_id": job.case_id, "format": job.format, "state": job.state,
         "counts": counts, "sha256": job.sha256, "byte_size": job.byte_size,
@@ -216,7 +225,7 @@ def _csv_value(value):
     return value
 
 
-def _write_package(job, rows, storage, destination: Path, manifest_bytes):
+def _write_package(job, rows, storage, destination: Path, manifest_bytes, signature=None):
     if job.format == "json":
         with destination.open("wb") as output:
             output.write(canonical_json({"items": [_metadata(item, original) for item, original, _occurrence, _source in rows], "manifest": json.loads(manifest_bytes), "scope": job.counts.get("scope", {})}))
@@ -229,6 +238,8 @@ def _write_package(job, rows, storage, destination: Path, manifest_bytes):
     else:
         with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as archive:
             archive.writestr("manifest.json", manifest_bytes)
+            if signature is not None:
+                archive.writestr(SIGNATURE_NAME, canonical_json(signature))
             for item, original, _occurrence, _source in rows:
                 digest, size = hashlib.sha256(), 0
                 with storage.path(original.storage_key).open("rb") as incoming, archive.open(_native_name(item), "w", force_zip64=True) as outgoing:
@@ -242,7 +253,6 @@ def _write_package(job, rows, storage, destination: Path, manifest_bytes):
 
 def process_pending_exports(database, settings, storage):
     """Claim and process one durable export job; return whether a job was claimed."""
-    del settings  # Provider/network settings do not affect source exports.
     with database.sessions() as db:
         candidate = db.scalar(select(Export.id).where(Export.state == "pending").order_by(Export.created_at, Export.id).limit(1))
         if candidate is None:
@@ -256,13 +266,23 @@ def process_pending_exports(database, settings, storage):
         try:
             user = _requester(db, job)
             rows = _validate_job(db, job, storage)
-            manifest_bytes = canonical_json(_manifest(job, rows))
+            try:
+                signing_key = load_private_signing_key(getattr(settings, "export_signing_key_file", None)) if job.format == "zip" else None
+            except SigningKeyError:
+                fail(503, "EXPORT_SIGNING_KEY_INVALID", "Configured export signing key is invalid or unavailable. No unsigned package was generated.")
+            manifest = _manifest(job, rows)
+            if signing_key is not None:
+                manifest["schema_version"] = "casequarry-hash-manifest-v2"
+                manifest["package_files"] = {_native_name(item): {"sha256": original.sha256, "byte_size": original.byte_size} for item, original, _occurrence, _source in rows}
+                manifest["assurance"] = "Exact manifest bytes and complete package inventory signed with Ed25519; verification requires an independently trusted public key and does not establish an independent timestamp."
+            manifest_bytes = canonical_json(manifest)
+            signature = sign_manifest(manifest_bytes, signing_key) if signing_key is not None else None
             temporary = storage.root / "temporary-exports"
             temporary.mkdir(parents=True, exist_ok=True)
             with tempfile.NamedTemporaryFile(dir=temporary, delete=False) as created:
                 path = Path(created.name)
             try:
-                _write_package(job, rows, storage, path, manifest_bytes)
+                _write_package(job, rows, storage, path, manifest_bytes, signature=signature)
                 # Start a fresh transaction after potentially lengthy file generation.
                 db.rollback()
                 job = db.get(Export, claimed)
@@ -273,7 +293,7 @@ def process_pending_exports(database, settings, storage):
             finally:
                 path.unlink(missing_ok=True)
             job.storage_key, job.sha256, job.byte_size, job.state = key, digest, size, "completed"
-            job.counts = {**job.counts, "processed": len(rows), "failed": 0, "manifest_sha256": manifest_hash, "manifest_storage_key": manifest_key, "completed_at": now().isoformat()}
+            job.counts = {**job.counts, "processed": len(rows), "failed": 0, "manifest_sha256": manifest_hash, "manifest_storage_key": manifest_key, "completed_at": now().isoformat(), "manifest_signing": signing_metadata(signing_key)}
             audit.record(db, user, job.case_id, "export.completed", "export", job.id, {"format": job.format, "count": len(rows), "sha256": digest})
             db.commit()
         except Exception as error:

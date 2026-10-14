@@ -226,28 +226,39 @@ export function ErrorBox({
   const message = error instanceof Error ? error.message : String(error);
   const friendly =
     error instanceof ApiError
-      ? error.code === "TASK_VERSION_CONFLICT" ||
-        error.code === "TASK_VERSION_REQUIRED"
-        ? "This task changed. Load its current version before saving."
-        : error.code === "TASK_LIST_CHANGED"
-          ? "The task list changed. Return to the first page."
-          : error.code === "WORKLIST_CHANGED"
-            ? "The worklist changed. Refresh to start from the first page."
-            : ["INVALID_CREDENTIALS", "MFA_CODE_INVALID"].includes(error.code)
-              ? "The sign-in details or authenticator code are incorrect."
-              : error.status === 401
-                ? "Your session has expired. Sign in again."
-                : error.status === 403
-                  ? "You do not have permission to perform this action."
-                  : error.status === 404
-                    ? "This resource is no longer available."
-                    : error.status === 429
-                      ? "Too many requests. Please wait and try again."
-                      : error.status === 422
-                        ? "Check the highlighted values and try again."
-                        : error.status >= 500
-                          ? "The server could not complete the request. Try again."
-                          : ""
+      ? error.code === "HOLD_NOTICE_CONFLICT" ||
+        error.code === "HOLD_NOTICE_TRANSITION_INVALID"
+        ? "This notice changed. Your draft is preserved; load the current version before saving."
+        : error.code === "HOLD_NOTICE_TEXT_FROZEN"
+          ? "Issued notice text and its hash are immutable. Acknowledgement is recorded by staff, not verified by the custodian."
+          : error.code === "HOLD_INACTIVE"
+            ? "This hold is released. Its notice register is read-only."
+            : error.code === "HOLD_NOTICE_EXISTS"
+              ? "Check the highlighted values and try again."
+              : error.code === "TASK_VERSION_CONFLICT" ||
+                  error.code === "TASK_VERSION_REQUIRED"
+                ? "This task changed. Load its current version before saving."
+                : error.code === "TASK_LIST_CHANGED"
+                  ? "The task list changed. Return to the first page."
+                  : error.code === "WORKLIST_CHANGED"
+                    ? "The worklist changed. Refresh to start from the first page."
+                    : ["INVALID_CREDENTIALS", "MFA_CODE_INVALID"].includes(
+                          error.code,
+                        )
+                      ? "The sign-in details or authenticator code are incorrect."
+                      : error.status === 401
+                        ? "Your session has expired. Sign in again."
+                        : error.status === 403
+                          ? "You do not have permission to perform this action."
+                          : error.status === 404
+                            ? "This resource is no longer available."
+                            : error.status === 429
+                              ? "Too many requests. Please wait and try again."
+                              : error.status === 422
+                                ? "Check the highlighted values and try again."
+                                : error.status >= 500
+                                  ? "The server could not complete the request. Try again."
+                                  : ""
       : "";
   const localized =
     getInterfaceLanguage() !== "en" && friendly

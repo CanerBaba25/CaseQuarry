@@ -31,4 +31,16 @@ Shipped API launch commands disable Uvicorn proxy-header rewriting explicitly. G
 
 The optional Rust evidence core provides bounded streaming SHA-256, native-package manifest verification and MBOX preflight. The CLI invokes a fixed locally built binary through an operation allowlist without a shell; Python fallbacks keep these local diagnostics available when the binary is not built. It does not replace server-side matter authorization or MIME/document parsing.
 
+Optional Ed25519 signing uses an operator-managed private PEM outside evidence
+storage. Native-export and production workers sign the exact v2 manifest and its
+complete package inventory with one key snapshot per job. The offline CLI verifier
+requires a separately trusted public PEM and checks bounded ZIP members without
+extraction or server access. See [signed packages](SIGNED_EXPORTS.md).
+
+Custodian hold notices are separate versioned records linked to an existing hold
+and custodian. Mutations share matter/user authorization locks and audited
+transactions; issued text is immutable. Issuance, acknowledgement and reminders are
+manual records. Releasing a hold retains them and stops further changes. See
+[hold notices](HOLD_NOTICES.md).
+
 The published 0.1.0 baseline and working reviewer extensions use Apache-2.0. Confidential deployment, production recovery/redaction interoperability, practitioner QA and larger capacity claims remain release gates until their exact tests and reviews are recorded. The local 10k SQLite trial is documented in [benchmarks](BENCHMARKS.md); it proves its recorded scope only and predates the isolated parser extensions.

@@ -1,6 +1,6 @@
 # Administrator guide
 
-This guide covers the implemented 0.3 controls. PostgreSQL is the shared database for browser and desktop clients. Real PostgreSQL migrations, import workflows and separate-client updates have been exercised; Docker runtime operation and production recovery remain unvalidated. Use a synthetic evaluation corpus until the host, access policy, preservation and reviewer workflow are approved for the intended deployment.
+This guide covers the implemented 0.8 controls. PostgreSQL is the shared database for browser and desktop clients. Real PostgreSQL migrations, import workflows and separate-client updates have been exercised; Docker runtime operation and production recovery remain unvalidated. Use a synthetic evaluation corpus until the host, access policy, preservation and reviewer workflow are approved for the intended deployment.
 
 ## Install and bootstrap
 
@@ -12,7 +12,10 @@ For deployment, terminate HTTPS through the configured service boundary, use `CA
 
 ## Apply the versioned schema
 
-The release schema is `0003_disclosure_workflow`: core evidence tables, optional local-analysis tables, and separate disclosure/assignment records. Migrations ship in the Python package and source distribution.
+The release schema is `0010_manual_hold_notices`, following `0009_user_language`.
+It adds a separate notice register without changing existing holds or evidence.
+Migrations ship in the Python package and source distribution; apply the forward
+migration before starting the upgraded server.
 
 With services stopped and a verified backup available, run from the project environment:
 
@@ -29,13 +32,13 @@ Development startup may adopt an **exact known** unversioned development schema.
 
 Firm administrators manage user accounts and configuration. Matter membership controls content access independently:
 
-| Matter role | Relevant workflow permissions |
-| --- | --- |
-| Matter lead | Import, review, assignments, export, holds, final privilege and separate disclosure approval. Only the lead can consent to matter-local model processing. |
-| Attorney | Import, review, export, holds, final privilege and separate disclosure approval. |
-| Review manager | Import, review, assignments and export; cannot make final privilege decisions or approve disclosure as attorney/lead. |
-| Reviewer | Evidence review and assignment claim/release/completion within the allocation rules. |
-| Expert, read-only, auditor | Authorized matter viewing; the auditor also has matter audit access. These roles do not gain review/export permission automatically. |
+| Matter role                | Relevant workflow permissions                                                                                                                             |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Matter lead                | Import, review, assignments, export, holds, final privilege and separate disclosure approval. Only the lead can consent to matter-local model processing. |
+| Attorney                   | Import, review, export, holds, final privilege and separate disclosure approval.                                                                          |
+| Review manager             | Import, review, assignments and export; cannot make final privilege decisions or approve disclosure as attorney/lead.                                     |
+| Reviewer                   | Evidence review and assignment claim/release/completion within the allocation rules.                                                                      |
+| Expert, read-only, auditor | Authorized matter viewing; the auditor also has matter audit access. These roles do not gain review/export permission automatically.                      |
 
 Create a second matter lead or attorney for independent redaction and production approval. The requester cannot approve their own disclosure, even if they are also a firm administrator. Verify boundaries with separate accounts before using a matter operationally.
 
@@ -61,21 +64,32 @@ Assignments contain fixed 1–500-item snapshots with exclusive active allocatio
 
 Redaction and production records are separate from preserved originals. PDF redaction uses a fixed local renderer subprocess without JavaScript/XFA support, builds fresh lossless image-only PDFs and verifies their structure and pixel bytes. Text requests remove selected character ranges from verified UTF-8 extraction. Every ready redaction and production proposal requires a different current attorney or matter lead to approve it. Human inspection must identify all needed regions/ranges; the renderer does not discover every sensitive occurrence.
 
-| Disclosure limit | Implemented boundary |
-| --- | --- |
-| Production selection | At most 200 evidence items; explicit IDs, review-set snapshot or query snapshot. |
-| PDF original / document | At most 50 MB, 50 pages and 40 million rendered pixels. |
-| PDF preview / render deadline | 30-second isolated preview or 90-second flattening subprocess. |
-| Aggregate production | At most 60 million rendered pixels and 250 MB of produced document/image bytes. |
-| Text derivative | Complete indexed text up to 2 MB; partial/unavailable extraction is held back for text delivery. |
-| Redaction selection | At most 200 normalized PDF rectangles or non-overlapping text ranges. |
-| Bates registry | Prefix up to 16 uppercase characters, beginning with a letter; eight-digit numbers allocated per matter/prefix, never recycled after reservation. |
+| Disclosure limit              | Implemented boundary                                                                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production selection          | At most 200 evidence items; explicit IDs, review-set snapshot or query snapshot.                                                                  |
+| PDF original / document       | At most 50 MB, 50 pages and 40 million rendered pixels.                                                                                           |
+| PDF preview / render deadline | 30-second isolated preview or 90-second flattening subprocess.                                                                                    |
+| Aggregate production          | At most 60 million rendered pixels and 250 MB of produced document/image bytes.                                                                   |
+| Text derivative               | Complete indexed text up to 2 MB; partial/unavailable extraction is held back for text delivery.                                                  |
+| Redaction selection           | At most 200 normalized PDF rectangles or non-overlapping text ranges.                                                                             |
+| Bates registry                | Prefix up to 16 uppercase characters, beginning with a letter; eight-digit numbers allocated per matter/prefix, never recycled after reservation. |
 
 Production is derived-only PDF/text, with preserved source and parent IDs, original/produced hashes and an explicit load-file profile. Native ZIP exports are separate and include original bytes, requiring review of embedded descendants. They are not a redacted-delivery substitute.
 
 Unreviewed/needs-review, suspected/confirmed privilege and quarantine block production. Changes to source bytes, extraction/review version, redacted derivative or current requester/approver access invalidate delivery. Mixed redacted and unredacted copies of the same original are blocked. Active legal holds preserve originals and block matter archival where required; they do not grant disclosure authority. Hold activation/release require an authorized lead/attorney and an audited reason; released holds are not silently reactivated.
 
 Load files use a documented CSV, UTF-8 DAT delimiter and ASCII Opticon profile with single-page flattened PDF references. Internal fixtures validate the mapping and package hashes; no recipient review-platform import has been executed. Test that profile with the intended recipient before delivery. SHA-256 verification is not a digital signature, independent timestamp or external custody anchor.
+
+Version 0.8 optionally adds [Ed25519-signed ZIP manifests](SIGNED_EXPORTS.md) with
+a dedicated `CASEQUARRY_EXPORT_SIGNING_KEY_FILE`. Keep the private key outside
+source control, distribute trusted public keys independently and retain historical
+public keys across rotation. Invalid configured keys fail closed; CSV/JSON exports
+remain unsigned. Signing does not change the approval or preservation rules.
+
+Use the [custodian notice register](HOLD_NOTICES.md) to record staff-managed
+issuance, acknowledgements and reminders. Issued text is frozen, all writes use
+version checks and hold permission, and released holds retain read-only history.
+The register does not deliver messages or verify a custodian's identity.
 
 ## Candidates, versions and optional local analysis
 

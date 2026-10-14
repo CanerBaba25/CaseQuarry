@@ -51,6 +51,106 @@ except typer.Exit as error:
     print(json.dumps({"blocked": True, "exit_code": error.exit_code, "elapsed_seconds": time.monotonic() - started}))
 '''
 
+CLI_SIGNING_PROBE = '''
+import hashlib
+import json
+import runpy
+import sys
+import zipfile
+from pathlib import Path
+import casequarry
+import casequarry_cli
+from casequarry_cli import client
+
+prefix = Path(sys.prefix).resolve()
+sys.stdout.reconfigure(encoding="utf8")
+sys.stderr.reconfigure(encoding="utf8")
+if any(not Path(module.__file__).resolve().is_relative_to(prefix) for module in (casequarry, casequarry_cli)):
+    raise RuntimeError("Signing verification requires installed runtime modules")
+
+def forbidden(*args, **kwargs):
+    raise RuntimeError("Offline signing verification must not access credentials or HTTP")
+
+client.secure_keyring = forbidden
+for name in ("get_keyring", "get_password", "set_password", "delete_password"):
+    setattr(client.keyring, name, forbidden)
+client.httpx.request = forbidden
+client.httpx.Client.request = forbidden
+directory = Path(sys.argv[2])
+client.config_path = lambda: directory / "profiles.json"
+if sys.argv[1] == "command":
+    sys.argv = ["cq", *sys.argv[3:]]
+    runpy.run_module("casequarry_cli", run_name="__main__", alter_sys=True)
+else:
+    from casequarry.manifest_signing import load_private_signing_key, public_key_id, sign_manifest
+    key = load_private_signing_key(directory / "private.pem")
+    data = b"Installed runtime synthetic evidence."
+    manifest = {"schema_version": "casequarry-hash-manifest-v2", "algorithm": "SHA-256", "package_files": {"native/synthetic.txt": {"sha256": hashlib.sha256(data).hexdigest(), "byte_size": len(data)}}}
+    raw = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode("utf8")
+    signature = json.dumps(sign_manifest(raw, key), sort_keys=True, separators=(",", ":")).encode("utf8")
+    for name in ("valid", "tampered", "unsigned"):
+        with zipfile.ZipFile(directory / (name + ".zip"), "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("manifest.json", raw)
+            archive.writestr("native/synthetic.txt", b"X" + data[1:] if name == "tampered" else data)
+            if name != "unsigned":
+                archive.writestr("manifest.signature.json", signature)
+    print(json.dumps({"built": True, "key_id": public_key_id(key), "files": 1, "bytes": len(data), "installed_modules": True}))
+'''
+
+
+def verify_cli_signing(python, directory, env):
+    """Exercise installed offline CLI signing with temporary owner-private keys."""
+    clean_env = {key: value for key, value in env.items() if not key.startswith("CASEQUARRY_") and key not in {"PYTHONPATH", "PYTHONHOME"}}
+    clean_env["PYTHONIOENCODING"] = "utf8"
+    with tempfile.TemporaryDirectory(prefix="cli-signing-", dir=directory) as temporary:
+        private = Path(temporary)
+        options = {"env": clean_env, "cwd": private, "stdout": subprocess.PIPE, "stderr": subprocess.PIPE, "creationflags": subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0}
+
+        def probe(mode, arguments=(), expected=0):
+            command = [str(python), "-I", "-c", CLI_SIGNING_PROBE, mode, str(private), *arguments]
+            completed = subprocess.run(command, timeout=30, **options)
+            if b"PRIVATE KEY" in completed.stdout or b"PRIVATE KEY" in completed.stderr:
+                raise RuntimeError("Installed offline signing probe exposed private key material")
+            if completed.returncode != expected:
+                raise RuntimeError(f"Installed offline signing probe returned {completed.returncode}, expected {expected}: {completed.stdout.decode('utf8', errors='replace')} {completed.stderr.decode('utf8', errors='replace')}")
+            try:
+                value = json.loads(completed.stdout)
+            except (ValueError, UnicodeError):
+                raise RuntimeError("Installed offline signing probe did not return JSON") from None
+            if not isinstance(value, dict):
+                raise RuntimeError("Installed offline signing probe returned an invalid result")
+            return value
+
+        created = []
+        for name in ("", "other-"):
+            result = probe("command", ["--output", "json", "export", "signing-key-create", "--private-key-file", str(private / (name + "private.pem")), "--public-key-file", str(private / (name + "public.pem"))])
+            if result.get("algorithm") != "Ed25519" or type(result.get("overwritten_files")) is not int or result["overwritten_files"] != 0 or not isinstance(result.get("key_id"), str) or len(result["key_id"]) != 71 or not result["key_id"].startswith("sha256:") or any(character not in "0123456789abcdef" for character in result["key_id"][7:]):
+                raise RuntimeError("Installed CLI did not create an exclusive Ed25519 key pair")
+            created.append(result["key_id"])
+            if os.name != "nt" and any((private / (name + suffix)).stat().st_mode & 0o777 != 0o600 for suffix in ("private.pem", "public.pem")):
+                raise RuntimeError("Installed CLI signing-key files are not owner-private")
+        fixture = probe("fixture")
+        if fixture.get("built") is not True or fixture.get("installed_modules") is not True or fixture.get("key_id") != created[0] or type(fixture.get("files")) is not int or fixture["files"] != 1 or not isinstance(fixture.get("bytes"), int) or isinstance(fixture["bytes"], bool) or fixture["bytes"] <= 0 or created[0] == created[1]:
+            raise RuntimeError("Installed signing fixture did not retain its trusted key or typed counts")
+        before = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in private.iterdir() if path.is_file()}
+        required = {"private.pem", "public.pem", "other-private.pem", "other-public.pem", "valid.zip", "tampered.zip", "unsigned.zip"}
+        if not required.issubset(before):
+            raise RuntimeError("Installed signing fixture is incomplete")
+        checks = []
+        for name, package, public, expected, signature_valid in (("valid", "valid", "public.pem", 0, True), ("tampered-member", "tampered", "public.pem", 8, True), ("wrong-trusted-key", "valid", "other-public.pem", 8, False), ("unsigned", "unsigned", "public.pem", 8, False)):
+            result = probe("command", ["--output", "json", "evidence", "verify-package", "--path", str(private / (package + ".zip")), "--trusted-public-key", str(private / public)], expected=expected)
+            if result.get("valid") is not (expected == 0) or result.get("signature_valid") is not signature_valid:
+                raise RuntimeError("Installed CLI accepted invalid evidence or confused signature and package validity")
+            if name == "valid" and (result.get("files_checked") != fixture["files"] or result.get("bytes_checked") != fixture["bytes"] or result.get("key_id") != created[0]):
+                raise RuntimeError("Installed CLI verified counts or trusted key do not match the fixture")
+            if any(not isinstance(result.get(field), int) or isinstance(result[field], bool) or result[field] < 0 for field in ("files_checked", "bytes_checked")):
+                raise RuntimeError("Installed CLI did not return typed verification counts")
+            checks.append({"case": name, "exit_code": expected, "valid": result["valid"], "signature_valid": result["signature_valid"], "files_checked": result["files_checked"], "bytes_checked": result["bytes_checked"]})
+        after = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in private.iterdir() if path.is_file()}
+        if before != after:
+            raise RuntimeError("Offline package verification changed its input packages or key files")
+    return {"platform": sys.platform, "checks": checks, "installed_modules_only": True, "input_files_preserved": True, "credential_or_http_access": False}
+
 
 def verify_cli_profile_lock(python, directory, env):
     """Exercise the installed CLI lock with owned processes and private files."""
@@ -164,6 +264,8 @@ def verify(args):
             installed_python = data / "runtime" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
             report["cli_profile_lock"] = verify_cli_profile_lock(installed_python, directory, env)
             report["checks"].append("Installed CLI profile-store OS lock: bounded process exclusion and reacquisition after normal and abrupt owner exit")
+            report["cli_signing"] = verify_cli_signing(installed_python, directory, env)
+            report["checks"].append("Installed offline Ed25519 CLI: exclusive key creation, trusted signed ZIP verification and rejection of tampered, wrong-key and unsigned packages")
             port = free_port()
             with (report_path.parent / "services.log").open("w", encoding="utf8") as log:
                 child = subprocess.Popen([sys.executable, str(controller), "start", "--data-dir", str(data), "--web-port", str(port)], env=env, stdout=log, stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)

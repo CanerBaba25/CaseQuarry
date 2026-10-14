@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,7 +39,13 @@ class Settings(BaseSettings):
     ai_model: str = ""
     allow_remote_ai: bool = True
     provider_key_encryption_key: str | None = Field(default=None, repr=False)
+    export_signing_key_file: Path | None = Field(default=None, repr=False)
     antivirus_command: str | None = None
+
+    @field_validator("export_signing_key_file", mode="before")
+    @classmethod
+    def optional_signing_key_file(cls, value):
+        return None if isinstance(value, str) and not value.strip() else value
 
     @property
     def secure_cookies(self) -> bool:

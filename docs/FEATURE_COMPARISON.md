@@ -1,8 +1,8 @@
 # Feature comparison
 
-Reviewed on 13 October 2026 using the five projects' repository READMEs,
-documentation and licence files. Their capabilities below are documented by the
-projects, not independently installed, executed or tested for this comparison.
+Reviewed on 14 October 2026 UTC using the five projects' repository READMEs,
+documentation, licence files and selected implementation paths at the revisions below.
+The referenced applications were not independently installed, executed or tested.
 Demo availability, format counts and benchmark descriptions do not establish
 production capacity or suitability for a particular matter.
 
@@ -27,52 +27,76 @@ plus web and native interface localization for English, Russian, French, Spanish
 German, Turkish, Greek, Italian, Portuguese, Ukrainian, Simplified Chinese,
 Traditional Chinese and Hindi (`en`, `ru`, `fr`, `es`, `de`, `tr`, `el`, `it`, `pt`,
 `uk`, `zh-Hans`, `zh-Hant`, `hi`). Interface translation does not establish OCR, search-analysis or model
-quality in those languages.
+quality in those languages. Version 0.7.0 adds Kimi alongside the other four optional cloud providers.
 
 PST/OST import, OAuth mail connectors, media transcription and large-scale ranked
 search remain unfinished. Production capacity and the two-million-email target
-remain unvalidated. Current export manifests use SHA-256 verification without a
-digital signature or independent timestamp.
+remain unvalidated. Unsigned export manifests use SHA-256 verification without an
+independent timestamp.
 
-## Referenced projects
+## Additions in CaseQuarry 0.8.0
 
-| Project                                                                            | Documented capabilities and useful differences                                                                                                                                                                                                                                                                   | Status and licence boundaries                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [FreeEed](https://github.com/shmsoft/FreeEed#capabilities)                         | PST processing, OCR, document review, PDF imaging, audio/video transcription and a claimed 1,400+ formats through Apache Tika. PST and transcription extend CaseQuarry's current adapter coverage.                                                                                                               | Its README explicitly marks AI responsiveness, privilege and smoking-gun analysis as under development. The [root LICENSE](https://github.com/shmsoft/FreeEed/blob/main/LICENSE) is Apache-2.0 and includes a proprietary JPST-driver note distinguishing evaluation from production licensing. Its [EULA](https://github.com/shmsoft/FreeEed/blob/main/EULA.txt) distinguishes open-source components from optional commercial features. |
-| [OpenArchiver](https://github.com/kayoom/OpenArchiver#-key-features)               | Google Workspace, Microsoft 365 and IMAP synchronization; PST, EML and MBOX ingestion; local/S3-compatible storage; email thread context and integrity reports. OAuth synchronization is the main difference from CaseQuarry's existing read-only IMAP acquisition.                                              | Features and a live demo are advertised in the README; legal holds are explicitly marked TBD. The requested kayoom repository links another organization as its installation upstream. The exact [root licence](https://github.com/kayoom/OpenArchiver/blob/main/LICENSE) is GNU AGPL v3.                                                                                                                                                 |
-| [JeremyFlorence/ediscovery](https://github.com/JeremyFlorence/ediscovery#features) | A Django review application with custodian hold notices, acknowledgement links, reminder tracking and acknowledgement-rate reporting, alongside review coding and Bates productions. The notice workflow extends basic preservation-hold tracking.                                                               | The README describes a runnable application and 26 tests; those tests were not executed for this comparison. No root LICENSE file or README licence declaration was found at review. Public source visibility does not establish permission to reuse it.                                                                                                                                                                                  |
-| [Mike](https://github.com/open-legal-products/mike#features)                       | Reusable assistant and tabular-review workflows, CourtListener research, Word integration and local Ollama support. Its [export guide](https://github.com/open-legal-products/mike/blob/main/docs/tamper-evident-exports.md) documents optional Ed25519 manifest signatures and trusted public-key distribution. | The Word add-in is explicitly beta. CaseQuarry already has optional local analysis and verified citations; those alone are not gaps. Mike's [root licence](https://github.com/open-legal-products/mike/blob/main/LICENSE) is GNU AGPL v3.                                                                                                                                                                                                 |
-| [LegalMemory](https://github.com/eigenweltlabs/LegalMemory#highlights)             | Read-only document-source synchronization with mirrored ACLs, permission filtering before ranking, hybrid retrieval, document-version collapse and identity-bound MCP access. These offer a longer-term reference for external document estates.                                                                 | Its README describes a live demo and a retrieval benchmark gate; neither establishes independently validated production capacity here. Its [licence](https://github.com/eigenweltlabs/LegalMemory/blob/main/LICENSE) is GNU AGPL v3, with component notices and a commercial alternative described in the README.                                                                                                                         |
+Two gaps from the source comparison are implemented independently:
 
-## Recommended additions
+- **Optional signed ZIP packages**, informed by Mike's signed JSON-manifest workflow.
+  A dedicated operator-managed Ed25519 key signs the exact manifest bytes. The
+  manifest inventories every data member, including production images and load
+  files. Offline CLI verification requires an independently trusted public key and
+  checks the signature, complete inventory, byte lengths and hashes. Unconfigured
+  servers retain unsigned exports; an invalid configured key cannot silently
+  downgrade a package. See [signed packages](SIGNED_EXPORTS.md).
+- **Custodian hold-notice register**, informed by eDiscovery's notice records.
+  Staff record draft notices, issuance, acknowledgement and reminders with version
+  checks and an audit history. Issued text is frozen; account-local dates identify
+  overdue reminders. These are manual records, without automatic email delivery,
+  public acknowledgement links or verified custodian identity. Releasing a hold
+  retains the notice history and stops further notice changes.
 
-These are proposed gaps, not delivered capabilities or release commitments. Scope
-estimates are relative and require verification against the current implementation.
+The existing preservation, privilege, independent approval and matter-permission
+rules still apply. Signing authenticates a manifest relative to a trusted key; it
+does not independently timestamp it, certify collection completeness or prove
+chain of custody. Notices do not expand or release the underlying legal hold.
 
-| Priority | Addition                                                  | Bounded scope and practical risks                                                                                                                                                                                                                                                                     |
-| -------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1        | Optional signed export manifests                          | Small to medium. Extend existing exports and CLI verification with a versioned signature format, dedicated operator-managed signing key and key identifier. Verify against an explicitly trusted public key. Key custody, rotation and public-key distribution need a documented operating procedure. |
-| 2        | Custodian hold-notice register                            | Medium. Extend existing holds with versioned notice records, acknowledgement history and reminder dates. First verify which fields are already implemented. A manually recorded acknowledgement must be labelled as such; public acknowledgement links require separate token and identity design.    |
-| 3        | Saved structured review templates                         | Medium to large. Add reusable question/column definitions over bounded evidence scopes, retaining source citations, coverage and separate human decisions. Avoid treating generated values as authoritative review coding.                                                                            |
-| 4        | OAuth synchronization and PST acquisition                 | Large; deliver as separate adapters. Start with one provider or container format, durable checkpoints and explicit coverage limits. Handle token expiry, provider quotas, duplicate occurrences, parser isolation and provenance before expanding coverage.                                           |
-| 5        | Permission-aware DMS synchronization and hybrid retrieval | Large; stage independently from core review. Preserve source ACLs, fail closed on unknown access, reconcile deletion observations and benchmark scoped retrieval. Do not inherit another project's capacity claims.                                                                                   |
+## Referenced projects and inspected revisions
 
-The most bounded next addition is optional signed export manifests, informed by
-Mike's documented workflow. Preserve unsigned operation when no signing key is
-configured. Verification should fail for modified manifests, changed package files
-and an incorrect trusted key, while supporting historical signing keys after
-rotation. A signature authenticates a manifest relative to the trusted key; it does
-not provide an independent timestamp or prove chain of custody. This feature is
-proposed and has not been implemented by this comparison.
+| Project                                                     | Revision inspected                                                                                         | Source-supported differences                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [FreeEed](https://github.com/shmsoft/FreeEed)               | [`d268fac3`](https://github.com/shmsoft/FreeEed/commit/d268fac3c59beb91b3d9d77d7c386657d149ac4d)           | [PST traversal](https://github.com/shmsoft/FreeEed/blob/d268fac3c59beb91b3d9d77d7c386657d149ac4d/freeeed-processing/src/main/java/org/freeeed/main/PstProcessor.java#L185) invokes a separate parser. Its README advertises broader Tika formats and transcription; the inspected transcription path did not establish end-to-end ingestion.                                                                                                                                                                                                                                               |
+| [OpenArchiver](https://github.com/kayoom/OpenArchiver)      | [`f01d1b17`](https://github.com/kayoom/OpenArchiver/commit/f01d1b176cc5f988a80965051f557b382d364ca7)       | [Scheduled incremental collection](https://github.com/kayoom/OpenArchiver/blob/f01d1b176cc5f988a80965051f557b382d364ca7/packages/backend/src/jobs/processors/continuous-sync.processor.ts), [mailbox checkpoints](https://github.com/kayoom/OpenArchiver/blob/f01d1b176cc5f988a80965051f557b382d364ca7/packages/backend/src/services/ingestion-connectors/ImapConnector.ts#L170), provider delta cursors and S3 storage extend explicit one-time acquisition.                                                                                                                              |
+| [eDiscovery](https://github.com/JeremyFlorence/ediscovery)  | [`3cb43be9`](https://github.com/JeremyFlorence/ediscovery/commit/3cb43be95100c48ef1f1647296b151b689471f76) | [Per-custodian hold notices](https://github.com/JeremyFlorence/ediscovery/blob/3cb43be95100c48ef1f1647296b151b689471f76/holds/models.py#L59) and acknowledgement/reminder records extend basic hold activation. [Views](https://github.com/JeremyFlorence/ediscovery/blob/3cb43be95100c48ef1f1647296b151b689471f76/holds/views.py#L81) record issuance/reminders; actual email delivery is left unimplemented.                                                                                                                                                                             |
+| [Mike](https://github.com/open-legal-products/mike)         | [`08e6c649`](https://github.com/open-legal-products/mike/commit/08e6c6499b854aabb29a39eecf65a509c7590c53)  | [Signed JSON manifests](https://github.com/open-legal-products/mike/blob/08e6c6499b854aabb29a39eecf65a509c7590c53/backend/src/lib/manifestSigning.ts#L60), [tabular question workflows](https://github.com/open-legal-products/mike/blob/08e6c6499b854aabb29a39eecf65a509c7590c53/frontend/src/app/components/workflows/WFEditColumnModal.tsx#L93), research and drafting offer distinct additions. Its Word integration is beta; signed JSON does not establish generic ZIP sealing.                                                                                                      |
+| [LegalMemory](https://github.com/eigenweltlabs/LegalMemory) | [`8ac42f04`](https://github.com/eigenweltlabs/LegalMemory/commit/8ac42f04fbbf23bd1a486390308c038e0908df46) | [Mirrored ACL predicates](https://github.com/eigenweltlabs/LegalMemory/blob/8ac42f04fbbf23bd1a486390308c038e0908df46/src/knowledge_index/permissions.py#L144), [permission-scoped ranking](https://github.com/eigenweltlabs/LegalMemory/blob/8ac42f04fbbf23bd1a486390308c038e0908df46/src/knowledge_index/retrieval.py#L2088), source synchronization and [Word revision/comment extraction](https://github.com/eigenweltlabs/LegalMemory/blob/8ac42f04fbbf23bd1a486390308c038e0908df46/src/knowledge_index/pipeline/converters.py#L100) extend matter permissions and extraction history. |
+
+The requested OpenArchiver fork points to another organization in its installation
+instructions; this comparison concerns the exact requested snapshot. Its legal
+holds are marked TBD. Its inspected storage code enables encryption only when a
+key is configured, so the README's blanket encryption wording is not adopted.
+FreeEed marks responsiveness/privilege/smoking-gun analysis as under development.
+LegalMemory's inspected document-ranking function fuses three document legs, with
+decision search separately available; the README's four-leg wording is not repeated
+as a verified description of that function. No advertised benchmark is imported.
+
+## Recommended next work
+
+These remain proposals, not delivered capabilities or release commitments:
+
+| Priority | Addition                                              | Bounded first delivery                                                                                                                                                                                                                                       |
+| -------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1        | Incremental read-only mailbox collection              | Extend the existing IMAPS CLI with durable host/mailbox/UIDVALIDITY/UID checkpoints. Advance only after preservation, report partial coverage and require reconciliation after UIDVALIDITY changes. Scheduling and provider OAuth follow separately.         |
+| 2        | Isolated PST adapter                                  | Detect an independently installed parser, preserve the container and retain stable message/folder provenance. Bound bytes, time and family expansion; report unsupported Outlook objects. OST is a separate format.                                          |
+| 3        | Structured review-question matrix                     | Reusable typed questions over fixed review scopes, with human-entered answers and immutable source anchors. Optional model suggestions remain separate from responsiveness and privilege decisions.                                                          |
+| 4        | Word tracked revisions and comments                   | Extract bounded OOXML changes into a separate provenance artifact. Keep visible text, deleted text, source author/date claims and human conclusions distinct.                                                                                                |
+| 5        | Permission-aware source synchronization and retrieval | Start one read-only source with ACL snapshots, resumable scans and fail-closed scope checks before ranking. Record deletion observations without deleting preserved or held evidence. Benchmark retrieval quality as well as speed.                          |
+| 6        | Encrypted evidence storage and S3                     | Stage storage changes independently. Preserve authenticated reads, write-once objects, plaintext content hashes, key rotation, temporary-file limits and verified recovery. Current provider-key and backup encryption do not encrypt live evidence objects. |
 
 ## Reuse boundaries
 
-These projects are references for independent feature design. No referenced
-repository code is included by this comparison. AGPL-covered code has copyleft
-conditions, including conditions for modified software used over a network;
-importing or adapting it requires a separate licence-compatibility review.
-Permissively licensed components also retain their applicable notices and terms.
-FreeEed's component-specific and distribution terms require separate attention,
-and the absence of a licence in the reviewed ediscovery repository supplies no
-reuse permission. Verify the exact revision and component licences before any
-dependency decision. This comparison is not legal clearance.
+The additions are independently authored. No referenced repository implementation,
+template, model or proprietary driver is incorporated into CaseQuarry.
+
+- FreeEed's [Apache-2.0 root licence](https://github.com/shmsoft/FreeEed/blob/d268fac3c59beb91b3d9d77d7c386657d149ac4d/LICENSE) includes a separate proprietary JPST-driver note; its EULA distinguishes optional commercial components.
+- The inspected [OpenArchiver](https://github.com/kayoom/OpenArchiver/blob/f01d1b176cc5f988a80965051f557b382d364ca7/LICENSE), [Mike](https://github.com/open-legal-products/mike/blob/08e6c6499b854aabb29a39eecf65a509c7590c53/LICENSE) and [LegalMemory](https://github.com/eigenweltlabs/LegalMemory/blob/8ac42f04fbbf23bd1a486390308c038e0908df46/LICENSE) revisions use AGPL-3.0, with component-specific notices where supplied.
+- No licence grant was found in the inspected eDiscovery tree or README. Public visibility alone does not supply reuse permission.
+
+Any future dependency or source adoption needs review of that exact component and
+revision. This feature comparison supplies no licence-compatibility clearance.

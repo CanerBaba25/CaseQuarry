@@ -52,7 +52,7 @@ The transfer makes a SQLite snapshot, verifies its exact known schema and every 
 
 ## Backups and upgrades
 
-Stop API/worker application services before a coordinated backup. Use PostgreSQL `pg_dump` custom format for the database, and copy the immutable storage directory, private `.env` and provider encryption key into protected backup storage. Encryption at rest, restricted access and an off-host copy are the operator's responsibility. Restore into a separate database and storage directory, verify original hashes and audit chains, and rehearse startup before relying on a backup. Do not overwrite the active installation during a restore.
+Stop API/worker application services before a coordinated backup. Use PostgreSQL `pg_dump` custom format for the database, and copy the immutable storage directory, private `.env` and provider encryption key into protected backup storage. If export signing is configured, separately back up the Ed25519 private-key file: `.env` contains its path, not its bytes. Retain independently trusted historical public keys for verifying earlier packages. Encryption at rest, restricted access and an off-host copy are the operator's responsibility. Restore into a separate database and storage directory, verify original hashes and audit chains, and rehearse startup before relying on a backup. Do not overwrite the active installation during a restore.
 
 For an upgrade, stop services, take that coordinated backup, install the new versioned package using the same data directory, and apply its forward migrations. The static schema checker refuses unknown revisions and drift; it never performs a destructive downgrade. If an interrupted supervisor leaves `run.json`, inspect the recorded process and private logs before removing only that stale marker.
 
@@ -62,9 +62,20 @@ The 0.5 → 0.6 upgrade applies `0008_task_priorities` and `0009_user_language` 
 
 The 0.6.0 → 0.7.0 upgrade adds no database migration. Reload clients after restarting services. Saved CLI profiles need a fresh sign-in, and direct cloud-job API callers must send the confirmed provider/revision snapshot; see the [CLI reference](CLI_REFERENCE.md) and [cloud contract](CLOUD_AI_GUIDE.md#api-contract).
 
+The 0.7.0 → 0.8.0 upgrade applies `0010_manual_hold_notices` after `0009_user_language`. It adds an empty custodian-notice table and preserves existing holds, evidence, account preferences, tasks and audit events. Apply the migration before starting API/worker, verify the current schema, and reload clients. The [notice register](HOLD_NOTICES.md) records staff actions; the upgrade sends no notices or reminders.
+
+Optional [signed evidence packages](SIGNED_EXPORTS.md) use a dedicated operator-managed Ed25519 PEM file configured by `CASEQUARRY_EXPORT_SIGNING_KEY_FILE`. A blank setting retains unsigned operation. A configured invalid or unavailable key fails closed rather than silently generating an unsigned ZIP. Signing evidence packages does not sign or authenticate the application installers.
+
 ## Compose deployment
 
-The source distribution includes PostgreSQL/API/worker/web Compose configuration. `tasks.py init` generates private secrets, and the migration service runs before the API. PostgreSQL is unpublished on an internal network; only API/worker gain outbound connectivity for explicitly authorized vendor requests. The optional HTTPS overlay is:
+The source distribution includes PostgreSQL/API/worker/web Compose configuration. `tasks.py init` generates private secrets, and the migration service runs before the API. PostgreSQL is unpublished on an internal network; only API/worker gain outbound connectivity for explicitly authorized vendor requests.
+
+Dockerfiles copy only the shipped source, configuration and assets; host
+dependencies, build caches and local environment files are not image inputs.
+Build from a clean source archive when using a remote builder: local and global
+Git ignores do not restrict Docker context transfer.
+
+Start the optional HTTPS overlay with:
 
 ```sh
 docker compose -f docker-compose.yml -f infra/deploy/compose.https.yml up --build -d

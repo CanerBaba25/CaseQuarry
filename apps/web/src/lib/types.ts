@@ -217,5 +217,5 @@ export type ExportRecord = {
   format: string;
   download_url?: string;
   created_at?: string;
-  counts?: Record<string, number>;
+  counts?: Record<string, unknown>;
 };

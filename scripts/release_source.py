@@ -34,6 +34,9 @@ EXCLUDED_DIRS = {
     "tests",
 }
 EXCLUDED_NAMES = {
+    ".dockerignore",
+    ".gitignore",
+    ".rgignore",
     "IMPLEMENTATION_STATUS.md",
     "CODEX_START_HERE.md",
     "BRAND_NAME_RESEARCH.md",

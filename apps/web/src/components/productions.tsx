@@ -1,4 +1,5 @@
 "use client";
+import ManifestSigningStatus from "./manifest-signing";
 import { uiText } from "@/lib/i18n";
 
 import Link from "next/link";
@@ -299,6 +300,10 @@ export default function ProductionsPage({
                       </td>
                       <td>
                         <Badge value={item.state} />
+                        <ManifestSigningStatus
+                          state={item.state}
+                          counts={item.counts}
+                        />
                       </td>
                       <td className="mono">{item.bates_prefix}</td>
                       <td>
@@ -1266,6 +1271,11 @@ function ProductionReview({
                 )}
               </span>
             </div>
+            <ManifestSigningStatus
+              state={row.state}
+              counts={row.counts}
+              detail
+            />
             <details className="audit-metadata" open>
               <summary>
                 {uiText("Scope, processing and hold disclosure")}

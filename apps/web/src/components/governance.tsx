@@ -9,6 +9,7 @@ import { can } from "@/lib/permissions";
 import type { Matter, Member } from "@/lib/types";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { PageHeading, Pagination } from "./matter-pages";
+import HoldNotices from "./hold-notices";
 import { TaskDeadline } from "./task-deadline";
 import TaskDetails from "./task-details";
 import {
@@ -106,6 +107,7 @@ export function GovernancePage({
   };
   const [create, setCreate] = useState(false),
     [release, setRelease] = useState<Hold | null>(null),
+    [noticeHold, setNoticeHold] = useState<Hold | null>(null),
     [issue, setIssue] = useState<Issue | null>(null),
     [deadlineTask, setDeadlineTask] = useState<Task | null>(null),
     [taskDetailsId, setTaskDetailsId] = useState<string | null>(null),
@@ -123,6 +125,7 @@ export function GovernancePage({
     setHistory([]);
     setCreate(false);
     setRelease(null);
+    setNoticeHold(null);
     setIssue(null);
     setDeadlineTask(null);
     setTaskDetailsId(null);
@@ -446,15 +449,23 @@ export function GovernancePage({
                   )}
                   <td>
                     {kind === "holds" ? (
-                      item.state === "active" && (
+                      <div className="form-actions">
                         <button
                           className="button secondary compact"
-                          disabled={!canManage}
-                          onClick={() => setRelease(item)}
+                          onClick={() => setNoticeHold(item)}
                         >
-                          {uiText("Record release")}
+                          {uiText("View notices")}
                         </button>
-                      )
+                        {item.state === "active" && (
+                          <button
+                            className="button secondary compact"
+                            disabled={!canManage}
+                            onClick={() => setRelease(item)}
+                          >
+                            {uiText("Record release")}
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       <select
                         className="task-state"
@@ -532,6 +543,13 @@ export function GovernancePage({
             setRelease(null);
             resource.refresh();
           }}
+        />
+      )}
+      {noticeHold && (
+        <HoldNotices
+          matter={matter}
+          hold={noticeHold}
+          close={() => setNoticeHold(null)}
         />
       )}
       {deadlineTask && canEditTask && (

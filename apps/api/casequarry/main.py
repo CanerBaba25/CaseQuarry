@@ -24,6 +24,7 @@ from . import (
     evidence_routes,
     exports,
     governance_routes,
+    hold_routes,
     import_routes,
     investigation_routes,
     mfa_routes,
@@ -35,6 +36,7 @@ from . import (
 )
 from .config import Settings
 from .database import Database
+from .manifest_signing import load_private_signing_key
 from .models import ImportBatch, Member, Setting, Tenant, now
 from .request_limits import IMPORT_ROUTE, RequestSizeLimit, body_limit
 from .schemas import contains_nul
@@ -73,6 +75,7 @@ def prepare_setup(database, settings, storage):
 
 def create_app(settings: Settings | None = None):
     settings = settings or Settings()
+    load_private_signing_key(settings.export_signing_key_file)
     database, storage = Database(settings), Storage(settings.storage_path)
     stop_event = threading.Event()
 
@@ -280,6 +283,7 @@ def create_app(settings: Settings | None = None):
         evidence_routes.router,
         exports.router,
         governance_routes.router,
+        hold_routes.router,
         investigation_routes.router,
         mfa_routes.router,
         ai_routes.router,

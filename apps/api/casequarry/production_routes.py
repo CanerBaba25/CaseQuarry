@@ -22,6 +22,13 @@ from sqlalchemy.orm import Session
 from . import audit
 from .evidence_routes import checked_text
 from .exports import _check_items, _rows, _select_ids, _snapshot, canonical_json
+from .manifest_signing import (
+    SIGNATURE_NAME,
+    SigningKeyError,
+    load_private_signing_key,
+    sign_manifest,
+    signing_metadata,
+)
 from .models import Hold, User, new_id, now
 from .production_models import BatesCounter, Production, ProductionItem, Redaction
 from .production_render import clean_pdf, clean_pdf_images, stamped_images
@@ -154,6 +161,8 @@ def redaction_json(row):
 
 def production_json(row, db=None):
     counts = {key: value for key, value in row.counts.items() if key != "manifest_storage_key"}
+    if row.state == "completed":
+        counts.setdefault("manifest_signing", signing_metadata(None))
     result = {"id": row.id, "case_id": row.case_id, "state": row.state, "requested_by": row.requested_by, "approved_by": row.approved_by, "approved_at": utc(row.approved_at).isoformat() if row.approved_at else None, "created_at": utc(row.created_at).isoformat(), "bates_prefix": row.bates_prefix, "evidence_ids": row.evidence_ids, "redactions": row.redactions, "reason": row.reason, "counts": counts, "sha256": row.sha256, "byte_size": row.byte_size, "download_url": f"/api/v1/cases/{row.case_id}/productions/{row.id}/download" if row.state == "completed" else None}
     if db is not None:
         ledger = list(db.scalars(select(ProductionItem).where(ProductionItem.production_id == row.id, ProductionItem.tenant_id == row.tenant_id, ProductionItem.case_id == row.case_id).order_by(ProductionItem.start_number)))
@@ -497,9 +506,13 @@ def _render_sources(db, job, rows, storage, heartbeat=None):
     return produced
 
 
-def _package(job, rows, produced, ledger, destination, heartbeat=None):
+def _package(job, rows, produced, ledger, destination, heartbeat=None, signing_key=None):
     entries, opt, total = [], [], 0
+    package_files = {}
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as archive:
+        def write_member(name, data):
+            archive.writestr(name, data)
+            package_files[name] = {"sha256": hashlib.sha256(data).hexdigest(), "byte_size": len(data)}
         for item, original, _occurrence, _source in rows:
             record = ledger[item.id]
             labels = [_label(record.prefix, number) for number in range(record.start_number, record.end_number + 1)]
@@ -511,7 +524,7 @@ def _package(job, rows, produced, ledger, destination, heartbeat=None):
                 for number, (image, label) in enumerate(zip(images, labels, strict=True)):
                     page_path = f"images/{label}.pdf"
                     page_bytes = clean_pdf([image])
-                    archive.writestr(page_path, page_bytes)
+                    write_member(page_path, page_bytes)
                     total += len(page_bytes)
                     opt.append((label, "CQ", page_path.replace("/", "\\"), "Y" if number == 0 else "", "", "", str(len(images)) if number == 0 else ""))
             else:
@@ -519,7 +532,7 @@ def _package(job, rows, produced, ledger, destination, heartbeat=None):
             total += len(data)
             if total > MAX_PACKAGE_BYTES:
                 fail(413, "PRODUCTION_SIZE_LIMIT", "The complete derived package exceeds 250 megabytes.")
-            archive.writestr(path, data)
+            write_member(path, data)
             digest = hashlib.sha256(data).hexdigest()
             entry = {"BEGBATES": labels[0], "ENDBATES": labels[-1], "EVIDENCE_ID": item.id, "PARENT_ID": item.parent_id or "", "SOURCE_ID": item.source_id, "ORIGINAL_SHA256": original.sha256, "PRODUCED_SHA256": digest, "PAGE_COUNT": record.page_count, "REDACTED": str(item.id in job.redactions).lower(), "DERIVED_PATH": path, "TEXT_PATH": path if kind == "text" else ""}
             entries.append(entry)
@@ -530,18 +543,27 @@ def _package(job, rows, produced, ledger, destination, heartbeat=None):
         writer = csv.DictWriter(output, fieldnames=FIELDS)
         writer.writeheader()
         writer.writerows(entries)
-        archive.writestr("loadfile.csv", output.getvalue().encode("utf-8-sig"))
+        write_member("loadfile.csv", output.getvalue().encode("utf-8-sig"))
         # Explicit UTF-8 DAT profile: U+0014 columns and U+00FE quoted fields.
         dat = "\r\n".join("\x14".join("þ" + str(value) + "þ" for value in line) for line in [FIELDS, *[[entry[field] for field in FIELDS] for entry in entries]]) + "\r\n"
-        archive.writestr("loadfile.dat", dat.encode("utf-8-sig"))
+        write_member("loadfile.dat", dat.encode("utf-8-sig"))
         output = io.StringIO(newline="")
         csv.writer(output, lineterminator="\r\n").writerows(opt)
-        archive.writestr("images.opt", output.getvalue().encode("ascii"))
+        write_member("images.opt", output.getvalue().encode("ascii"))
         manifest = {"schema_version": "casequarry-derived-production-v1", "production_id": job.id, "case_id": job.case_id, "delivery": "derived_only", "items": entries, "algorithm": "SHA-256", "assurance": "Application SHA-256 verification without a digital signature or independent time anchor.", "loadfile_profile": {"csv": "UTF-8 BOM, comma, quoted by RFC4180 writer", "dat": "UTF-8 BOM; U+0014 column; U+00FE quote; CRLF rows; no long-text field", "opt": "ASCII seven-column Opticon; relative Windows paths; single-page flattened PDF images; text-only items have a document control and no image entry"}, "limitations": ["No recipient review-platform import was executed; configure this explicit field/delimiter/image profile for the recipient.", "Text derivatives preserve extracted text, not native layout or attachments. PDF derivatives flatten visible pages and add a new Bates footer without hidden text.", "Only explicitly selected IDs are delivered; originals and source names, paths, participants, titles, internal reasons and queries are omitted.", "Selected-region or selected-range redaction requires human visual/content review; this is not automatic detection of all sensitive content."], "approval": {"requested_by": job.requested_by, "approved_by": job.approved_by, "approved_at": utc(job.approved_at).isoformat()}, "preservation": "Originals remain preserved; an active legal hold does not grant disclosure authority."}
+        if signing_key is not None:
+            manifest["schema_version"] = "casequarry-derived-production-v2"
+            manifest["package_files"] = package_files
+            manifest["assurance"] = "Exact manifest bytes and complete derived package inventory signed with Ed25519; verification requires an independently trusted public key and does not establish an independent timestamp."
         manifest_bytes = canonical_json(manifest)
         archive.writestr("manifest.json", manifest_bytes)
+        if signing_key is not None:
+            archive.writestr(SIGNATURE_NAME, canonical_json(sign_manifest(manifest_bytes, signing_key)))
     with zipfile.ZipFile(destination) as archive:
-        if archive.testzip() or set(archive.namelist()) != {"manifest.json", "loadfile.csv", "loadfile.dat", "images.opt", *[entry["DERIVED_PATH"] for entry in entries], *[line[2].replace("\\", "/") for line in opt]}:
+        expected = {"manifest.json", *package_files}
+        if signing_key is not None:
+            expected.add(SIGNATURE_NAME)
+        if archive.testzip() or set(archive.namelist()) != expected:
             fail(409, "PRODUCTION_PACKAGE_INVALID", "The generated production failed its package structure check.")
         for entry in entries:
             if hashlib.sha256(archive.read(entry["DERIVED_PATH"])).hexdigest() != entry["PRODUCED_SHA256"]:
@@ -549,7 +571,7 @@ def _package(job, rows, produced, ledger, destination, heartbeat=None):
     return manifest_bytes
 
 
-def _run_production(database, storage, claimed):
+def _run_production(database, storage, claimed, signing_key=None):
     identifier, token = claimed
     with database.sessions() as db:
         job = _still_owned(db, Production, identifier, token)
@@ -568,7 +590,7 @@ def _run_production(database, storage, claimed):
         temporary.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=temporary) as directory:
             destination = Path(directory) / "production.zip"
-            manifest_bytes = _package(job, rows, produced, ledger, destination, heartbeat=heartbeat)
+            manifest_bytes = _package(job, rows, produced, ledger, destination, heartbeat=heartbeat, signing_key=signing_key)
             hashes = {key: row.produced_sha256 for key, row in ledger.items()}
             db.rollback()
             job = _still_owned(db, Production, identifier, token)
@@ -579,7 +601,7 @@ def _run_production(database, storage, claimed):
             manifest_key, manifest_hash, _manifest_size = storage.store_bytes(job.tenant_id, job.case_id, manifest_bytes, kind="exports")
         job.storage_key, job.sha256, job.byte_size, job.state = key, digest, size, "completed"
         job.lease_token, job.lease_until = None, None
-        job.counts = {**job.counts, "processed": len(job.evidence_ids), "page_controls": sum(row.page_count for row in ledger.values()), "manifest_sha256": manifest_hash, "manifest_storage_key": manifest_key}
+        job.counts = {**job.counts, "processed": len(job.evidence_ids), "page_controls": sum(row.page_count for row in ledger.values()), "manifest_sha256": manifest_hash, "manifest_storage_key": manifest_key, "manifest_signing": signing_metadata(signing_key)}
         audit.record(db, user, job.case_id, "production.completed", "production", job.id, {"count": len(job.evidence_ids), "sha256": digest})
         db.commit()
 
@@ -604,12 +626,18 @@ def _failed(database, model, claimed, error):
 
 
 def process_pending_productions(database, settings, storage):
-    del settings
     for model, callback in ((Redaction, _run_redaction), (Production, _run_production)):
         claimed = _claim(database, model)
         if claimed:
             try:
-                callback(database, storage, claimed)
+                if model is Production:
+                    try:
+                        signing_key = load_private_signing_key(getattr(settings, "export_signing_key_file", None))
+                    except SigningKeyError:
+                        fail(503, "EXPORT_SIGNING_KEY_INVALID", "Configured export signing key is invalid or unavailable. No unsigned package was generated.")
+                    callback(database, storage, claimed, signing_key=signing_key)
+                else:
+                    callback(database, storage, claimed)
             except Exception as error:
                 _failed(database, model, claimed, error)
             return True

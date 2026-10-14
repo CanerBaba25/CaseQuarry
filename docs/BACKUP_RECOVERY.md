@@ -1,6 +1,6 @@
 # Database and evidence recovery
 
-PostgreSQL is the normal database. A recoverable firm backup includes its database, immutable storage directory, private server `.env` and provider encryption key. A database dump cannot recover missing originals, and encrypted credential rows cannot recover keys after the master key is lost.
+PostgreSQL is the normal database. A recoverable firm backup includes its database, immutable storage directory, private server `.env` and provider encryption key. If export signing is configured, also preserve the separately stored Ed25519 private PEM: `.env` contains only its path. A database dump cannot recover missing originals, and encrypted credential rows cannot recover keys after the master key is lost.
 
 ## PostgreSQL
 
@@ -11,6 +11,11 @@ pg_dump --format=custom --no-owner --no-acl --file=firm.dump
 ```
 
 Copy immutable storage and private configuration into encrypted, access-controlled backup storage. Record hashes/schema revision, retain an off-host copy and protect backup credentials separately. Keep the provider master key recoverable by authorized operators; do not distribute it to desktop clients.
+
+Keep export-signing private keys outside evidence storage and restrict their backup
+to authorized operators. Retain historical trusted public keys and key identifiers
+separately so recipients can verify older signed ZIPs after rotation. Restoring a
+backup does not create or rotate keys. See [signed-package recovery](SIGNED_EXPORTS.md).
 
 Restore into a new isolated database and separate storage:
 

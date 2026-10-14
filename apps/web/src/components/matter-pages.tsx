@@ -28,6 +28,7 @@ import type {
 import { can } from "@/lib/permissions";
 import { MatterTeam } from "./team";
 import ImportCapabilities from "./import-capabilities";
+import ManifestSigningStatus from "./manifest-signing";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 
 export function PageHeading({
@@ -1483,6 +1484,10 @@ export function ReportsPage({ matter }: { matter: Matter }) {
                     <td>{item.format.toUpperCase()}</td>
                     <td>
                       <Badge value={item.state} />
+                      <ManifestSigningStatus
+                        state={item.state}
+                        counts={item.counts}
+                      />
                     </td>
                     <td>{date(item.created_at, true)}</td>
                     <td>

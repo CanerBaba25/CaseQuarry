@@ -14,11 +14,11 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from . import ai_models, production_models, provider_models, sync_models, workflow_models  # noqa: F401 - register the complete schema
+from . import ai_models, hold_models, production_models, provider_models, sync_models, workflow_models  # noqa: F401 - register the complete schema
 from .config import Settings
 from .models import Base
 
-HEAD_REVISION = "0009_user_language"
+HEAD_REVISION = "0010_manual_hold_notices"
 CORE_REVISION = "0001_core"
 _MIGRATION_LOCK = threading.RLock()
 _POSTGRES_LOCK_KEY = 0x4351534348454D41

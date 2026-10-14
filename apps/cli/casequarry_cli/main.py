@@ -22,6 +22,7 @@ from rich.table import Table
 from . import __version__
 from .client import API, Options, fail, profiles, save_login
 from .connector_commands import app as connectors
+from .integrity_commands import register as register_integrity
 from .native import native_available
 from .workflow_commands import register as register_workflows
 
@@ -56,6 +57,7 @@ for name, group in [
     app.add_typer(group, name=name)
 
 register_workflows(app, ingest, auth, email, evidence)
+register_integrity(evidence, exports)
 
 
 def version_callback(value: bool) -> None:

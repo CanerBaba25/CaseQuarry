@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "casequarry"
-version = "0.7.0"
+version = "0.8.0"
 description = "Private evidence preservation, search and review for legal teams"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE*"]
@@ -27,15 +27,44 @@ dev = ["pytest>=8.3,<10", "pytest-asyncio>=0.25,<2", "ruff>=0.11,<1"]
 casequarry = "casequarry_cli.main:app"
 cq = "casequarry_cli.main:app"
 
+[tool.hatch.build]
+ignore-vcs = true
+skip-excluded-dirs = true
+exclude = [
+  "**/.env", "**/.env.*", "**/.data", "**/.release-artifacts", "**/.venv",
+  "**/__pycache__", "**/*.py[cod]", "**/node_modules", "**/.next", "**/target",
+  "**/.cache", "**/.pytest_cache", "**/.ruff_cache", "**/.mypy_cache", "**/*.egg-info",
+  "**/.gitignore", "**/.dockerignore", "**/.rgignore", "**/AGENTS.md", "**/CLAUDE.md",
+  "**/.graphify*", "**/graphify-out", "**/*.log",
+]
+
 [tool.hatch.build.targets.wheel]
-packages = ["apps/api/casequarry", "apps/cli/casequarry_cli"]
+dev-mode-dirs = ["apps/api", "apps/cli"]
+include = [
+  "/apps/api/casequarry/*.py", "/apps/cli/casequarry_cli/*.py",
+  "/migrations/env.py", "/migrations/schema_signatures.json", "/migrations/script.py.mako",
+  "/migrations/versions/*.py",
+]
+
+[tool.hatch.build.targets.wheel.sources]
+"apps/api" = ""
+"apps/cli" = ""
+"migrations" = "casequarry/migrations"
 
 [tool.hatch.build.targets.wheel.force-include]
-"migrations" = "casequarry/migrations"
 "alembic.ini" = "casequarry/alembic.ini"
 
 [tool.hatch.build.targets.sdist]
-include = ["apps/api/", "apps/cli/", "migrations/", "alembic.ini", "crates/", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "pyproject.toml", "README.md", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]
+include = [
+  "/apps/api/casequarry/*.py", "/apps/cli/casequarry_cli/*.py",
+  "/migrations/env.py", "/migrations/schema_signatures.json", "/migrations/script.py.mako",
+  "/migrations/versions/*.py", "/alembic.ini", "/crates/evidence-core/Cargo.toml",
+  "/crates/evidence-core/src/*.rs", "/Cargo.toml", "/Cargo.lock", "/rust-toolchain.toml",
+  "/pyproject.toml", "/scripts/hatch_build.py", "/README.md", "/LICENSE", "/NOTICE", "/THIRD_PARTY_NOTICES.md",
+]
+
+[tool.hatch.build.targets.sdist.hooks.custom]
+path = "scripts/hatch_build.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

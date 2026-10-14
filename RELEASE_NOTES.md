@@ -1,5 +1,87 @@
 # Release notes
 
+## 0.8.0 — October 14, 2026
+
+Custodian hold notices and optional signed evidence ZIPs, following a source-based
+comparison of FreeEed, OpenArchiver, eDiscovery, Mike and LegalMemory. The
+[comparison](docs/FEATURE_COMPARISON.md) separates delivered features from proposed
+mailbox synchronization, PST, structured review and retrieval work. No code from
+those projects is incorporated.
+
+### Custodian hold notices
+
+- Create and revise one notice per hold/custodian with exact version checks and
+  reasons. Concurrent changes retain the user's draft for conflict resolution.
+- Record issuance, acknowledgement and reminders in a scoped audit history. Issued
+  text and its SHA-256 are frozen; acknowledged notices are read-only.
+- Browse the paginated register with complete counts and overdue reminders using
+  the account's timezone. Released holds retain their notice history and block
+  further changes, including while an older dialog response is cached.
+- Record actions manually with existing matter roles. This release does not send
+  notices, expose public acknowledgement links or verify a custodian's identity.
+- All notice controls and signature labels are available in the 13 existing
+  interface languages. See the [notice guide](docs/HOLD_NOTICES.md).
+
+### Signed evidence packages
+
+- An optional dedicated Ed25519 PEM signs native-export and derived-production ZIP
+  manifests. The signed inventory covers every data member, including production
+  images and CSV/DAT/OPT loadfiles.
+- Completed packages display their signing status and key identifier. Signing is
+  unconfigured by default; an invalid configured key fails instead of silently
+  creating an unsigned package. CSV and JSON metadata exports remain unsigned.
+- `cq export signing-key-create` creates a protected key pair without overwriting
+  existing files. `cq evidence verify-package` checks received ZIPs offline against
+  a separately trusted public key, with bounded processing and no extraction.
+- Verification rejects changed, missing, extra or duplicate members, unsafe paths,
+  invalid signatures and the wrong trusted key. The signature authenticates the
+  manifest and listed content; it does not independently timestamp the package,
+  certify collection completeness or replace chain-of-custody records.
+- See [configuration, trust and recovery](docs/SIGNED_EXPORTS.md).
+
+### Upgrade
+
+Preserve a verified backup, stop application processes and migrate from
+`0009_user_language` to `0010_manual_hold_notices` before restarting. The migration
+creates an empty notice table; existing holds, evidence and audit records remain.
+Reload connected clients. Upgrading does not generate or configure a signing key.
+Protect any separately configured private PEM in backups and retain historical
+trusted public keys. See [server installation](docs/SERVER_INSTALL.md).
+
+Container builds use explicit product inputs so local dependencies and build
+outputs cannot replace image dependencies. Python distributions exclude local
+state independently of Git ignore configuration.
+
+### Validation
+
+Local Python validation passed 730 integration cases across the full run and
+targeted rerun, with PostgreSQL checks enabled, no skipped cases and two existing
+Starlette deprecation warnings. Some legacy fixtures intentionally use SQLite.
+Four final packaging checks cover actual source-copy layouts and wheel/source
+distributions; direct and source-rebuilt wheels preserve all ten migrations and
+exclude private-state canaries. Both the normal editable installation and the
+exact API container inputs passed locked Python installation. Docker runtime
+execution remains outside the current validation environment.
+
+The website production build and typecheck passed, as did 93 interface behavior
+checks and seven new actual-PostgreSQL browser stages. These include preserved
+conflict drafts, frozen issued text, reminder/history transitions, complete
+pagination counts, 375px dark layout, released controls during a delayed response
+and a downloaded signed ZIP verified against a separately held public key. All
+13 catalogs validate with 1,601 messages each. Updated screenshots show the actual
+0.8.0 website, notice register and Windows desktop using synthetic data.
+
+The Rust integrity component passed 11 tests and the native client ten, with
+compiler lint and formatting checks. The rebuilt Windows application passed all
+13 interface languages and 143 native menu labels. A protected local PostgreSQL
+0009→0010 upgrade passed a backup/restore rehearsal and preserved existing state;
+17 offline checks cover its guards. Nine focused checks cover the installed CLI
+signing probe. Native cross-platform installation and installed Windows/Linux
+server checks remain publication gates. No live provider request was made.
+
+Windows remains unsigned and Mac remains non-notarized. The documented production
+capacity and operator recovery limits still apply.
+
 ## 0.7.0 — October 14, 2026
 
 Kimi provider support and fixes across authentication, evidence processing, review,

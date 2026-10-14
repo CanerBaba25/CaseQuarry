@@ -44,6 +44,21 @@ uv run cq ingest inventory-mbox --path evidence.mbox --engine auto
 
 The MBOX inventory counts message boundaries and checks configured line/message limits; it does not replace MIME parsing or verify extraction completeness. Manifest verification requires the native export's `casequarry-hash-manifest-v1` format and rejects unsafe paths. Synthetic generation, benchmarks and browser acceptance harnesses remain local and are omitted from the public source distribution; commands depending on those assets report their absence explicitly.
 
+Version 0.8.0 adds offline Ed25519 key creation and complete signed-ZIP verification:
+
+```sh
+uv run cq export signing-key-create --private-key-file /secure/keys/private.pem --public-key-file /secure/keys/public.pem
+uv run cq evidence verify-package --path received.zip --trusted-public-key /trusted/producer-public.pem
+```
+
+Key creation requires distinct new files in existing directories, establishes
+owner-private permissions before writing, and supports global `--dry-run`.
+`verify-package` requires an independently trusted Ed25519 public PEM key and
+checks the signed v2 manifest plus every ZIP data member without extraction.
+Its default total uncompressed budget is 8 GiB; use `--max-total-bytes` explicitly
+for a larger authorized package. Failed verification exits 8, including a valid
+signature paired with modified data. See [signing, trust and rotation](SIGNED_EXPORTS.md).
+
 CSV/JSON exports save a separate `<path>.manifest.json` sidecar and verify the downloaded export hash before writing. Native ZIP requires completed human review for every included item; a blanket confirmation never substitutes for those decisions. Privilege/confidentiality and integrity policies also apply to metadata exports.
 
 Exit codes: 0 success; 2 usage/validation; 3 authentication/authorization; 4 missing or inaccessible item; 5 conflict/blocked transition; 6 partial or continuing operation; 7 subsystem unavailable; 8 integrity failure. Use JSON for automation and inspect both the exit code and reported processing state.
@@ -63,6 +78,11 @@ uv run cq api request PUT /cases/CASE_ID/upload-sessions/UPLOAD_ID/parts/0 --dat
 ```
 
 `api request` provides authenticated JSON access to implemented public API routes, including routes without a dedicated shortcut. It accepts a bounded JSON document or binary request part, preserves normal dry-run behavior, disables redirects and redacts sensitive response keys. Use dedicated original/export download commands for binary responses. Store credential-bearing JSON files only in private locations, exclude them from version control, and remove them after use.
+
+The [custodian hold-notice API](HOLD_NOTICES.md#api-contract) is also available
+through `api request`. Recording issuance, acknowledgement or a reminder requires
+an active hold, current hold permission, a reason and its exact displayed version.
+These commands record staff actions; they do not deliver emails.
 
 Cloud requests through `api request` require the explicit provider and revision snapshot described in the [cloud API contract](CLOUD_AI_GUIDE.md#api-contract). Read and review that configuration before confirming it; do not automatically fetch new revisions and retry a stale confirmation. The dedicated `ai ask` shortcut uses local mode.
 

@@ -1,0 +1,121 @@
+.heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-block: 1rem;
+}
+.heading > div {
+  min-width: 0;
+}
+.heading h3 {
+  overflow-wrap: anywhere;
+  margin-top: 0;
+}
+.heading > button {
+  flex-shrink: 0;
+}
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.summary > div {
+  padding: 0.9rem 1rem;
+  background: var(--surface-subtle);
+}
+.summary dt {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.summary dd {
+  margin: 0.3rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 650;
+}
+.fields {
+  border: 0;
+  margin: 1rem 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.fields label {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+.fields textarea {
+  resize: vertical;
+}
+.fields input,
+.fields textarea,
+.fields select {
+  min-width: 0;
+  width: 100%;
+}
+.fields:disabled {
+  opacity: 0.8;
+}
+.fields textarea:read-only {
+  background: var(--surface-subtle);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+.ack {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  display: grid;
+  gap: 0.8rem;
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-block: 1.5rem;
+}
+.facts dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.facts dd {
+  margin: 0.35rem 0 0;
+  overflow-wrap: anywhere;
+}
+.history {
+  margin-top: 1.5rem;
+}
+.history article {
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.history article p {
+  margin-block: 0.4rem;
+  white-space: pre-wrap;
+}
+.overdue {
+  display: block;
+  color: var(--red);
+  font-weight: 650;
+}
+@media (max-width: 600px) {
+  .heading {
+    flex-direction: column;
+  }
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .facts {
+    grid-template-columns: 1fr;
+  }
+  .actions > button {
+    flex: 1 1 100%;
+  }
+}

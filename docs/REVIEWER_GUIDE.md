@@ -1,6 +1,6 @@
 # Reviewer guide
 
-This guide describes the implemented 0.5 workflows. Start with a synthetic evaluation matter. Your matter role controls the available actions; being a firm administrator does not grant access to every matter.
+This guide describes the implemented 0.8 workflows. Start with a synthetic evaluation matter. Your matter role controls the available actions; being a firm administrator does not grant access to every matter.
 
 ## Find and inspect evidence
 
@@ -53,11 +53,11 @@ Claiming or releasing changes the evidence assignment and review version. Finish
 
 Use source findings and comparison as investigation aids:
 
-| Operation | Actual scope and interpretation |
-| --- | --- |
-| Near duplicates | Word-trigram similarity over the first 20,000 characters and at most 5,000 words. The candidate pool is ID-ordered and capped at 100 items; up to 20 verified matches are returned. Exact original duplicates are excluded from this candidate search. |
+| Operation            | Actual scope and interpretation                                                                                                                                                                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Near duplicates      | Word-trigram similarity over the first 20,000 characters and at most 5,000 words. The candidate pool is ID-ordered and capped at 100 items; up to 20 verified matches are returned. Exact original duplicates are excluded from this candidate search.           |
 | Extracted candidates | Regex patterns for email addresses, dates, currency amounts and explicitly labeled invoice numbers. Returned findings cite exact current artifact spans; at most 200 findings are considered. Names, roles, obligations and company identities are not inferred. |
-| Document comparison | Exact extracted-text differences with passages and provenance from both sources. Each input is bounded to 20,000 characters and 1,000 tokens; up to 200 diff segments are returned. |
+| Document comparison  | Exact extracted-text differences with passages and provenance from both sources. Each input is bounded to 20,000 characters and 1,000 tokens; up to 200 diff segments are returned.                                                                              |
 
 Read each operation's coverage and limits. Truncated text or candidate coverage means the result does not describe the complete corpus or document. Similarity, a date pattern or a changed passage does not establish identity, authenticity, event timing or contradiction. These operations do not merge identities, delete duplicates or apply review decisions.
 
@@ -97,6 +97,17 @@ The ZIP includes `manifest.json`, document-level `loadfile.csv` and `loadfile.da
 Production limits also include 60 million rendered pixels across a job, 250 MB of produced document/image content, and complete indexed text up to 2 MB per text derivative. Split larger scopes. Hash manifests provide application SHA-256 verification, without a digital signature or independent time anchor.
 
 An active legal hold preserves originals and blocks archival release paths that would violate preservation. It does not authorize disclosure or override privilege holdback. Reviewed native ZIP exports are a separate workflow; they include original bytes and require review of embedded descendants. Do not use a native export to deliver a redacted production.
+
+When the server is configured for signing, completed ZIP exports and productions
+show their signing key identifier. Give recipients an independently trusted public
+key and use [offline signed-package verification](SIGNED_EXPORTS.md); CSV/JSON and
+unconfigured ZIP exports remain unsigned. A signature does not replace source,
+redaction or privilege review.
+
+Matter leads and attorneys can maintain [custodian hold notices](HOLD_NOTICES.md)
+through **View notices** on a preservation hold. The register records manual
+issuance, reminders and acknowledgements. Issued text is immutable and a released
+hold's history remains read-only. It does not send messages or verify recipients.
 
 ## Optional local source-cited analysis
 
