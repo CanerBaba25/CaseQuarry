@@ -3,11 +3,12 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from sqlalchemy import and_, func, select, update
 from sqlalchemy.orm import aliased
 
 from . import audit
+from .languages import Language
 from .mfa_routes import valid_mfa
 from .models import Audit, Case, LoginSession, Member, Tenant, User, now
 from .schemas import Input, Reason
@@ -35,12 +36,26 @@ class UserPatch(Reason):
 
 
 class UserPreferences(Input):
-    time_zone: str = Field(min_length=1, max_length=100, strict=True)
+    time_zone: str | None = Field(default=None, min_length=1, max_length=100, strict=True)
+    language: Language | None = None
+
+    @field_validator("time_zone", "language", mode="before")
+    @classmethod
+    def non_null(cls, value):
+        if value is None:
+            raise ValueError("Preference values cannot be null.")
+        return value
 
     @field_validator("time_zone")
     @classmethod
     def supported_zone(cls, value):
         return validate_time_zone(value)
+
+    @model_validator(mode="after")
+    def require_preference(self):
+        if not self.model_fields_set:
+            raise ValueError("Choose a timezone or interface language to update.")
+        return self
 
 
 @router.get("/timezones")
@@ -53,12 +68,14 @@ def preferences(body: UserPreferences, request: Request, actor: Actor = Depends(
     db.refresh(actor.user, with_for_update={"key_share": True})
     if not actor.user.active:
         fail(401, "ACCOUNT_DISABLED", "This account is unavailable.")
-    changed = actor.user.time_zone != body.time_zone
-    if changed:
-        actor.user.time_zone = body.time_zone
-        audit.record(db, actor.user, None, "user.preferences_updated", "user", actor.user.id, {"fields": ["time_zone"]}, request.state.request_id)
+    values = body.model_dump(exclude_unset=True)
+    changed_fields = sorted(key for key, value in values.items() if getattr(actor.user, key) != value)
+    if changed_fields:
+        for key in changed_fields:
+            setattr(actor.user, key, values[key])
+        audit.record(db, actor.user, None, "user.preferences_updated", "user", actor.user.id, {"fields": changed_fields}, request.state.request_id)
         db.commit()
-    return {**user_json(actor.user), "changed": changed}
+    return {**user_json(actor.user), "changed": bool(changed_fields)}
 
 
 def require_admin(db, actor, *, lock=False):

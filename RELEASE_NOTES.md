@@ -1,5 +1,67 @@
 # Release notes
 
+## 0.6.0 — October 13, 2026
+
+Daily task triage and a multilingual interface for the website and desktop client.
+Includes the existing Windows/Linux server packages and Windows, universal Mac
+and Ubuntu desktop installer formats.
+
+### Interface languages
+
+- Choose English, Russian, French, Spanish, German, Turkish, Greek, Italian,
+  Portuguese, Ukrainian, Simplified Chinese, Traditional Chinese or Hindi.
+- Account language is saved on the firm server and restored across connected
+  workstations. Setup can save the language chosen before account creation.
+- The desktop connection screen has an independent device language preference
+  that also updates native menus. Changing language retains typed connection data.
+- Interface dates and numbers follow the selected language while retaining the
+  saved timezone. Evidence, case names, source text and user-entered notes keep
+  their original text. Language changes do not send translation requests.
+- Shared catalog checks enforce complete message coverage, exact placeholders,
+  preserved product/technical constants and consistent API language codes.
+
+### Task triage
+
+- Set low, normal, high or urgent priority when creating or editing a task.
+  Priority changes retain the existing version checks and audit trail.
+- Search My work by literal task-title text, filter by priority and sort urgent
+  work first or by deadline. Counts reflect the current authorized matching scope.
+- `cq task worklist` exposes the same search, priority, status, deadline, sort and
+  cursor options in JSON, CSV or readable table output.
+- Search and priority changes invalidate the appropriate paging scope. Delayed
+  completion responses cannot reset a newer search, filter or page.
+- Task titles and descriptions reject embedded null characters with a validation
+  response instead of causing a PostgreSQL server error.
+
+The [feature comparison](docs/FEATURE_COMPARISON.md) reviews the five suggested
+projects and identifies further work, including signed export attestations,
+custodian notices, structured review templates and additional connectors. These
+items are documented opportunities rather than completed features in this release.
+
+### Validation
+
+The complete local Python suite passed 505 tests with PostgreSQL checks enabled,
+no skipped tests and two existing Starlette warnings. The Rust integrity component
+passed 11 tests and the native desktop client passed ten Rust tests. Actual Windows
+checks verified all 13 languages and 143 native menu labels, plus installation,
+launch and uninstall with existing device state preserved. Browser checks passed
+25 baseline workflows, five task-triage workflows and nine multilingual stages,
+including preserved drafts, timezone settings, Chinese/Hindi mobile views, export
+diagnostics and account isolation. These checks do not establish production capacity
+or live-provider model quality.
+
+### Upgrade
+
+Stop the server and preserve a verified database/evidence backup. Upgrade
+dependencies and run `uv run python scripts/tasks.py migrate`, then reload clients.
+`0008_task_priorities` backfills normal priority without changing existing task
+versions, timestamps or audit events. `0009_user_language` gives existing accounts
+English as their initial preference. Older My work cursors must restart from page
+one. Existing task edits still require `expected_version`.
+
+Windows remains unsigned and Mac remains non-notarized. A reachable firm server is
+required; the documented production-scale and live-provider limits still apply.
+
 ## 0.5.1 — October 13, 2026
 
 Maintenance release for resumable uploads, current matter permissions, security

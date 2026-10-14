@@ -1,9 +1,18 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const repositoryRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 const apiUrl =
   process.env.CASEQUARRY_API_INTERNAL_URL || "http://127.0.0.1:8000";
 
 /** @type {import('next').NextConfig} */
 const config = {
   output: "standalone",
+  outputFileTracingRoot: repositoryRoot,
+  turbopack: { root: repositoryRoot },
   distDir: process.env.CASEQUARRY_NEXT_DIST_DIR || ".next",
   agentRules: false,
   devIndicators: false,

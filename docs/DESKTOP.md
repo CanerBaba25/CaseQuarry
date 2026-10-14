@@ -8,11 +8,11 @@ The installer does not deploy a server, create a separate evidence database or p
 
 Download the installer for your operating system from the latest regular release and verify its SHA-256 against its matching `.sha256` file:
 
-| Computer | Installer | Installation and runtime |
-| --- | --- | --- |
-| Windows x64, Windows 10 or later | `CaseQuarry_<version>_x64-setup.exe` | Run the installer for the current user. Microsoft Edge WebView2 is required. If missing, the installer downloads Microsoft's bootstrapper and opens its prerequisite installation interface; review Microsoft's terms. This initial runtime installation needs internet access. |
-| MacBook, Apple Silicon or Intel, macOS 11 or later | `CaseQuarry_<version>_universal.dmg` | Open the disk image and drag CaseQuarry into Applications. Both CPU architectures are included. The client uses the system's WKWebView. |
-| Ubuntu 24.04 x64 desktop | `CaseQuarry_<version>_amd64.deb` | Run `sudo apt install ./CaseQuarry_<version>_amd64.deb`, then open CaseQuarry from the application menu. APT installs declared GTK/WebKit and certificate prerequisites from your configured system repositories. |
+| Computer                                           | Installer                            | Installation and runtime                                                                                                                                                                                                                                                        |
+| -------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows x64, Windows 10 or later                   | `CaseQuarry_<version>_x64-setup.exe` | Run the installer for the current user. Microsoft Edge WebView2 is required. If missing, the installer downloads Microsoft's bootstrapper and opens its prerequisite installation interface; review Microsoft's terms. This initial runtime installation needs internet access. |
+| MacBook, Apple Silicon or Intel, macOS 11 or later | `CaseQuarry_<version>_universal.dmg` | Open the disk image and drag CaseQuarry into Applications. Both CPU architectures are included. The client uses the system's WKWebView.                                                                                                                                         |
+| Ubuntu 24.04 x64 desktop                           | `CaseQuarry_<version>_amd64.deb`     | Run `sudo apt install ./CaseQuarry_<version>_amd64.deb`, then open CaseQuarry from the application menu. APT installs declared GTK/WebKit and certificate prerequisites from your configured system repositories.                                                               |
 
 The DEB requires glibc 2.39 or later and WebKitGTK 4.1; Ubuntu 24.04 is the tested distribution target. Other Linux distributions, earlier Debian/Ubuntu versions, ARM Linux and an AppImage are not part of this release. A browser can connect from other supported desktop environments without installing the native client.
 
@@ -33,6 +33,13 @@ WebView2 collects required and optional diagnostic information; Windows diagnost
 
 Use **Connection → Firm connection…** or `Ctrl+Shift+C` (`Cmd+Shift+C` on Mac) to return to local settings. **Close workspace** returns to settings. Closing the connection window or choosing **Exit CaseQuarry** exits the application.
 
+Choose **Interface language** on the connection screen to translate its controls
+and native menus. This device preference is stored separately from the server
+address and account sign-in. The opened workspace uses the signed-in account's
+language setting. Both support all 13 [interface languages](LANGUAGES.md), including
+Simplified Chinese, Traditional Chinese and Hindi. Typed connection details remain
+intact when changing language.
+
 The optional saved server address is encrypted for the current Windows account using Windows DPAPI, in the application configuration directory's `firm-connection.dpapi` file. **Forget saved server** deletes that preference; it does not revoke a server-side session. Sign out in the workspace when leaving an account. Native code does not read or store passwords, provider keys, session cookies or evidence. DPAPI does not protect against a compromise of the Windows account itself. [Microsoft DPAPI documentation](https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata).
 
 On Mac and Linux, the optional preference is URL-only JSON in `firm-connection.json`, with the application directory restricted to mode `0700` and the file to `0600` for the current account. It is not encrypted; native code verifies ownership and permissions and refuses symlinked or oversized preference files. Only the server URL and explicit loopback setting are saved on every platform. API keys, account passwords and evidence are never written into this preference.
@@ -47,7 +54,7 @@ For a server on the same computer, expand **Local development connection** and e
 
 ## Desktop security boundary
 
-The bundled connection screen has three native commands: read the protected preference, validate/connect to a server, and forget the preference. Every command checks the trusted window label and bundled asset origin as well as its Tauri capability. All commands are enrolled in the application permission manifest.
+The bundled connection screen has four native commands: read the protected preference, validate/connect to a server, forget the preference, and set the native menu language. Language updates accept only supported codes and bounded, nonempty menu labels without control characters. Every command checks the trusted window label and bundled asset origin as well as its Tauri capability. All commands are enrolled in the application permission manifest.
 
 The remote workspace has **no native capabilities or remote IPC grants**. It cannot invoke settings commands or native filesystem, process, shell or plugin APIs. Navigation stays on the selected server's origin; pop-ups and navigation to other origins are blocked. Remote content uses the server's web policies. The local screen has a restricted Content Security Policy and loads no external scripts or fonts. [Tauri capabilities documentation](https://v2.tauri.app/security/capabilities/).
 

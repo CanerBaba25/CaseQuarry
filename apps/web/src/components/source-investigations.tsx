@@ -1,8 +1,9 @@
 "use client";
+import { uiText, type MessageKey } from "@/lib/i18n";
 
 import Link from "next/link";
 import { useState } from "react";
-import { label, number, post } from "@/lib/api";
+import { uiLabel as label, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import { Badge, Empty, ErrorBox, Icon, Loading } from "./ui";
 
@@ -83,19 +84,20 @@ export default function SourceInvestigations({
       <div className="notice amber">
         <Icon name="review" size={17} />
         <span>
-          Source-backed candidates require human interpretation. They do not
-          merge identities, establish facts or change evidence review decisions.
+          {uiText(
+            "Source-backed candidates require human interpretation. They do not merge identities, establish facts or change evidence review decisions.",
+          )}
         </span>
       </div>
-      <h3>Anchored rule candidates</h3>
+      <h3>{uiText("Anchored rule candidates")}</h3>
       <p className="field-help">
-        Email addresses, dates, currency amounts and labeled invoice numbers
-        from a verified text prefix. A candidate occurrence is not a confirmed
-        entity or legal event.
+        {uiText(
+          "Email addresses, dates, currency amounts and labeled invoice numbers from a verified text prefix. A candidate occurrence is not a confirmed entity or legal event.",
+        )}
       </p>
       <ErrorBox error={entities.error} retry={entities.refresh} />
       {entities.loading ? (
-        <Loading text="Verifying candidate source locations…" />
+        <Loading text={uiText("Verifying candidate source locations…")} />
       ) : (
         entities.data && (
           <>
@@ -106,7 +108,10 @@ export default function SourceInvestigations({
                     <Badge value={item.kind} />
                     <strong>{item.text}</strong>
                     <small>
-                      Characters {item.char_start}–{item.char_end}
+                      {uiText("Characters {0}–{1}", {
+                        "0": item.char_start,
+                        "1": item.char_end,
+                      })}
                     </small>
                     <CitationLinks caseId={caseId} citations={item.citations} />
                   </div>
@@ -114,7 +119,9 @@ export default function SourceInvestigations({
               </div>
             ) : (
               <p className="muted">
-                No anchored rule matches in the retrieved text prefix.
+                {uiText(
+                  "No anchored rule matches in the retrieved text prefix.",
+                )}
               </p>
             )}
             <OperationCoverage
@@ -125,11 +132,11 @@ export default function SourceInvestigations({
         )
       )}
       <section className="investigation-operation">
-        <h3>Near-duplicate candidates</h3>
+        <h3>{uiText("Near-duplicate candidates")}</h3>
         <p className="field-help">
-          Compare three-word shingles against at most 100 eligible source
-          occurrences. Byte-exact originals are excluded. Similarity is a
-          text-overlap score, not a probability or verified relationship.
+          {uiText(
+            "Compare three-word shingles against at most 100 eligible source occurrences. Byte-exact originals are excluded. Similarity is a text-overlap score, not a probability or verified relationship.",
+          )}
         </p>
         <form
           className="candidate-search-form"
@@ -154,7 +161,7 @@ export default function SourceInvestigations({
           }}
         >
           <label>
-            Minimum text similarity
+            {uiText("Minimum text similarity")}
             <input
               type="number"
               min={0.1}
@@ -166,7 +173,9 @@ export default function SourceInvestigations({
             />
           </label>
           <button className="button secondary compact" disabled={Boolean(busy)}>
-            {busy === "near" ? "Comparing…" : "Find near-duplicate candidates"}
+            {busy === "near"
+              ? uiText("Comparing…")
+              : uiText("Find near-duplicate candidates")}
           </button>
         </form>
         {near && (
@@ -183,7 +192,9 @@ export default function SourceInvestigations({
                       <Icon name="arrow" size={13} />
                     </button>
                     <span>
-                      {(item.score * 100).toFixed(1)}% word-shingle similarity
+                      {uiText("{0}% word-shingle similarity", {
+                        "0": (item.score * 100).toFixed(1),
+                      })}
                     </span>
                     <small className="mono">{item.evidence_id}</small>
                     <div className="button-row">
@@ -194,7 +205,7 @@ export default function SourceInvestigations({
                           setComparison(null);
                         }}
                       >
-                        Use in comparison
+                        {uiText("Use in comparison")}
                       </button>
                       <Badge value="Requires human review" tone="amber" />
                     </div>
@@ -203,7 +214,9 @@ export default function SourceInvestigations({
               </div>
             ) : (
               <p className="muted">
-                No verified candidates met this threshold in the scanned subset.
+                {uiText(
+                  "No verified candidates met this threshold in the scanned subset.",
+                )}
               </p>
             )}
             <OperationCoverage coverage={near.coverage} limits={near.limits} />
@@ -211,11 +224,11 @@ export default function SourceInvestigations({
         )}
       </section>
       <section className="investigation-operation">
-        <h3>Compare extracted text</h3>
+        <h3>{uiText("Compare extracted text")}</h3>
         <p className="field-help">
-          A bounded word-and-whitespace diff with hashes and exact source
-          ranges. It does not infer which document came first or explain why
-          text changed.
+          {uiText(
+            "A bounded word-and-whitespace diff with hashes and exact source ranges. It does not infer which document came first or explain why text changed.",
+          )}
         </p>
         <form
           onSubmit={async (event) => {
@@ -238,19 +251,23 @@ export default function SourceInvestigations({
           }}
         >
           <label>
-            Other evidence ID
+            {uiText("Other evidence ID")}
             <input
               value={rightId}
               required
               onChange={(event) => setRightId(event.target.value)}
-              placeholder="Paste an evidence ID or use a candidate above"
+              placeholder={uiText(
+                "Paste an evidence ID or use a candidate above",
+              )}
             />
           </label>
           <button
             className="button secondary compact"
             disabled={Boolean(busy) || !rightId.trim()}
           >
-            {busy === "compare" ? "Comparing…" : "Compare these sources"}
+            {busy === "compare"
+              ? uiText("Comparing…")
+              : uiText("Compare these sources")}
           </button>
         </form>
         {comparison && (
@@ -268,7 +285,7 @@ export default function SourceInvestigations({
                 checked={changesOnly}
                 onChange={(event) => setChangesOnly(event.target.checked)}
               />
-              <span>Show changed segments only</span>
+              <span>{uiText("Show changed segments only")}</span>
             </label>
             <div className="diff-segments">
               {comparison.segments
@@ -279,20 +296,25 @@ export default function SourceInvestigations({
                     <div className="diff-columns">
                       <div>
                         <small>
-                          Current · chars {segment.left_start}–
-                          {segment.left_end}
+                          {uiText("Current · chars {0}–{1}", {
+                            "0": segment.left_start,
+                            "1": segment.left_end,
+                          })}
                         </small>
                         <pre>
-                          {segment.left_text || "No text in this range"}
+                          {segment.left_text || uiText("No text in this range")}
                         </pre>
                       </div>
                       <div>
                         <small>
-                          Other · chars {segment.right_start}–
-                          {segment.right_end}
+                          {uiText("Other · chars {0}–{1}", {
+                            "0": segment.right_start,
+                            "1": segment.right_end,
+                          })}
                         </small>
                         <pre>
-                          {segment.right_text || "No text in this range"}
+                          {segment.right_text ||
+                            uiText("No text in this range")}
                         </pre>
                       </div>
                     </div>
@@ -309,8 +331,10 @@ export default function SourceInvestigations({
               ) && (
                 <Empty
                   icon="file"
-                  title="No differences in the compared scope"
-                  text="The retrieved text segments match. Review the operation coverage before treating this as a full-document comparison."
+                  title={uiText("No differences in the compared scope")}
+                  text={uiText(
+                    "The retrieved text segments match. Review the operation coverage before treating this as a full-document comparison.",
+                  )}
                 />
               )}
             <OperationCoverage
@@ -329,22 +353,25 @@ function SourceProvenance({
   side,
   source,
 }: {
-  side: string;
+  side: MessageKey;
   source: Provenance;
 }) {
   return (
     <div>
-      <small className="eyebrow">{side}</small>
+      <small className="eyebrow">{uiText(side)}</small>
       <strong>{source.title}</strong>
       <small className="mono">
-        {source.evidence_id} · text v{source.artifact_version}
+        {uiText("{0} · text v{1}", {
+          "0": source.evidence_id,
+          "1": source.artifact_version,
+        })}
       </small>
       <details className="audit-metadata">
-        <summary>Verified source hashes</summary>
+        <summary>{uiText("Verified source hashes")}</summary>
         <code className="hash-block">
-          Original: {source.original_sha256}
+          {uiText("Original")}: {source.original_sha256}
           <br />
-          Artifact: {source.artifact_sha256}
+          {uiText("Artifact")}: {source.artifact_sha256}
         </code>
       </details>
     </div>
@@ -364,13 +391,20 @@ function CitationLinks({
           key={index}
           className="text-link"
           href={`/app/matters/${caseId}/evidence/${citation.evidence_id}?version=${citation.artifact_version}${citation.span_id ? `#span-${citation.span_id}` : ""}`}
-          title={`Original SHA-256 ${citation.original_sha256}; artifact SHA-256 ${citation.artifact_sha256}`}
+          title={uiText("Original SHA-256 {0}; artifact SHA-256 {1}", {
+            "0": citation.original_sha256,
+            "1": citation.artifact_sha256,
+          })}
         >
           <Icon name="file" size={12} />
           {citation.page
-            ? `Page ${citation.page}`
-            : `Chars ${citation.char_start}–${citation.char_end}`}{" "}
-          · v{citation.artifact_version}
+            ? uiText("Page {0}", { "0": citation.page })
+            : uiText("Chars {0}–{1}", {
+                "0": citation.char_start,
+                "1": citation.char_end,
+              })}{" "}
+          {uiText("· v")}
+          {citation.artifact_version}
         </Link>
       ))}
     </div>
@@ -385,7 +419,7 @@ function OperationCoverage({
 }) {
   return (
     <details className="operation-coverage" open>
-      <summary>Operation coverage and limitations</summary>
+      <summary>{uiText("Operation coverage and limitations")}</summary>
       <dl>
         {Object.entries(coverage).map(([key, value]) => (
           <div key={key}>
@@ -393,8 +427,8 @@ function OperationCoverage({
             <dd>
               {typeof value === "boolean"
                 ? value
-                  ? "Yes"
-                  : "No"
+                  ? uiText("Yes")
+                  : uiText("No")
                 : number(value)}
             </dd>
           </div>

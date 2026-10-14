@@ -63,6 +63,7 @@ class User(Identity, Base):
     mfa_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     time_zone: Mapped[str] = mapped_column(String(100), default="UTC", server_default="UTC")
+    language: Mapped[str] = mapped_column(String(10), default="en", server_default="en")
 
 
 class LoginSession(Identity, Base):
@@ -318,6 +319,7 @@ class Task(Identity, Scoped, Base):
     __table_args__ = (Index("ix_tasks_worklist_due", "tenant_id", "assigned_to", "state", "due_date", "id"),)
     title: Mapped[str] = mapped_column(String(300))
     state: Mapped[str] = mapped_column(String(30), default="open")
+    priority: Mapped[str] = mapped_column(String(20), default="normal", server_default="normal")
     assigned_to: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"))
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)

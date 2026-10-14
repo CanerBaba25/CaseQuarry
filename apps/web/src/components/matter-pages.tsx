@@ -1,4 +1,5 @@
 "use client";
+import { uiText, type MessageKey } from "@/lib/i18n";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -7,7 +8,7 @@ import {
   bytes,
   date,
   getDisplayTimeZone,
-  label,
+  uiLabel as label,
   number,
   post,
 } from "@/lib/api";
@@ -75,18 +76,24 @@ export function Coverage({
   return (
     <div className="coverage-card">
       <div className="section-heading">
-        <h3>Data coverage</h3>
+        <h3>{uiText("Data coverage")}</h3>
         <Badge
           value={excluded ? "Requires attention" : "Indexed records available"}
           tone={excluded ? "amber" : "green"}
         />
       </div>
       <p className="muted">
-        {total !== undefined
-          ? `${number(total)} preserved evidence items. `
-          : ""}
-        Text search depends on extracted content. Preserved items remain
-        available by metadata.
+        {uiText(
+          "{0}Text search depends on extracted content. Preserved items remain available by metadata.",
+          {
+            "0":
+              total !== undefined
+                ? `${uiText("{0} preserved evidence items.", {
+                    "0": number(total),
+                  })} `
+                : "",
+          },
+        )}
       </p>
       <div className="coverage-grid">
         {keys.map((key) => (
@@ -109,21 +116,22 @@ export function MatterOverview({ matter }: { matter: Matter }) {
       <PageHeading
         eyebrow={matter.matter_number}
         title={matter.title}
-        text={`${matter.client || "Client not specified"}${matter.jurisdiction ? ` · ${matter.jurisdiction}` : ""}`}
+        text={`${matter.client || uiText("Client not specified")}${matter.jurisdiction ? ` · ${matter.jurisdiction}` : ""}`}
       >
         <Link
           className="button primary"
           href={`/app/matters/${matter.id}/sources`}
         >
           <Icon name="upload" size={18} />
-          Import evidence
+          {uiText("Import evidence")}
         </Link>
       </PageHeading>
       {matter.archived_at && (
         <div className="notice amber">
           <Icon name="alert" />
-          This matter is archived. Restore it in matter settings before
-          continuing work.
+          {uiText(
+            "This matter is archived. Restore it in matter settings before continuing work.",
+          )}
         </div>
       )}
       <ErrorBox error={stats.error} retry={stats.refresh} />
@@ -137,53 +145,69 @@ export function MatterOverview({ matter }: { matter: Matter }) {
                 icon="file"
                 value={number(data.evidence_items)}
                 name="Evidence items"
-                detail={`${number(data.source_occurrences)} source occurrences`}
+                detail={uiText("{0} source occurrences", {
+                  "0": number(data.source_occurrences),
+                })}
               />
               <Metric
                 icon="search"
                 value={number(data.indexed)}
                 name="Searchable items"
-                detail="Extracted and indexed content"
+                detail={uiText("Extracted and indexed content")}
               />
               <Metric
                 icon="review"
                 value={number(data.reviewed)}
                 name="Human reviewed"
-                detail={`${data.evidence_items ? Math.round((data.reviewed / data.evidence_items) * 100) : 0}% of preserved evidence`}
+                detail={uiText("{0}% of preserved evidence", {
+                  "0": number(
+                    data.evidence_items
+                      ? Math.round((data.reviewed / data.evidence_items) * 100)
+                      : 0,
+                  ),
+                })}
               />
               <Metric
                 icon="shield"
                 value={bytes(data.total_bytes)}
                 name="Preserved originals"
-                detail={`${number(data.unique_objects)} unique objects · ${number(data.duplicates)} duplicate occurrences`}
+                detail={uiText(
+                  "{0} unique objects · {1} duplicate occurrences",
+                  {
+                    "0": number(data.unique_objects),
+                    "1": number(data.duplicates),
+                  },
+                )}
               />
             </div>
             <div className="overview-grid">
               <section className="panel">
                 <div className="panel-heading spread">
                   <div>
-                    <span className="eyebrow">THE COLLECTION</span>
-                    <h2>Your evidence, at a glance.</h2>
+                    <span className="eyebrow">{uiText("THE COLLECTION")}</span>
+                    <h2>{uiText("Your evidence, at a glance.")}</h2>
                   </div>
                   <Link
                     href={`/app/matters/${matter.id}/explorer`}
                     className="text-link"
                   >
-                    Explore evidence
+                    {uiText("Explore evidence")}
                     <Icon name="arrow" size={16} />
                   </Link>
                 </div>
                 {data.evidence_items === 0 ? (
                   <Empty
                     icon="upload"
-                    title="Ready for the first source."
-                    text="Import emails or documents. CaseQuarry preserves original bytes and reports any extraction gaps."
+                    title={uiText("Ready for the first source.")}
+                    text={uiText(
+                      "Import emails or documents. CaseQuarry preserves original bytes and reports any extraction gaps.",
+                    )}
                   >
                     <Link
                       href={`/app/matters/${matter.id}/sources`}
                       className="button secondary"
                     >
-                      Import files
+                      {uiText("Import files")}
                       <Icon name="arrow" size={16} />
                     </Link>
                   </Empty>
@@ -219,15 +243,17 @@ export function MatterOverview({ matter }: { matter: Matter }) {
                 <div className="panel-footer">
                   <Icon name="lock" size={16} />
                   <span>
-                    Source objects are kept separately from derived text.
+                    {uiText(
+                      "Source objects are kept separately from derived text.",
+                    )}
                   </span>
                 </div>
               </section>
               <section className="panel review-progress">
                 <div className="panel-heading">
                   <div>
-                    <span className="eyebrow">REVIEW PROGRESS</span>
-                    <h2>Every decision, recorded.</h2>
+                    <span className="eyebrow">{uiText("REVIEW PROGRESS")}</span>
+                    <h2>{uiText("Every decision, recorded.")}</h2>
                   </div>
                 </div>
                 <div
@@ -247,7 +273,7 @@ export function MatterOverview({ matter }: { matter: Matter }) {
                         : 0}
                       <small>%</small>
                     </strong>
-                    <span>reviewed</span>
+                    <span>{uiText("reviewed")}</span>
                   </div>
                 </div>
                 <div className="review-legend">
@@ -262,7 +288,7 @@ export function MatterOverview({ matter }: { matter: Matter }) {
                   href={`/app/matters/${matter.id}/review`}
                   className="button secondary full-width"
                 >
-                  Open review queue
+                  {uiText("Open review queue")}
                   <Icon name="arrow" size={17} />
                 </Link>
               </section>
@@ -274,12 +300,12 @@ export function MatterOverview({ matter }: { matter: Matter }) {
               />
               <section className="panel activity-panel">
                 <div className="section-heading">
-                  <h3>Recent activity</h3>
+                  <h3>{uiText("Recent activity")}</h3>
                   <Link
                     href={`/app/matters/${matter.id}/audit`}
                     className="text-link"
                   >
-                    View audit trail
+                    {uiText("View audit trail")}
                     <Icon name="arrow" size={15} />
                   </Link>
                 </div>
@@ -299,7 +325,7 @@ export function MatterOverview({ matter }: { matter: Matter }) {
                   </div>
                 ) : (
                   <p className="muted">
-                    Activity will appear here as your team works.
+                    {uiText("Activity will appear here as your team works.")}
                   </p>
                 )}
               </section>
@@ -319,13 +345,13 @@ function Metric({
 }: {
   icon: string;
   value: string;
-  name: string;
+  name: MessageKey;
   detail: string;
 }) {
   return (
     <div className="metric-card">
       <div className="metric-label">
-        <span>{name}</span>
+        <span>{uiText(name)}</span>
         <Icon name={icon} size={18} />
       </div>
       <strong>{value}</strong>
@@ -394,9 +420,11 @@ export function SourcesPage({
   return (
     <>
       <PageHeading
-        eyebrow="SOURCE INVENTORY"
-        title="A traceable record."
-        text="Preserve where evidence came from, then follow every import through processing."
+        eyebrow={uiText("SOURCE INVENTORY")}
+        title={uiText("A traceable record.")}
+        text={uiText(
+          "Preserve where evidence came from, then follow every import through processing.",
+        )}
       >
         <button
           className="button primary"
@@ -404,7 +432,7 @@ export function SourcesPage({
           disabled={Boolean(matter.archived_at) || !can(matter.role, "import")}
         >
           <Icon name="upload" size={18} />
-          Import files
+          {uiText("Import files")}
         </button>
       </PageHeading>
       <div className="source-intro">
@@ -412,17 +440,18 @@ export function SourcesPage({
           <Icon name="shield" size={27} />
         </span>
         <div>
-          <strong>Original bytes first. Extraction second.</strong>
+          <strong>{uiText("Original bytes first. Extraction second.")}</strong>
           <p>
-            Every original is hashed before processing. Unsupported and partial
-            files remain visible in the import report.
+            {uiText(
+              "Every original is hashed before processing. Unsupported and partial files remain visible in the import report.",
+            )}
           </p>
         </div>
       </div>
       <section className="section">
         <div className="section-heading">
           <h2>
-            Sources{" "}
+            {uiText("Sources")}{" "}
             <span className="count-chip">
               {number(sources.data?.items.length)}
             </span>
@@ -433,7 +462,7 @@ export function SourcesPage({
             disabled={!can(matter.role, "import")}
           >
             <Icon name="plus" size={16} />
-            Add source
+            {uiText("Add source")}
           </button>
         </div>
         <ErrorBox error={sources.error} retry={sources.refresh} />
@@ -443,8 +472,10 @@ export function SourcesPage({
           <div className="panel">
             <Empty
               icon="matters"
-              title="No sources registered yet"
-              text="Add a named source or create one when importing files. Include a custodian to preserve collection context."
+              title={uiText("No sources registered yet")}
+              text={uiText(
+                "Add a named source or create one when importing files. Include a custodian to preserve collection context.",
+              )}
             />
           </div>
         ) : (
@@ -458,11 +489,17 @@ export function SourcesPage({
                 </span>
                 <div>
                   <h3>{item.label}</h3>
-                  <p>{label(item.kind)}</p>
+                  <p>
+                    {item.kind === "file-upload"
+                      ? uiText("File upload")
+                      : item.kind}
+                  </p>
                   <small>
                     {item.item_count !== undefined
-                      ? `${number(item.item_count)} evidence items`
-                      : `Source ${item.id.slice(0, 8)}`}
+                      ? uiText("{0} evidence items", {
+                          "0": number(item.item_count),
+                        })
+                      : uiText("Source {0}", { "0": item.id.slice(0, 8) })}
                   </small>
                 </div>
                 <Badge value="Registered" tone="green" />
@@ -473,12 +510,12 @@ export function SourcesPage({
       </section>
       <section className="section">
         <div className="section-heading">
-          <h2>Import history</h2>
+          <h2>{uiText("Import history")}</h2>
           <button
             className="button secondary compact"
             onClick={imports.refresh}
           >
-            Refresh
+            {uiText("Refresh")}
           </button>
         </div>
         <ErrorBox error={imports.error} retry={imports.refresh} />
@@ -488,15 +525,17 @@ export function SourcesPage({
           <div className="panel">
             <Empty
               icon="upload"
-              title="Bring the collection together."
-              text="Upload one file or a batch. Searchable content appears as the import is processed."
+              title={uiText("Bring the collection together.")}
+              text={uiText(
+                "Upload one file or a batch. Searchable content appears as the import is processed.",
+              )}
             >
               <button
                 className="button primary"
                 onClick={() => setUpload(true)}
                 disabled={!can(matter.role, "import")}
               >
-                Import evidence
+                {uiText("Import evidence")}
               </button>
             </Empty>
           </div>
@@ -505,12 +544,12 @@ export function SourcesPage({
             <table>
               <thead>
                 <tr>
-                  <th>Import batch</th>
-                  <th>Status</th>
-                  <th>Discovered</th>
-                  <th>Indexed</th>
-                  <th>Gaps & errors</th>
-                  <th>Imported</th>
+                  <th>{uiText("Import batch")}</th>
+                  <th>{uiText("Status")}</th>
+                  <th>{uiText("Discovered")}</th>
+                  <th>{uiText("Indexed")}</th>
+                  <th>{uiText("Gaps & errors")}</th>
+                  <th>{uiText("Imported")}</th>
                   <th />
                 </tr>
               </thead>
@@ -521,7 +560,7 @@ export function SourcesPage({
                       <strong>
                         {item.source_label ||
                           item.filename ||
-                          `Import ${item.id.slice(0, 8)}`}
+                          uiText("Import {0}", { "0": item.id.slice(0, 8) })}
                       </strong>
                       <small className="block">{item.id}</small>
                     </td>
@@ -547,7 +586,7 @@ export function SourcesPage({
                           setActionError(null);
                         }}
                       >
-                        View report
+                        {uiText("View report")}
                         <Icon name="arrow" size={15} />
                       </button>
                     </td>
@@ -582,7 +621,11 @@ export function SourcesPage({
         />
       )}
       {activeBatch && (
-        <Modal title="Import report" wide close={() => setActiveBatch(null)}>
+        <Modal
+          title={uiText("Import report")}
+          wide
+          close={() => setActiveBatch(null)}
+        >
           <ErrorBox error={selected.error} retry={selected.refresh} />
           <ErrorBox error={actionError} />
           {selected.loading && !selected.data ? (
@@ -602,7 +645,7 @@ export function SourcesPage({
                     </div>
                   ))}
                 </div>
-                <h3>Processing exceptions</h3>
+                <h3>{uiText("Processing exceptions")}</h3>
                 {selected.data.errors?.length ? (
                   <div className="exception-list">
                     {selected.data.errors.map((error, i) => (
@@ -617,7 +660,9 @@ export function SourcesPage({
                     ))}
                   </div>
                 ) : (
-                  <p className="muted">No reported processing exceptions.</p>
+                  <p className="muted">
+                    {uiText("No reported processing exceptions.")}
+                  </p>
                 )}
                 <div className="form-actions">
                   {["queued", "pending", "running", "processing"].includes(
@@ -628,7 +673,7 @@ export function SourcesPage({
                       disabled={actionBusy}
                       onClick={() => void action("pause")}
                     >
-                      Pause import
+                      {uiText("Pause import")}
                     </button>
                   )}
                   {selected.data.state.toLowerCase() === "paused" && (
@@ -637,7 +682,7 @@ export function SourcesPage({
                       disabled={actionBusy}
                       onClick={() => void action("resume")}
                     >
-                      Resume import
+                      {uiText("Resume import")}
                     </button>
                   )}
                   {Boolean(selected.data.counts.failed) && (
@@ -646,7 +691,7 @@ export function SourcesPage({
                       disabled={actionBusy}
                       onClick={() => void action("retry")}
                     >
-                      Retry failed items
+                      {uiText("Retry failed items")}
                     </button>
                   )}
                   <Link
@@ -654,7 +699,7 @@ export function SourcesPage({
                     href={`/app/matters/${matter.id}/explorer`}
                     onClick={() => setActiveBatch(null)}
                   >
-                    Explore evidence
+                    {uiText("Explore evidence")}
                     <Icon name="arrow" size={16} />
                   </Link>
                 </div>
@@ -706,7 +751,7 @@ function ImportModal({
   }
   return (
     <Modal
-      title="Import evidence"
+      title={uiText("Import evidence")}
       close={() => {
         if (!busy) close();
       }}
@@ -714,8 +759,9 @@ function ImportModal({
     >
       <form onSubmit={submit}>
         <p className="muted">
-          Originals are preserved with a SHA-256 hash. Content that cannot be
-          extracted is reported explicitly.
+          {uiText(
+            "Originals are preserved with a SHA-256 hash. Content that cannot be extracted is reported explicitly.",
+          )}
         </p>
         <ErrorBox error={error} />
         <label
@@ -734,16 +780,16 @@ function ImportModal({
           <Icon name="upload" size={30} />
           <strong>
             {files.length
-              ? `${number(files.length)} ${files.length === 1 ? "file" : "files"} selected`
-              : "Drop your evidence here"}
+              ? uiText("Files selected: {0}", { "0": number(files.length) })
+              : uiText("Drop your evidence here")}
           </strong>
-          <span>or click to choose files from your computer</span>
+          <span>{uiText("or click to choose files from your computer")}</span>
           <input
             name="file-picker"
             type="file"
             multiple
             onChange={(event) => setFiles(Array.from(event.target.files || []))}
-            aria-label="Choose evidence files"
+            aria-label={uiText("Choose evidence files")}
             disabled={busy}
           />
         </label>
@@ -757,15 +803,21 @@ function ImportModal({
               </div>
             ))}
             {files.length > 8 && (
-              <small>and {number(files.length - 8)} more files</small>
+              <small>
+                {uiText("and {0} more files", {
+                  "0": number(files.length - 8),
+                })}
+              </small>
             )}
           </div>
         )}
         <div className="form-grid">
           <label>
-            Existing source
+            {uiText("Existing source")}
             <select name="source_id">
-              <option value="">Create a source for this import</option>
+              <option value="">
+                {uiText("Create a source for this import")}
+              </option>
               {sources.map((source) => (
                 <option key={source.id} value={source.id}>
                   {source.label}
@@ -774,25 +826,29 @@ function ImportModal({
             </select>
           </label>
           <label>
-            New source label
+            {uiText("New source label")}
             <input
               name="source_label"
-              placeholder="e.g. Finance mailbox collection"
+              placeholder={uiText("e.g. Finance mailbox collection")}
             />
           </label>
           <label className="full-width">
-            Custodian name <span className="optional">optional</span>
+            {uiText("Custodian name") + " "}
+            <span className="optional">{uiText("optional")}</span>
             <input
               name="custodian_name"
-              placeholder="Person or team responsible for this collection"
+              placeholder={uiText(
+                "Person or team responsible for this collection",
+              )}
             />
           </label>
         </div>
         <div className="notice subtle">
           <Icon name="shield" size={18} />
           <span>
-            Only import evidence you are authorized to collect. Remote content
-            in email and HTML viewers is blocked.
+            {uiText(
+              "Only import evidence you are authorized to collect. Remote content in email and HTML viewers is blocked.",
+            )}
           </span>
         </div>
         <div className="form-actions">
@@ -802,12 +858,12 @@ function ImportModal({
             onClick={close}
             disabled={busy}
           >
-            Cancel
+            {uiText("Cancel")}
           </button>
           <button className="button primary" disabled={busy || !files.length}>
             {busy
-              ? "Uploading originals…"
-              : `Import ${files.length ? number(files.length) : ""} ${files.length === 1 ? "file" : "files"}`}
+              ? uiText("Uploading originals…")
+              : uiText("Import files: {0}", { "0": number(files.length) })}
             <Icon name="arrow" size={17} />
           </button>
         </div>
@@ -828,7 +884,7 @@ function SourceModal({
   const [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false);
   return (
-    <Modal title="Register a source" close={close}>
+    <Modal title={uiText("Register a source")} close={close}>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -849,15 +905,21 @@ function SourceModal({
       >
         <ErrorBox error={error} />
         <label>
-          Source name
-          <input name="label" required placeholder="Executive mailbox" />
+          {uiText("Source name")}
+          <input
+            name="label"
+            required
+            placeholder={uiText("Executive mailbox")}
+          />
         </label>
         <label>
-          Source type
+          {uiText("Source type")}
           <select name="kind">
-            <option value="file-collection">File collection</option>
-            <option value="email-archive">Email archive</option>
-            <option value="document-collection">Document collection</option>
+            <option value="file-collection">{uiText("File collection")}</option>
+            <option value="email-archive">{uiText("Email archive")}</option>
+            <option value="document-collection">
+              {uiText("Document collection")}
+            </option>
           </select>
         </label>
         <div className="form-actions">
@@ -865,7 +927,7 @@ function SourceModal({
             className="button primary"
             disabled={busy || !can(matter.role, "import")}
           >
-            {busy ? "Saving…" : "Register source"}
+            {busy ? uiText("Saving…") : uiText("Register source")}
           </button>
         </div>
       </form>
@@ -887,13 +949,15 @@ export function PeoplePage({ matter }: { matter: Matter }) {
   return (
     <>
       <PageHeading
-        eyebrow="PARTICIPANT DIRECTORY"
-        title="The people in the record."
-        text="Header addresses from imported email. Source occurrences and byte-exact unique originals are counted separately; names never merge distinct addresses."
+        eyebrow={uiText("PARTICIPANT DIRECTORY")}
+        title={uiText("The people in the record.")}
+        text={uiText(
+          "Header addresses from imported email. Source occurrences and byte-exact unique originals are counted separately; names never merge distinct addresses.",
+        )}
       />
       <div className="section-heading">
         <h2>
-          Participants{" "}
+          {uiText("Participants")}{" "}
           <span className="count-chip">{number(data.data?.items.length)}</span>
         </h2>
         <label className="search-small">
@@ -901,8 +965,8 @@ export function PeoplePage({ matter }: { matter: Matter }) {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Name or email address…"
-            aria-label="Filter participants"
+            placeholder={uiText("Name or email address…")}
+            aria-label={uiText("Filter participants")}
           />
         </label>
       </div>
@@ -913,8 +977,10 @@ export function PeoplePage({ matter }: { matter: Matter }) {
         <div className="panel">
           <Empty
             icon="people"
-            title="No participants to show"
-            text="Import emails to build a directory from sender and recipient metadata."
+            title={uiText("No participants to show")}
+            text={uiText(
+              "Import emails to build a directory from sender and recipient metadata.",
+            )}
           />
         </div>
       ) : (
@@ -922,11 +988,11 @@ export function PeoplePage({ matter }: { matter: Matter }) {
           <table>
             <thead>
               <tr>
-                <th>Participant</th>
-                <th>Sent</th>
-                <th>Received</th>
-                <th>Occurrences</th>
-                <th>Unique originals</th>
+                <th>{uiText("Participant")}</th>
+                <th>{uiText("Sent")}</th>
+                <th>{uiText("Received")}</th>
+                <th>{uiText("Occurrences")}</th>
+                <th>{uiText("Unique originals")}</th>
                 <th />
               </tr>
             </thead>
@@ -961,7 +1027,7 @@ export function PeoplePage({ matter }: { matter: Matter }) {
                       className="button ghost compact"
                       href={`/app/matters/${matter.id}/explorer?person_id=${encodeURIComponent(person.id)}`}
                     >
-                      View messages
+                      {uiText("View messages")}
                       <Icon name="arrow" size={15} />
                     </Link>
                   </td>
@@ -974,8 +1040,9 @@ export function PeoplePage({ matter }: { matter: Matter }) {
       {data.data?.truncated && (
         <div className="notice amber">
           <Icon name="alert" size={17} />
-          The directory shows the 200 highest-volume header addresses. Use
-          evidence search to inspect other participants.
+          {uiText(
+            "The directory shows the 200 highest-volume header addresses. Use evidence search to inspect other participants.",
+          )}
         </div>
       )}
     </>
@@ -996,22 +1063,29 @@ export function TimelinePage({ matter }: { matter: Matter }) {
   return (
     <>
       <PageHeading
-        eyebrow="SOURCE CHRONOLOGY"
-        title="Follow the sequence."
-        text="Dates come from evidence metadata. This chronology does not infer events from the document body."
+        eyebrow={uiText("SOURCE CHRONOLOGY")}
+        title={uiText("Follow the sequence.")}
+        text={uiText(
+          "Dates come from evidence metadata. This chronology does not infer events from the document body.",
+        )}
       />
       <div className="notice subtle">
         <Icon name="clock" size={18} />
         <span>
-          Times shown in {getDisplayTimeZone()}. Items without a usable date are
-          excluded from this chronology and remain in the evidence explorer.
+          {uiText(
+            "Times shown in {0}. Items without a usable date are excluded from this chronology and remain in the evidence explorer.",
+            { "0": getDisplayTimeZone() },
+          )}
         </span>
       </div>
       {data.data && data.data.missing_date_count > 0 && (
         <div className="notice amber">
           <Icon name="alert" size={17} />
-          {number(data.data.missing_date_count)} preserved evidence items have
-          no usable date and remain available in the evidence explorer.
+          {number(data.data.missing_date_count)}{" "}
+          {" " +
+            uiText(
+              "preserved evidence items have no usable date and remain available in the evidence explorer.",
+            )}
         </div>
       )}
       <ErrorBox error={data.error} retry={data.refresh} />
@@ -1021,8 +1095,10 @@ export function TimelinePage({ matter }: { matter: Matter }) {
         <div className="panel">
           <Empty
             icon="timeline"
-            title="The chronology is waiting for evidence"
-            text="Dated emails and documents appear here after processing."
+            title={uiText("The chronology is waiting for evidence")}
+            text={uiText(
+              "Dated emails and documents appear here after processing.",
+            )}
           />
         </div>
       ) : (
@@ -1042,7 +1118,7 @@ export function TimelinePage({ matter }: { matter: Matter }) {
               <span className="timeline-point" />
               <div className="timeline-content">
                 <span className="eyebrow">
-                  {label(item.type)} · SOURCE METADATA
+                  {uiText("{0} · SOURCE METADATA", { "0": label(item.type) })}
                 </span>
                 <h3>{item.title}</h3>
                 <span className="mono">{item.evidence_id}</span>
@@ -1055,7 +1131,10 @@ export function TimelinePage({ matter }: { matter: Matter }) {
       <Pagination
         text={
           data.data
-            ? `${number(data.data.items.length)} shown of ${number(data.data.total_items)} dated evidence items`
+            ? uiText("{0} shown of {1} dated evidence items", {
+                "0": number(data.data.items.length),
+                "1": number(data.data.total_items),
+              })
             : undefined
         }
         previous={
@@ -1095,9 +1174,11 @@ export function AuditPage({ matter }: { matter: Matter }) {
   return (
     <>
       <PageHeading
-        eyebrow="ACCOUNTABLE ACTIONS"
-        title="A record of the work."
-        text="Matter activity attributed to authorized accounts. Hash chaining is an integrity check, not a tamper-proof guarantee."
+        eyebrow={uiText("ACCOUNTABLE ACTIONS")}
+        title={uiText("A record of the work.")}
+        text={uiText(
+          "Matter activity attributed to authorized accounts. Hash chaining is an integrity check, not a tamper-proof guarantee.",
+        )}
       >
         <button
           className="button secondary"
@@ -1115,7 +1196,7 @@ export function AuditPage({ matter }: { matter: Matter }) {
           }}
         >
           <Icon name="shield" size={18} />
-          {busy ? "Verifying…" : "Verify audit chain"}
+          {busy ? uiText("Verifying…") : uiText("Verify audit chain")}
         </button>
       </PageHeading>
       <ErrorBox error={error} />
@@ -1126,8 +1207,12 @@ export function AuditPage({ matter }: { matter: Matter }) {
         >
           <Icon name={verified.valid ? "check" : "alert"} />
           {verified.valid
-            ? `Audit chain verified across ${number(verified.events_checked)} events.`
-            : "Audit integrity check failed. Investigate before relying on this record."}
+            ? uiText("Audit chain verified across {0} events.", {
+                "0": number(verified.events_checked),
+              })
+            : uiText(
+                "Audit integrity check failed. Investigate before relying on this record.",
+              )}
         </div>
       )}
       <ErrorBox error={data.error} retry={data.refresh} />
@@ -1138,10 +1223,10 @@ export function AuditPage({ matter }: { matter: Matter }) {
           <table>
             <thead>
               <tr>
-                <th>Date · {getDisplayTimeZone()}</th>
-                <th>Action</th>
-                <th>Actor</th>
-                <th>Target</th>
+                <th>{uiText("Date · {0}", { "0": getDisplayTimeZone() })}</th>
+                <th>{uiText("Action")}</th>
+                <th>{uiText("Actor")}</th>
+                <th>{uiText("Target")}</th>
               </tr>
             </thead>
             <tbody>
@@ -1154,11 +1239,13 @@ export function AuditPage({ matter }: { matter: Matter }) {
                     <strong>{label(item.event_type)}</strong>
                   </td>
                   <td className="mono">
-                    {item.actor_name || item.actor_id || "System"}
+                    {item.actor_name || item.actor_id || uiText("System")}
                   </td>
                   <td>
                     <span>
-                      {item.target_type ? label(item.target_type) : "Matter"}
+                      {item.target_type
+                        ? label(item.target_type)
+                        : uiText("Matter")}
                     </span>
                     <small className="block mono">
                       {item.target_id || "—"}
@@ -1171,8 +1258,8 @@ export function AuditPage({ matter }: { matter: Matter }) {
           {!data.data?.items.length && (
             <Empty
               icon="shield"
-              title="No audit events"
-              text="Authorized activity will be recorded here."
+              title={uiText("No audit events")}
+              text={uiText("Authorized activity will be recorded here.")}
             />
           )}
         </div>
@@ -1247,94 +1334,112 @@ export function ReportsPage({ matter }: { matter: Matter }) {
   return (
     <>
       <PageHeading
-        eyebrow="REVIEWED DELIVERY"
-        title="Take the record with you."
-        text="Permissioned exports with verifiable original hashes and recorded purpose."
+        eyebrow={uiText("REVIEWED DELIVERY")}
+        title={uiText("Take the record with you.")}
+        text={uiText(
+          "Permissioned exports with verifiable original hashes and recorded purpose.",
+        )}
       />
       <div className="reports-grid">
         <form className="panel export-form" onSubmit={submit}>
           <div className="panel-heading">
             <Icon name="export" size={24} />
             <div>
-              <h2>Create an evidence export</h2>
+              <h2>{uiText("Create an evidence export")}</h2>
               <p>
-                Exports the full authorized matter. Use the explorer to export a
-                filtered scope.
+                {uiText(
+                  "Exports the full authorized matter. Use the explorer to export a filtered scope.",
+                )}
               </p>
             </div>
           </div>
           <ErrorBox error={error} />
           <label>
-            Export format
+            {uiText("Export format")}
             <select name="format">
-              <option value="csv">CSV metadata + hash manifest</option>
-              <option value="json">JSON metadata + hash manifest</option>
-              <option value="zip">ZIP evidence package + manifest</option>
+              <option value="csv">
+                {uiText("CSV metadata + hash manifest")}
+              </option>
+              <option value="json">
+                {uiText("JSON metadata + hash manifest")}
+              </option>
+              <option value="zip">
+                {uiText("ZIP evidence package + manifest")}
+              </option>
             </select>
           </label>
           <label>
-            Purpose or reason
+            {uiText("Purpose or reason")}
             <textarea
               name="reason"
               required
               minLength={3}
               rows={3}
-              placeholder="Describe the purpose of this export"
+              placeholder={uiText("Describe the purpose of this export")}
             />
           </label>
           <label className="checkbox-label">
             <input type="checkbox" name="confirmed" required />
             <span>
-              I have reviewed the scope and am authorized to export this
-              evidence.
+              {uiText(
+                "I have reviewed the scope and am authorized to export this evidence.",
+              )}
             </span>
           </label>
           <div className="notice amber">
             <Icon name="lock" size={18} />
             <span>
-              Privilege, review and integrity holdbacks are enforced by the
-              server. Review decisions may block this export.
+              {uiText(
+                "Privilege, review and integrity holdbacks are enforced by the server. Review decisions may block this export.",
+              )}
             </span>
           </div>
           <button className="button primary" disabled={busy}>
-            {busy ? "Preparing export…" : "Create export"}
+            {busy ? uiText("Preparing export…") : uiText("Create export")}
             <Icon name="arrow" size={17} />
           </button>
         </form>
         <div className="panel export-context">
-          <span className="eyebrow">PRESERVATION FIRST</span>
-          <h2>Keep a connection to the source.</h2>
+          <span className="eyebrow">{uiText("PRESERVATION FIRST")}</span>
+          <h2>{uiText("Keep a connection to the source.")}</h2>
           <p>
-            A hash manifest lets you verify exported files against the original
-            evidence record. Exported metadata includes stable evidence
-            identifiers and source references.
+            {uiText(
+              "A hash manifest lets you verify exported files against the original evidence record. Exported metadata includes stable evidence identifiers and source references.",
+            )}
           </p>
           <div>
             <Icon name="shield" />
-            <span>Original files are never stamped or changed.</span>
+            <span>
+              {uiText("Original files are never stamped or changed.")}
+            </span>
           </div>
           <div>
             <Icon name="review" />
-            <span>Human review and privilege decisions remain visible.</span>
+            <span>
+              {uiText("Human review and privilege decisions remain visible.")}
+            </span>
           </div>
           <div>
             <Icon name="clock" />
-            <span>Export actions are attributed in the audit trail.</span>
+            <span>
+              {uiText("Export actions are attributed in the audit trail.")}
+            </span>
           </div>
           <small>
-            Production redaction and Bates workflows require separate validation
-            before professional use.
+            {uiText(
+              "Production redaction and Bates workflows require separate validation before professional use.",
+            )}
           </small>
         </div>
       </div>
       <section className="section">
         <div className="section-heading">
-          <h2>Export history</h2>
+          <h2>{uiText("Export history")}</h2>
           <button
             className="button secondary compact"
             onClick={records.refresh}
           >
-            Refresh
+            {uiText("Refresh")}
           </button>
         </div>
         <ErrorBox error={records.error} retry={records.refresh} />
@@ -1344,8 +1449,10 @@ export function ReportsPage({ matter }: { matter: Matter }) {
           <div className="panel">
             <Empty
               icon="export"
-              title="No exports yet"
-              text="Created export packages appear here after permission and integrity checks."
+              title={uiText("No exports yet")}
+              text={uiText(
+                "Created export packages appear here after permission and integrity checks.",
+              )}
             />
           </div>
         ) : (
@@ -1353,10 +1460,10 @@ export function ReportsPage({ matter }: { matter: Matter }) {
             <table>
               <thead>
                 <tr>
-                  <th>Export</th>
-                  <th>Format</th>
-                  <th>Status</th>
-                  <th>Created</th>
+                  <th>{uiText("Export")}</th>
+                  <th>{uiText("Format")}</th>
+                  <th>{uiText("Status")}</th>
+                  <th>{uiText("Created")}</th>
                   <th />
                 </tr>
               </thead>
@@ -1379,13 +1486,13 @@ export function ReportsPage({ matter }: { matter: Matter }) {
                             href={`/api/v1/cases/${matter.id}/exports/${item.id}/download`}
                           >
                             <Icon name="export" size={15} />
-                            Download
+                            {uiText("Download")}
                           </a>
                           <a
                             className="button ghost compact"
                             href={`/api/v1/cases/${matter.id}/exports/${item.id}/manifest`}
                           >
-                            Hash manifest
+                            {uiText("Hash manifest")}
                           </a>
                         </div>
                       ) : (
@@ -1440,40 +1547,42 @@ export function SettingsPage({
   return (
     <>
       <PageHeading
-        eyebrow="MATTER CONFIGURATION"
-        title="Set the boundaries."
-        text="Matter details and model availability for this private workspace."
+        eyebrow={uiText("MATTER CONFIGURATION")}
+        title={uiText("Set the boundaries.")}
+        text={uiText(
+          "Matter details and model availability for this private workspace.",
+        )}
       />
       <div className="settings-grid">
         <form className="panel form-panel" onSubmit={submit}>
-          <h2>Matter details</h2>
+          <h2>{uiText("Matter details")}</h2>
           <ErrorBox error={error} />
           {saved && (
             <div className="notice green" role="status">
               <Icon name="check" />
-              Matter details saved.
+              {uiText("Matter details saved.")}
             </div>
           )}
           <label>
-            Matter number
+            {uiText("Matter number")}
             <input readOnly defaultValue={matter.matter_number} />
           </label>
           <label>
-            Title
+            {uiText("Title")}
             <input name="title" required defaultValue={matter.title} />
           </label>
           <div className="form-grid">
             <label>
-              Client
+              {uiText("Client")}
               <input name="client" defaultValue={matter.client} />
             </label>
             <label>
-              Jurisdiction
+              {uiText("Jurisdiction")}
               <input name="jurisdiction" defaultValue={matter.jurisdiction} />
             </label>
           </div>
           <label>
-            Description
+            {uiText("Description")}
             <textarea
               name="description"
               rows={4}
@@ -1485,7 +1594,7 @@ export function SettingsPage({
               className="button primary"
               disabled={busy || !can(matter.role, "manage")}
             >
-              {busy ? "Saving…" : "Save changes"}
+              {busy ? uiText("Saving…") : uiText("Save changes")}
             </button>
           </div>
         </form>
@@ -1528,11 +1637,15 @@ function MatterState({
   return (
     <section className="panel matter-state-panel">
       <div>
-        <h2>Matter status</h2>
+        <h2>{uiText("Matter status")}</h2>
         <p>
           {matter.archived_at
-            ? "This matter is archived. Its preserved evidence remains available for authorized viewing."
-            : "Archiving removes this matter from the active list and retains its preserved evidence. It can be restored."}
+            ? uiText(
+                "This matter is archived. Its preserved evidence remains available for authorized viewing.",
+              )
+            : uiText(
+                "Archiving removes this matter from the active list and retains its preserved evidence. It can be restored.",
+              )}
         </p>
         <Badge value={matter.archived_at ? "Archived" : "Active"} />
       </div>
@@ -1542,12 +1655,16 @@ function MatterState({
         onClick={() => setModal(true)}
       >
         <Icon name={matter.archived_at ? "back" : "matters"} size={17} />
-        {matter.archived_at ? "Restore matter" : "Archive matter"}
+        {matter.archived_at
+          ? uiText("Restore matter")
+          : uiText("Archive matter")}
       </button>
       {modal && (
         <Modal
           title={
-            matter.archived_at ? "Restore this matter" : "Archive this matter"
+            matter.archived_at
+              ? uiText("Restore this matter")
+              : uiText("Archive this matter")
           }
           close={() => setModal(false)}
         >
@@ -1555,12 +1672,16 @@ function MatterState({
             <ErrorBox error={error} />
             <p className="muted">
               {matter.archived_at
-                ? "Restore this matter to the active workspace. This action is recorded in the audit trail."
-                : "Original evidence is retained. An active preservation hold prevents archival and will be checked by the server."}
+                ? uiText(
+                    "Restore this matter to the active workspace. This action is recorded in the audit trail.",
+                  )
+                : uiText(
+                    "Original evidence is retained. An active preservation hold prevents archival and will be checked by the server.",
+                  )}
             </p>
             {!matter.archived_at && (
               <label>
-                Archive reason
+                {uiText("Archive reason")}
                 <textarea
                   name="reason"
                   required
@@ -1573,17 +1694,20 @@ function MatterState({
             <label className="checkbox-label">
               <input type="checkbox" required />
               <span>
-                I am authorized to {matter.archived_at ? "restore" : "archive"}{" "}
-                this matter.
+                {uiText("I am authorized to {0} this matter.", {
+                  "0": matter.archived_at
+                    ? uiText("restore")
+                    : uiText("archive"),
+                })}
               </span>
             </label>
             <div className="form-actions">
               <button className="button primary" disabled={busy}>
                 {busy
-                  ? "Updating matter…"
+                  ? uiText("Updating matter…")
                   : matter.archived_at
-                    ? "Restore matter"
-                    : "Archive matter"}
+                    ? uiText("Restore matter")
+                    : uiText("Archive matter")}
               </button>
             </div>
           </form>
@@ -1612,14 +1736,14 @@ export function Pagination({
           onClick={previous}
         >
           <Icon name="back" size={15} />
-          Previous
+          {uiText("Previous")}
         </button>
         <button
           className="button secondary compact"
           disabled={!next}
           onClick={next}
         >
-          Next
+          {uiText("Next")}
           <Icon name="arrow" size={15} />
         </button>
       </div>

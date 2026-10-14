@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "casequarry"
-version = "0.5.1"
+version = "0.6.0"
 description = "Private evidence preservation, search and review for legal teams"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE*"]

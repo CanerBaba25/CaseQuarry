@@ -1,4 +1,5 @@
 "use client";
+import { uiText, type MessageKey } from "@/lib/i18n";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -39,6 +40,8 @@ import FirmAdministration from "./firm-admin";
 import ReviewQueue from "./review-queue";
 import ProductionsPage from "./productions";
 import MyWork from "./task-worklist";
+import LanguageSettings, { LanguageControl } from "./language-settings";
+import { useInterfaceLanguage } from "./locale-provider";
 
 type MatterPage = {
   items: Matter[];
@@ -46,7 +49,7 @@ type MatterPage = {
   total: number;
 };
 
-const matterNavigation = [
+const matterNavigation: [string, MessageKey, string][] = [
   ["overview", "Overview", "grid"],
   ["explorer", "Evidence explorer", "search"],
   ["emails", "Email workspace", "email"],
@@ -65,7 +68,7 @@ const matterNavigation = [
   ["audit", "Audit trail", "shield"],
   ["settings", "Matter settings", "settings"],
 ];
-const matterGroups = [
+const matterGroups: { title: MessageKey; keys: string[] }[] = [
   { title: "Evidence", keys: ["overview", "explorer", "emails", "sources"] },
   {
     title: "Investigation",
@@ -79,6 +82,7 @@ const matterGroups = [
 ];
 
 export default function Workspace() {
+  const locale = useInterfaceLanguage();
   const router = useRouter(),
     pathname = usePathname();
   const [user, setUser] = useState<User | null>(null),
@@ -93,6 +97,16 @@ export default function Workspace() {
   const [matterFilter, setMatterFilter] = useState("");
   const [caseSearch, setCaseSearch] = useState("");
   const [caseCursors, setCaseCursors] = useState<(string | null)[]>([null]);
+  const preferencesSaved = useCallback((updated: User) => {
+    setUser((current) =>
+      current?.id === updated.id && current.tenant_id === updated.tenant_id
+        ? updated
+        : current,
+    );
+  }, []);
+  useEffect(() => {
+    if (user) void locale.activate(user.language || "en");
+  }, [user?.id, user?.language, locale.activate]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setCaseSearch(matterFilter.trim());
@@ -253,7 +267,7 @@ export default function Workspace() {
     return (
       <div className="boot">
         <Logo />
-        <Loading text="Connecting to your private workspace…" />
+        <Loading text={uiText("Connecting to your private workspace…")} />
       </div>
     );
   if (bootError)
@@ -278,12 +292,12 @@ export default function Workspace() {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
-        Skip to content
+        {uiText("Skip to content")}
       </a>
       {navOpen && (
         <button
           className="nav-scrim"
-          aria-label="Close navigation"
+          aria-label={uiText("Close navigation")}
           onClick={() => setNavOpen(false)}
         />
       )}
@@ -291,7 +305,7 @@ export default function Workspace() {
         ref={navigationRef}
         id="workspace-navigation"
         className={`sidebar ${navOpen ? "open" : ""}`}
-        aria-label="Workspace navigation"
+        aria-label={uiText("Workspace navigation")}
         onClick={(event) => {
           if (
             event.target instanceof Element &&
@@ -304,13 +318,13 @@ export default function Workspace() {
           <Logo />
         </Link>
         <div className="sidebar-scroll">
-          <div className="sidebar-section-title">WORKSPACE</div>
+          <div className="sidebar-section-title">{uiText("WORKSPACE")}</div>
           <Link
             href="/app"
             className={`nav-link ${!caseId && pieces[2] !== "new" && !accountSettings && !administration ? "active" : ""}`}
           >
             <Icon name="matters" />
-            All matters
+            {uiText("All matters")}
             {!caseSearch && !includeArchived && cases.data && (
               <span className="nav-count">{number(cases.data.total)}</span>
             )}
@@ -321,7 +335,7 @@ export default function Workspace() {
               className={`nav-link ${administration ? "active" : ""}`}
             >
               <Icon name="people" />
-              Firm administration
+              {uiText("Firm administration")}
             </Link>
           )}
           <Link
@@ -329,26 +343,34 @@ export default function Workspace() {
             className={`nav-link ${pieces[2] === "new" ? "active" : ""}`}
           >
             <Icon name="plus" />
-            Create matter
+            {uiText("Create matter")}
           </Link>
           <Link
             href="/app/settings"
             className={`nav-link ${accountSettings ? "active" : ""}`}
           >
             <Icon name="shield" />
-            Account security
+            {uiText("Account security")}
           </Link>
           {caseId && (
             <>
               <div className="sidebar-matter">
-                <span className="sidebar-section-title">CURRENT MATTER</span>
-                <span>{matter.data?.matter_number || "Loading matter"}</span>
-                <strong>{matter.data?.title || "Evidence workspace"}</strong>
+                <span className="sidebar-section-title">
+                  {uiText("CURRENT MATTER")}
+                </span>
+                <span>
+                  {matter.data?.matter_number || uiText("Loading matter")}
+                </span>
+                <strong>
+                  {matter.data?.title || uiText("Evidence workspace")}
+                </strong>
               </div>
-              <nav aria-label="Matter pages">
+              <nav aria-label={uiText("Matter pages")}>
                 {matterGroups.map((group) => (
                   <div className="nav-group" key={group.title}>
-                    <div className="sidebar-section-title">{group.title}</div>
+                    <div className="sidebar-section-title">
+                      {uiText(group.title)}
+                    </div>
                     {matterNavigation
                       .filter(([key]) => group.keys.includes(key))
                       .map(([key, text, icon]) => (
@@ -365,7 +387,7 @@ export default function Workspace() {
                           }
                         >
                           <Icon name={icon} />
-                          {text}
+                          {uiText(text)}
                         </Link>
                       ))}
                   </div>
@@ -375,17 +397,20 @@ export default function Workspace() {
           )}
         </div>
         <div className="sidebar-bottom">
+          <LanguageControl compact user={user} saved={preferencesSaved} />
           <div className="privacy-status" data-state={syncState}>
             <span className="status-dot" />
             <span>
               {syncState === "connected"
-                ? "Connected to firm server"
+                ? uiText("Connected to firm server")
                 : syncState === "checking"
-                  ? "Checking connection"
+                  ? uiText("Checking connection")
                   : syncState === "unavailable"
-                    ? "Matter unavailable"
-                    : "Reconnecting"}
-              <small>CaseQuarry {applicationVersion}</small>
+                    ? uiText("Matter unavailable")
+                    : uiText("Reconnecting")}
+              <small>
+                {uiText("CaseQuarry {0}", { "0": applicationVersion })}
+              </small>
             </span>
             <Icon name="lock" size={15} />
           </div>
@@ -405,7 +430,7 @@ export default function Workspace() {
             </div>
             <button
               className="icon-button"
-              aria-label="Sign out"
+              aria-label={uiText("Sign out")}
               onClick={async () => {
                 try {
                   await post("/auth/logout");
@@ -427,60 +452,71 @@ export default function Workspace() {
             className="icon-button mobile-menu"
             ref={menuRef}
             onClick={() => setNavOpen((value) => !value)}
-            aria-label="Open navigation"
+            aria-label={uiText("Open navigation")}
             aria-expanded={navOpen}
             aria-controls="workspace-navigation"
           >
             <Icon name="menu" />
           </button>
           <div className="breadcrumb">
-            <Link href="/app">Workspace</Link>
+            <Link href="/app">{uiText("Workspace")}</Link>
             {caseId && (
               <>
                 <Icon name="chevron" size={13} />
-                <span>{matter.data?.matter_number || "Matter"}</span>
+                <span>{matter.data?.matter_number || uiText("Matter")}</span>
               </>
             )}
             <Icon name="chevron" size={13} />
             <strong>
               {caseId
-                ? matterNavigation.find(([key]) => key === section)?.[1] ||
-                  "Evidence"
+                ? uiText(
+                    matterNavigation.find(([key]) => key === section)?.[1] ||
+                      "Evidence",
+                  )
                 : pieces[2] === "new"
-                  ? "New matter"
+                  ? uiText("New matter")
                   : accountSettings
-                    ? "Account security"
+                    ? uiText("Account security")
                     : administration
-                      ? "Firm administration"
-                      : "All matters"}
+                      ? uiText("Firm administration")
+                      : uiText("All matters")}
             </strong>
           </div>
           <div className="topbar-actions">
             <Link
               href="/app/settings"
               className="time-zone-status"
-              aria-label={`Timezone settings, displaying ${getDisplayTimeZone(user.time_zone || "UTC")}`}
-              title={`Account timezone: ${user.time_zone || "UTC"}${timeZoneSupported(user.time_zone || "UTC") ? "" : ". This browser displays UTC as a fallback."}`}
+              aria-label={uiText("Timezone settings, displaying {0}", {
+                "0": getDisplayTimeZone(user.time_zone || "UTC"),
+              })}
+              title={uiText("Account timezone: {0}{1}", {
+                "0": user.time_zone || uiText("UTC"),
+                "1": timeZoneSupported(user.time_zone || "UTC")
+                  ? ""
+                  : uiText(". This browser displays UTC as a fallback."),
+              })}
             >
               <Icon name="clock" size={14} />
               <span>
                 {timeZoneSupported(user.time_zone || "UTC")
                   ? getDisplayTimeZone(user.time_zone || "UTC")
-                  : "UTC fallback"}
+                  : uiText("UTC fallback")}
               </span>
             </Link>
             <button
               className="command-trigger"
-              aria-label="Quick navigation"
+              aria-label={uiText("Quick navigation")}
               onClick={() => setPalette(true)}
             >
               <Icon name="search" size={16} />
-              <span>Search matters & pages</span>
+              <span>{uiText("Search matters & pages")}</span>
               <kbd>{commandKey} K</kbd>
             </button>
             <button
               className="icon-button"
-              aria-label={dark ? "Use light theme" : "Use dark theme"}
+              aria-label={
+                dark ? uiText("Use light theme") : uiText("Use dark theme")
+              }
               onClick={toggleTheme}
             >
               <Icon name={dark ? "sun" : "moon"} size={19} />
@@ -546,26 +582,24 @@ export default function Workspace() {
             ) : (
               <Empty
                 icon="file"
-                title="This page is unavailable"
-                text="Use the matter navigation to open evidence, review or administration."
+                title={uiText("This page is unavailable")}
+                text={uiText(
+                  "Use the matter navigation to open evidence, review or administration.",
+                )}
               />
             )
           ) : accountSettings ? (
             <AccountSecurity
               user={user}
               preferences={
-                <TimeZoneSettings
-                  key={user.id}
-                  user={user}
-                  saved={(updated) =>
-                    setUser((current) =>
-                      current?.id === updated.id &&
-                      current.tenant_id === updated.tenant_id
-                        ? updated
-                        : current,
-                    )
-                  }
-                />
+                <>
+                  <LanguageSettings user={user} saved={preferencesSaved} />
+                  <TimeZoneSettings
+                    key={user.id}
+                    user={user}
+                    saved={preferencesSaved}
+                  />
+                </>
               }
             />
           ) : administration ? (
@@ -624,6 +658,7 @@ function AuthPage({
   setup: boolean;
   authenticated: (user: User) => void;
 }) {
+  const locale = useInterfaceLanguage();
   const [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -634,7 +669,7 @@ function AuthPage({
     try {
       const result = await post<{ user: User; csrf_token: string }>(
         setup ? "/setup" : "/auth/login",
-        data,
+        setup ? { ...data, language: locale.language } : data,
       );
       authenticated({ ...result.user, csrf_token: result.csrf_token });
     } catch (error) {
@@ -648,28 +683,30 @@ function AuthPage({
       <div className="auth-story">
         <Logo />
         <div>
-          <span className="eyebrow">FIND THE FACTS. FOLLOW THE EVIDENCE.</span>
+          <span className="eyebrow">
+            {uiText("FIND THE FACTS. FOLLOW THE EVIDENCE.")}
+          </span>
           <h1>
-            A clearer view
+            {uiText("A clearer view")}
             <br />
-            of the record.
+            {uiText("of the record.")}
           </h1>
           <p>
-            Preserve your sources. Connect the details.
+            {uiText("Preserve your sources. Connect the details.")}
             <br />
-            Build your case on evidence you can verify.
+            {uiText("Build your case on evidence you can verify.")}
           </p>
           <div className="auth-proof">
             <Icon name="shield" size={25} />
             <span>
-              Self-hosted. Private by default.
+              {uiText("Self-hosted. Private by default.")}
               <br />
-              <small>Search and review work without a model.</small>
+              <small>{uiText("Search and review work without a model.")}</small>
             </span>
           </div>
         </div>
         <small className="auth-bottom">
-          Built for careful investigation and human judgment.
+          {uiText("Built for careful investigation and human judgment.")}
         </small>
       </div>
       <div className="auth-form-container">
@@ -677,18 +714,23 @@ function AuthPage({
           <Logo />
         </div>
         <form className="auth-form" onSubmit={submit}>
-          <span className="eyebrow">YOUR PRIVATE WORKSPACE</span>
-          <h2>{setup ? "Set up CaseQuarry" : "Welcome back"}</h2>
+          <LanguageControl compact />
+          <span className="eyebrow">{uiText("YOUR PRIVATE WORKSPACE")}</span>
+          <h2>
+            {setup ? uiText("Set up CaseQuarry") : uiText("Welcome back")}
+          </h2>
           <p>
             {setup
-              ? "Create the first firm administrator using the setup token from your server."
-              : "Sign in to continue your evidence review."}
+              ? uiText(
+                  "Create the first firm administrator using the setup token from your server.",
+                )
+              : uiText("Sign in to continue your evidence review.")}
           </p>
           <ErrorBox error={error} />
           {setup && (
             <>
               <label>
-                Setup token
+                {uiText("Setup token")}
                 <input
                   name="token"
                   type="password"
@@ -697,27 +739,27 @@ function AuthPage({
                 />
               </label>
               <label>
-                Firm or workspace name
+                {uiText("Firm or workspace name")}
                 <input name="firm_name" required autoComplete="organization" />
               </label>
               <label>
-                Your name
+                {uiText("Your name")}
                 <input name="name" required autoComplete="name" />
               </label>
             </>
           )}
           <label>
-            Email address
+            {uiText("Email address")}
             <input
               name="email"
               type="email"
               required
               autoComplete="username"
-              placeholder="you@yourfirm.com"
+              placeholder={uiText("you@yourfirm.com")}
             />
           </label>
           <label>
-            Password
+            {uiText("Password")}
             <input
               name="password"
               type="password"
@@ -728,31 +770,37 @@ function AuthPage({
           </label>
           {setup ? (
             <small className="field-help">
-              Use at least 12 characters. There is no default password.
+              {uiText(
+                "Use at least 12 characters. There is no default password.",
+              )}
             </small>
           ) : (
             <label>
-              Authenticator code <span className="optional">if enabled</span>
+              {uiText("Authenticator code") + " "}
+              <span className="optional">{uiText("if enabled")}</span>
               <input
                 name="totp_code"
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 maxLength={6}
-                placeholder="6-digit code"
+                placeholder={uiText("6-digit code")}
               />
             </label>
           )}
-          <button className="button primary auth-submit" disabled={busy}>
+          <button
+            className="button primary auth-submit"
+            disabled={busy || locale.loading}
+          >
             {busy
-              ? "Connecting…"
+              ? uiText("Connecting…")
               : setup
-                ? "Create private workspace"
-                : "Sign in"}
+                ? uiText("Create private workspace")
+                : uiText("Sign in")}
             <Icon name="arrow" size={18} />
           </button>
           <p className="auth-notice">
             <Icon name="lock" size={15} />
-            Access is limited to matters shared with your account.
+            {uiText("Access is limited to matters shared with your account.")}
           </p>
         </form>
       </div>
@@ -805,27 +853,29 @@ function MatterDashboard({
       <section className="firm-dashboard-hero">
         <div className="firm-dashboard-intro">
           <span className="eyebrow">
-            FIRM WORKSPACE · {userName.split(" ")[0]}
+            {uiText("FIRM WORKSPACE · {0}", { "0": userName.split(" ")[0] })}
           </span>
           <h1>
-            Your matters.
-            <br />A clearer perspective.
+            {uiText("Your matters.")}
+            <br />
+            {uiText("A clearer perspective.")}
           </h1>
           <p>
-            A focused place to follow the record, coordinate review and move
-            your matters forward.
+            {uiText(
+              "A focused place to follow the record, coordinate review and move your matters forward.",
+            )}
           </p>
           <div className="button-row">
             <Link className="button primary" href="/app/matters/new">
               <Icon name="plus" size={18} />
-              New matter
+              {uiText("New matter")}
             </Link>
             <button
               type="button"
               className="button secondary"
               onClick={openFinder}
             >
-              <Icon name="search" size={17} /> Find a matter
+              <Icon name="search" size={17} /> {" " + uiText("Find a matter")}
             </button>
           </div>
         </div>
@@ -836,28 +886,29 @@ function MatterDashboard({
           <strong>
             {cases.data && !cases.loading ? number(cases.data.total) : "—"}
           </strong>
-          <span>Matters in this view</span>
+          <span>{uiText("Matters in this view")}</span>
           <small>
             {filter
-              ? "Matching your current search"
+              ? uiText("Matching your current search")
               : includeArchived
-                ? "Active and archived matters"
-                : "Active matters you can access"}
+                ? uiText("Active and archived matters")
+                : uiText("Active matters you can access")}
           </small>
         </div>
       </section>
       <div className="workspace-assurance">
         <Icon name="shield" size={16} />
         <span>
-          Preserved originals. Human review. External processing only with
-          explicit consent.
+          {uiText(
+            "Preserved originals. Human review. External processing only with explicit consent.",
+          )}
         </span>
       </div>
       <MyWork userId={userId} />
       <section className="section matter-directory">
         <div className="section-heading">
           <h2>
-            Your matters{" "}
+            {uiText("Your matters")}{" "}
             <span className="count-chip">{number(cases.data?.total)}</span>
           </h2>
           <div className="matter-directory-tools">
@@ -867,26 +918,26 @@ function MatterDashboard({
                 checked={includeArchived}
                 onChange={(event) => toggleArchived(event.target.checked)}
               />
-              <span>Include archived</span>
+              <span>{uiText("Include archived")}</span>
             </label>
             <label className="search-small">
               <Icon name="search" size={17} />
               <input
                 value={filter}
                 onChange={(event) => setFilter(event.target.value)}
-                placeholder="Find a matter…"
+                placeholder={uiText("Find a matter…")}
                 maxLength={200}
-                aria-label="Find a matter"
+                aria-label={uiText("Find a matter")}
               />
             </label>
             <div
               className="view-switch"
               role="group"
-              aria-label="Matter layout"
+              aria-label={uiText("Matter layout")}
             >
               <button
                 type="button"
-                aria-label="Card view"
+                aria-label={uiText("Card view")}
                 aria-pressed={view === "cards"}
                 onClick={() => changeView("cards")}
               >
@@ -894,7 +945,7 @@ function MatterDashboard({
               </button>
               <button
                 type="button"
-                aria-label="List view"
+                aria-label={uiText("List view")}
                 aria-pressed={view === "list"}
                 onClick={() => changeView("list")}
               >
@@ -905,21 +956,27 @@ function MatterDashboard({
         </div>
         <ErrorBox error={cases.error} retry={cases.refresh} />
         {cases.loading ? (
-          <Loading text="Loading your authorized matters…" />
+          <Loading text={uiText("Loading your authorized matters…")} />
         ) : !rows.length ? (
           <Empty
             icon="matters"
-            title={filter ? "No matching matters" : "Make room for the facts."}
+            title={
+              filter
+                ? uiText("No matching matters")
+                : uiText("Make room for the facts.")
+            }
             text={
               filter
-                ? "Try a different title, client or matter number."
-                : "Create your first matter, then import evidence to begin your investigation."
+                ? uiText("Try a different title, client or matter number.")
+                : uiText(
+                    "Create your first matter, then import evidence to begin your investigation.",
+                  )
             }
           >
             {!filter && (
               <Link className="button primary" href="/app/matters/new">
                 <Icon name="plus" size={17} />
-                Create your first matter
+                {uiText("Create your first matter")}
               </Link>
             )}
           </Empty>
@@ -937,14 +994,14 @@ function MatterDashboard({
               disabled={!hasPrevious || cases.loading}
               onClick={previous}
             >
-              Previous matters
+              {uiText("Previous matters")}
             </button>
             <button
               className="button secondary compact"
               disabled={!cases.data?.next_cursor || cases.loading}
               onClick={next}
             >
-              Next matters
+              {uiText("Next matters")}
             </button>
           </div>
         )}
@@ -952,8 +1009,10 @@ function MatterDashboard({
       <div className="workspace-footer">
         <Icon name="shield" size={16} />
         <span>
-          CaseQuarry {applicationVersion} · Professional judgment and verified
-          source records remain essential.
+          {uiText(
+            "CaseQuarry {0} · Professional judgment and verified source records remain essential.",
+            { "0": applicationVersion },
+          )}
         </span>
       </div>
     </>
@@ -974,7 +1033,7 @@ function MatterCard({ matter }: { matter: Matter }) {
         <span className="eyebrow">{matter.matter_number}</span>
         <h3>{matter.title}</h3>
         <p>
-          {matter.client || "Client not specified"}
+          {matter.client || uiText("Client not specified")}
           {matter.case_type ? ` · ${matter.case_type}` : ""}
         </p>
       </div>
@@ -984,17 +1043,17 @@ function MatterCard({ matter }: { matter: Matter }) {
             <strong>
               {stats.data ? number(stats.data.evidence_items) : "—"}
             </strong>
-            <span>Evidence items</span>
+            <span>{uiText("Evidence items")}</span>
           </div>
           <div>
             <strong>{stats.data ? number(stats.data.reviewed) : "—"}</strong>
-            <span>Reviewed</span>
+            <span>{uiText("Reviewed")}</span>
           </div>
         </div>
         {stats.data && (
           <div className="matter-review-progress">
             <div>
-              <span>Human review</span>
+              <span>{uiText("Human review")}</span>
               <strong>
                 {stats.data.evidence_items
                   ? Math.round(
@@ -1007,17 +1066,22 @@ function MatterCard({ matter }: { matter: Matter }) {
             <progress
               max={stats.data.evidence_items || 1}
               value={stats.data.reviewed}
-              aria-label={`${number(stats.data.reviewed)} of ${number(stats.data.evidence_items)} evidence items reviewed`}
+              aria-label={uiText("{0} of {1} evidence items reviewed", {
+                "0": number(stats.data.reviewed),
+                "1": number(stats.data.evidence_items),
+              })}
             />
           </div>
         )}
       </div>
       <div className="matter-card-bottom">
-        <span>Updated {date(matter.updated_at)}</span>
+        <span>{uiText("Updated {0}", { "0": date(matter.updated_at) })}</span>
         <Icon name="arrow" size={18} />
       </div>
       {Boolean(stats.error) && (
-        <span className="card-warning">Evidence counts unavailable</span>
+        <span className="card-warning">
+          {uiText("Evidence counts unavailable")}
+        </span>
       )}
     </Link>
   );
@@ -1046,71 +1110,77 @@ function CreateMatter({ created }: { created: (id: string) => void }) {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">A NEW INVESTIGATION</span>
-          <h1>Create a matter.</h1>
-          <p>A separate workspace for your evidence, reviewers and findings.</p>
+          <span className="eyebrow">{uiText("A NEW INVESTIGATION")}</span>
+          <h1>{uiText("Create a matter.")}</h1>
+          <p>
+            {uiText(
+              "A separate workspace for your evidence, reviewers and findings.",
+            )}
+          </p>
         </div>
       </div>
       <form className="panel form-panel" onSubmit={submit}>
         <div className="panel-heading">
           <span className="step-number">01</span>
           <div>
-            <h2>Matter details</h2>
-            <p>You can update these details later.</p>
+            <h2>{uiText("Matter details")}</h2>
+            <p>{uiText("You can update these details later.")}</p>
           </div>
         </div>
         <ErrorBox error={error} />
         <div className="form-grid">
           <label>
-            Matter number
+            {uiText("Matter number")}
             <input
               name="matter_number"
               required
-              placeholder="2026-CIV-0042"
+              placeholder={uiText("2026-CIV-0042")}
               maxLength={100}
             />
           </label>
           <label>
-            Matter title
+            {uiText("Matter title")}
             <input
               name="title"
               required
-              placeholder="Client v. Respondent"
+              placeholder={uiText("Client v. Respondent")}
               maxLength={300}
             />
           </label>
           <label>
-            Client
+            {uiText("Client")}
             <input
               name="client"
-              placeholder="Client or organization"
+              placeholder={uiText("Client or organization")}
               maxLength={300}
             />
           </label>
           <label>
-            Matter type
+            {uiText("Matter type")}
             <select name="case_type">
-              <option value="Civil litigation">Civil litigation</option>
-              <option>Internal investigation</option>
-              <option>Regulatory inquiry</option>
-              <option>Criminal defense</option>
-              <option>Other</option>
+              <option value="Civil litigation">
+                {uiText("Civil litigation")}
+              </option>
+              <option>{uiText("Internal investigation")}</option>
+              <option>{uiText("Regulatory inquiry")}</option>
+              <option>{uiText("Criminal defense")}</option>
+              <option>{uiText("Other")}</option>
             </select>
           </label>
           <label>
-            Jurisdiction
+            {uiText("Jurisdiction")}
             <input
               name="jurisdiction"
-              placeholder="Court, province or jurisdiction"
+              placeholder={uiText("Court, province or jurisdiction")}
               maxLength={300}
             />
           </label>
           <label className="full-width">
-            Description
+            {uiText("Description")}
             <textarea
               name="description"
               rows={4}
-              placeholder="What does this matter concern?"
+              placeholder={uiText("What does this matter concern?")}
               maxLength={5000}
             />
           </label>
@@ -1118,16 +1188,17 @@ function CreateMatter({ created }: { created: (id: string) => void }) {
         <div className="form-info">
           <Icon name="lock" />
           <p>
-            Only you will have access initially. Team access must be granted
-            explicitly for this matter.
+            {uiText(
+              "Only you will have access initially. Team access must be granted explicitly for this matter.",
+            )}
           </p>
         </div>
         <div className="form-actions">
           <Link href="/app" className="button secondary">
-            Cancel
+            {uiText("Cancel")}
           </Link>
           <button className="button primary" disabled={busy}>
-            {busy ? "Creating matter…" : "Create matter"}
+            {busy ? uiText("Creating matter…") : uiText("Create matter")}
             <Icon name="arrow" size={17} />
           </button>
         </div>

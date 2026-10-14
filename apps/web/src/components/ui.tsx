@@ -1,7 +1,8 @@
 "use client";
+import { getInterfaceLanguage, uiKnownText, uiText } from "@/lib/i18n";
 
 import { useEffect, useId, useRef } from "react";
-import { ApiError, label } from "@/lib/api";
+import { ApiError, uiLabel as label } from "@/lib/api";
 
 const paths: Record<string, React.ReactNode> = {
   matters: (
@@ -173,13 +174,22 @@ export function Logo({ small = false }: { small?: boolean }) {
         </svg>
       </span>
       <span>
-        CaseQuarry<span className="brand-subtitle">EVIDENCE WORKSPACE</span>
+        {uiText("CaseQuarry")}
+        <span className="brand-subtitle">{uiText("EVIDENCE WORKSPACE")}</span>
       </span>
     </div>
   );
 }
 
-export function Badge({ value, tone }: { value: string; tone?: string }) {
+export function Badge({
+  value,
+  tone,
+  text,
+}: {
+  value: string;
+  tone?: string;
+  text?: string;
+}) {
   const kind =
     tone ||
     (
@@ -202,7 +212,7 @@ export function Badge({ value, tone }: { value: string; tone?: string }) {
       } as Record<string, string>
     )[value.toLowerCase()] ||
     "neutral";
-  return <span className={`badge ${kind}`}>{label(value)}</span>;
+  return <span className={`badge ${kind}`}>{text ?? label(value)}</span>;
 }
 
 export function ErrorBox({
@@ -214,18 +224,56 @@ export function ErrorBox({
 }) {
   if (!error) return null;
   const message = error instanceof Error ? error.message : String(error);
+  const friendly =
+    error instanceof ApiError
+      ? error.code === "TASK_VERSION_CONFLICT" ||
+        error.code === "TASK_VERSION_REQUIRED"
+        ? "This task changed. Load its current version before saving."
+        : error.code === "TASK_LIST_CHANGED"
+          ? "The task list changed. Return to the first page."
+          : error.code === "WORKLIST_CHANGED"
+            ? "The worklist changed. Refresh to start from the first page."
+            : ["INVALID_CREDENTIALS", "MFA_CODE_INVALID"].includes(error.code)
+              ? "The sign-in details or authenticator code are incorrect."
+              : error.status === 401
+                ? "Your session has expired. Sign in again."
+                : error.status === 403
+                  ? "You do not have permission to perform this action."
+                  : error.status === 404
+                    ? "This resource is no longer available."
+                    : error.status === 429
+                      ? "Too many requests. Please wait and try again."
+                      : error.status === 422
+                        ? "Check the highlighted values and try again."
+                        : error.status >= 500
+                          ? "The server could not complete the request. Try again."
+                          : ""
+      : "";
+  const localized =
+    getInterfaceLanguage() !== "en" && friendly
+      ? uiText(friendly)
+      : uiKnownText(message);
   return (
     <div className="error-box" role="alert">
       <Icon name="alert" />
       <div>
-        <strong>{message}</strong>
+        <strong>{localized}</strong>
+        {localized !== message && error instanceof ApiError && (
+          <details>
+            <summary>{uiText("Original diagnostic details")}</summary>
+            <p>{message}</p>
+            <code>{error.code}</code>
+          </details>
+        )}
         {error instanceof ApiError && error.requestId && (
-          <small>Request: {error.requestId}</small>
+          <small>{uiText("Request: {0}", { "0": error.requestId })}</small>
         )}
         {error instanceof ApiError && error.retryAfterSeconds !== undefined && (
           <small>
-            The server requested a {error.retryAfterSeconds}-second pause before
-            retrying this request.
+            {uiText(
+              "The server requested a {0}-second pause before retrying this request.",
+              { "0": error.retryAfterSeconds },
+            )}
           </small>
         )}
       </div>
@@ -235,18 +283,18 @@ export function ErrorBox({
           className="button secondary compact"
           onClick={retry}
         >
-          Try again
+          {uiText("Try again")}
         </button>
       )}
     </div>
   );
 }
 
-export function Loading({ text = "Loading workspace…" }: { text?: string }) {
+export function Loading({ text }: { text?: string }) {
   return (
     <div className="loading" role="status">
       <span className="spinner" />
-      {text}
+      {text ?? uiText("Loading workspace…")}
     </div>
   );
 }
@@ -351,7 +399,7 @@ export function Modal({
           <h2 id={titleId}>{title}</h2>
           <button
             className="icon-button"
-            aria-label="Close dialog"
+            aria-label={uiText("Close dialog")}
             onClick={close}
           >
             <Icon name="close" />

@@ -1,8 +1,9 @@
 "use client";
+import { uiText } from "@/lib/i18n";
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, date, label, number, post } from "@/lib/api";
+import { api, ApiError, date, uiLabel as label, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import type { Matter, Member } from "@/lib/types";
@@ -10,7 +11,12 @@ import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
 import { PageHeading, Pagination } from "./matter-pages";
 import { TaskDeadline } from "./task-deadline";
 import TaskDetails from "./task-details";
-import type { TaskDetail } from "./task-types";
+import {
+  taskPriorities,
+  taskPriorityTone,
+  type TaskDetail,
+  type TaskPriority,
+} from "./task-types";
 import deadlineStyles from "./task-deadline.module.css";
 
 type Hold = {
@@ -40,6 +46,7 @@ type Task = {
   id: string;
   title: string;
   state: string;
+  priority: TaskPriority;
   assigned_to: string | null;
   due_date: string | null;
   created_by: string;
@@ -119,33 +126,42 @@ export function GovernancePage({
   }, [matter.id, kind]);
   const copy = {
     holds: {
-      eyebrow: "PRESERVATION RECORDS",
-      title: "Keep preservation visible.",
-      text: "Track matter preservation requests and record releases. Active holds block matter archival.",
-      add: "Register hold",
-      empty: "No preservation holds",
-      description:
+      eyebrow: uiText("PRESERVATION RECORDS"),
+      title: uiText("Keep preservation visible."),
+      text: uiText(
+        "Track matter preservation requests and record releases. Active holds block matter archival.",
+      ),
+      add: uiText("Register hold"),
+      empty: uiText("No preservation holds"),
+      description: uiText(
         "Register a preservation request with a documented reason. This record does not deliver notices or replace counsel's preservation process.",
+      ),
       icon: "lock",
     },
     issues: {
-      eyebrow: "THE ISSUE MATRIX",
-      title: "Connect claims to the record.",
-      text: "Organize supporting, contradictory and unclear evidence. Every interpretation remains a human decision.",
-      add: "Create issue",
-      empty: "No issues defined",
-      description:
+      eyebrow: uiText("THE ISSUE MATRIX"),
+      title: uiText("Connect claims to the record."),
+      text: uiText(
+        "Organize supporting, contradictory and unclear evidence. Every interpretation remains a human decision.",
+      ),
+      add: uiText("Create issue"),
+      empty: uiText("No issues defined"),
+      description: uiText(
         "Create an issue, then link the evidence that supports it, contradicts it or leaves the question unresolved.",
+      ),
       icon: "matters",
     },
     tasks: {
-      eyebrow: "TEAM WORK",
-      title: "Move the review forward.",
-      text: "Track the next steps in your investigation without losing their matter context.",
-      add: "Create task",
-      empty: "No tasks yet",
-      description:
+      eyebrow: uiText("TEAM WORK"),
+      title: uiText("Move the review forward."),
+      text: uiText(
+        "Track the next steps in your investigation without losing their matter context.",
+      ),
+      add: uiText("Create task"),
+      empty: uiText("No tasks yet"),
+      description: uiText(
         "Record the next step for your matter. Task completion is separate from evidence review decisions.",
+      ),
       icon: "review",
     },
   }[kind];
@@ -226,9 +242,9 @@ export function GovernancePage({
         <div className="notice amber">
           <Icon name="lock" size={18} />
           <span>
-            These records track preservation decisions in CaseQuarry. Notice
-            delivery, acknowledgments and legal sufficiency require your
-            separate professional process.
+            {uiText(
+              "These records track preservation decisions in CaseQuarry. Notice delivery, acknowledgments and legal sufficiency require your separate professional process.",
+            )}
           </span>
         </div>
       )}
@@ -249,7 +265,7 @@ export function GovernancePage({
               key={item.id}
               onClick={() => setIssue(item)}
             >
-              <span className="eyebrow">HUMAN-DEFINED ISSUE</span>
+              <span className="eyebrow">{uiText("HUMAN-DEFINED ISSUE")}</span>
               {item.review && (
                 <Badge
                   value={item.review.stale ? "Review stale" : item.review.state}
@@ -259,12 +275,16 @@ export function GovernancePage({
               <h2>{item.title}</h2>
               <p>
                 {item.description ||
-                  "Open this issue to connect its supporting and contradictory sources."}
+                  uiText(
+                    "Open this issue to connect its supporting and contradictory sources.",
+                  )}
               </p>
               <div>
-                <small>Created {date(item.created_at)}</small>
+                <small>
+                  {uiText("Created {0}", { "0": date(item.created_at) })}
+                </small>
                 <span className="text-link">
-                  Open evidence matrix
+                  {uiText("Open evidence matrix")}
                   <Icon name="arrow" size={16} />
                 </span>
               </div>
@@ -276,11 +296,16 @@ export function GovernancePage({
           <table>
             <thead>
               <tr>
-                <th>{kind === "holds" ? "Preservation hold" : "Task"}</th>
-                <th>Status</th>
-                <th>Created</th>
-                {kind === "tasks" && <th>Assigned to</th>}
-                {kind === "tasks" && <th>Due date</th>}
+                <th>
+                  {kind === "holds"
+                    ? uiText("Preservation hold")
+                    : uiText("Task")}
+                </th>
+                {kind === "tasks" && <th>{uiText("Priority")}</th>}
+                <th>{uiText("Status")}</th>
+                <th>{uiText("Created")}</th>
+                {kind === "tasks" && <th>{uiText("Assigned to")}</th>}
+                {kind === "tasks" && <th>{uiText("Due date")}</th>}
                 <th />
               </tr>
             </thead>
@@ -292,7 +317,9 @@ export function GovernancePage({
                       <button
                         type="button"
                         className="text-link"
-                        aria-label={`Open task details: ${item.title}`}
+                        aria-label={uiText("Open task details: {0}", {
+                          "0": item.title,
+                        })}
                         onClick={() => setTaskDetailsId(item.id)}
                       >
                         <strong>{item.title}</strong>
@@ -306,6 +333,14 @@ export function GovernancePage({
                       <p className="table-description">{item.reason}</p>
                     )}
                   </td>
+                  {kind === "tasks" && (
+                    <td>
+                      <Badge
+                        value={`${item.priority} priority`}
+                        tone={taskPriorityTone(item.priority)}
+                      />
+                    </td>
+                  )}
                   <td>
                     <Badge
                       value={item.state}
@@ -322,7 +357,9 @@ export function GovernancePage({
                   {kind === "tasks" && (
                     <td>
                       <select
-                        aria-label={`Assigned to for ${item.title}`}
+                        aria-label={uiText("Assigned to for {0}", {
+                          "0": item.title,
+                        })}
                         value={item.assigned_to || ""}
                         disabled={
                           busy ||
@@ -334,13 +371,13 @@ export function GovernancePage({
                           void taskAssignee(item, event.target.value || null)
                         }
                       >
-                        <option value="">Unassigned</option>
+                        <option value="">{uiText("Unassigned")}</option>
                         {item.assigned_to &&
                           !members.data?.items.some(
                             (member) => member.user_id === item.assigned_to,
                           ) && (
                             <option value={item.assigned_to} disabled>
-                              Unavailable assignee
+                              {uiText("Unavailable assignee")}
                             </option>
                           )}
                         {members.data?.items.map((member) => (
@@ -350,7 +387,9 @@ export function GovernancePage({
                             disabled={member.active === false}
                           >
                             {member.name}
-                            {member.active === false ? " (inactive)" : ""}
+                            {member.active === false
+                              ? uiText("(inactive)")
+                              : ""}
                           </option>
                         ))}
                       </select>
@@ -373,11 +412,15 @@ export function GovernancePage({
                           <button
                             type="button"
                             className="text-link"
-                            aria-label={`Edit due date for ${item.title}`}
+                            aria-label={uiText("Edit due date for {0}", {
+                              "0": item.title,
+                            })}
                             disabled={busy || resource.loading}
                             onClick={() => setDeadlineTask(item)}
                           >
-                            {item.due_date ? "Change date" : "Set date"}
+                            {item.due_date
+                              ? uiText("Change date")
+                              : uiText("Set date")}
                           </button>
                         )}
                       </div>
@@ -391,23 +434,27 @@ export function GovernancePage({
                           disabled={!canManage}
                           onClick={() => setRelease(item)}
                         >
-                          Record release
+                          {uiText("Record release")}
                         </button>
                       )
                     ) : (
                       <select
                         className="task-state"
-                        aria-label={`Status for ${item.title}`}
+                        aria-label={uiText("Status for {0}", {
+                          "0": item.title,
+                        })}
                         disabled={busy || !canEditTask || resource.loading}
                         value={item.state}
                         onChange={(event) =>
                           void taskState(item, event.target.value)
                         }
                       >
-                        <option value="open">Open</option>
-                        <option value="in_progress">In progress</option>
-                        <option value="done">Done</option>
-                        <option value="cancelled">Cancelled</option>
+                        <option value="open">{uiText("Open (status)")}</option>
+                        <option value="in_progress">
+                          {uiText("In progress")}
+                        </option>
+                        <option value="done">{uiText("Done")}</option>
+                        <option value="cancelled">{uiText("Cancelled")}</option>
                       </select>
                     )}
                   </td>
@@ -420,7 +467,9 @@ export function GovernancePage({
       <Pagination
         text={
           resource.data?.items.length
-            ? `${number(resource.data.items.length)} records on this page`
+            ? uiText("{0} records on this page", {
+                "0": number(resource.data.items.length),
+              })
             : undefined
         }
         previous={
@@ -528,10 +577,10 @@ function CreateGovernance({
     <Modal
       title={
         kind === "holds"
-          ? "Register a preservation hold"
+          ? uiText("Register a preservation hold")
           : kind === "issues"
-            ? "Define an issue"
-            : "Create a matter task"
+            ? uiText("Define an issue")
+            : uiText("Create a matter task")
       }
       close={close}
     >
@@ -563,7 +612,7 @@ function CreateGovernance({
       >
         <ErrorBox error={error} />
         <label>
-          {kind === "holds" ? "Hold name" : "Title"}
+          {kind === "holds" ? uiText("Hold name") : uiText("Title")}
           <input
             name={kind === "holds" ? "name" : "title"}
             required
@@ -573,7 +622,7 @@ function CreateGovernance({
         {kind === "holds" ? (
           <>
             <label>
-              Preservation reason
+              {uiText("Preservation reason")}
               <textarea
                 name="reason"
                 required
@@ -585,50 +634,75 @@ function CreateGovernance({
             <div className="notice amber">
               <Icon name="lock" size={18} />
               <span>
-                This hold becomes active immediately and blocks matter archival
-                until an authorized release is recorded.
+                {uiText(
+                  "This hold becomes active immediately and blocks matter archival until an authorized release is recorded.",
+                )}
               </span>
             </div>
           </>
         ) : kind === "issues" ? (
           <label>
-            Description
+            {uiText("Description")}
             <textarea
               name="description"
               maxLength={10000}
               rows={4}
-              placeholder="Describe the allegation or question to investigate"
+              placeholder={uiText(
+                "Describe the allegation or question to investigate",
+              )}
             />
           </label>
         ) : (
           <>
             <label>
-              Task description
+              {uiText("Task description")}
               <textarea
                 name="description"
                 rows={4}
                 maxLength={10000}
-                placeholder="Describe the next step, context or expected outcome"
+                placeholder={uiText(
+                  "Describe the next step, context or expected outcome",
+                )}
               />
             </label>
             <label>
-              Due date
+              {uiText("Task priority")}
+              <select
+                name="priority"
+                aria-label={uiText("Task priority")}
+                defaultValue="normal"
+              >
+                {taskPriorities.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {label(priority)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="muted">
+              {uiText(
+                "Manual priorities help your team triage work. They do not calculate court deadlines or apply court rules.",
+              )}
+            </p>
+            <label>
+              {uiText("Due date")}
               <input
                 name="due_date"
                 type="date"
                 max="9999-12-31"
-                aria-label="Due date"
+                aria-label={uiText("Due date")}
                 aria-describedby="create-task-date-hint"
               />
               <small id="create-task-date-hint" className={deadlineStyles.hint}>
-                Optional manual deadline. Your timezone controls dashboard date
-                labels.
+                {uiText(
+                  "Optional manual deadline. Your timezone controls dashboard date labels.",
+                )}
               </small>
             </label>
             <label>
-              Assign task to
+              {uiText("Assign task to")}
               <select name="assigned_to" defaultValue="">
-                <option value="">Unassigned</option>
+                <option value="">{uiText("Unassigned")}</option>
                 {members.data?.items
                   .filter((member) => member.active !== false)
                   .map((member) => (
@@ -640,8 +714,9 @@ function CreateGovernance({
             </label>
             <ErrorBox error={members.error} />
             <p className="muted">
-              New tasks start open. Task completion remains separate from
-              evidence review decisions.
+              {uiText(
+                "New tasks start open. Task completion remains separate from evidence review decisions.",
+              )}
             </p>
           </>
         )}
@@ -652,10 +727,10 @@ function CreateGovernance({
             onClick={close}
             disabled={busy}
           >
-            Cancel
+            {uiText("Cancel")}
           </button>
           <button className="button primary" disabled={busy}>
-            {busy ? "Saving…" : "Save record"}
+            {busy ? uiText("Saving…") : uiText("Save record")}
             <Icon name="arrow" size={16} />
           </button>
         </div>
@@ -695,7 +770,7 @@ function EditTaskDeadline({
   const denied =
     error instanceof ApiError && [401, 403, 404].includes(error.status);
   return (
-    <Modal title="Update task deadline" close={close}>
+    <Modal title={uiText("Update task deadline")} close={close}>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -726,12 +801,14 @@ function EditTaskDeadline({
         {changed && (
           <div className="notice amber">
             <span>
-              This task changed while the dialog was open. Your date is
-              preserved. Current deadline:{" "}
-              {detail.data!.due_date
-                ? date(detail.data!.due_date)
-                : "No due date"}
-              .
+              {uiText(
+                "This task changed while the dialog was open. Your date is preserved. Current deadline: {0}.",
+                {
+                  "0": detail.data!.due_date
+                    ? date(detail.data!.due_date)
+                    : uiText("No due date"),
+                },
+              )}
             </span>
             <button
               type="button"
@@ -741,15 +818,15 @@ function EditTaskDeadline({
                 setError(null);
               }}
             >
-              Keep date with current version
+              {uiText("Keep date with current version")}
             </button>
           </div>
         )}
         <label>
-          Due date
+          {uiText("Due date")}
           <input
             type="date"
-            aria-label="Due date"
+            aria-label={uiText("Due date")}
             aria-describedby="edit-task-date-hint"
             value={value}
             onChange={(event) => setValue(event.target.value)}
@@ -757,8 +834,9 @@ function EditTaskDeadline({
             disabled={busy}
           />
           <small id="edit-task-date-hint" className={deadlineStyles.hint}>
-            Leave empty to remove the deadline. Your timezone controls dashboard
-            date labels.
+            {uiText(
+              "Leave empty to remove the deadline. Your timezone controls dashboard date labels.",
+            )}
           </small>
         </label>
         <div className="form-actions">
@@ -768,7 +846,7 @@ function EditTaskDeadline({
             disabled={busy}
             onClick={close}
           >
-            Cancel
+            {uiText("Cancel")}
           </button>
           <button
             type="submit"
@@ -777,7 +855,7 @@ function EditTaskDeadline({
               busy || detail.loading || !detail.data || changed || denied
             }
           >
-            {busy ? "Saving…" : "Save deadline"}
+            {busy ? uiText("Saving…") : uiText("Save deadline")}
           </button>
         </div>
       </form>
@@ -799,7 +877,7 @@ function ReleaseHold({
   const [error, setError] = useState<unknown>(null),
     [busy, setBusy] = useState(false);
   return (
-    <Modal title="Record a preservation release" close={close}>
+    <Modal title={uiText("Record a preservation release")} close={close}>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -819,12 +897,15 @@ function ReleaseHold({
         }}
       >
         <p className="muted">
-          You are recording a release for <strong>{hold.name}</strong>. The
-          audit record preserves who made this decision and why.
+          {uiText("You are recording a release for") + " "}
+          <strong>{hold.name}</strong>
+          {uiText(
+            ". The audit record preserves who made this decision and why.",
+          )}
         </p>
         <ErrorBox error={error} />
         <label>
-          Release reason
+          {uiText("Release reason")}
           <textarea
             name="reason"
             required
@@ -836,15 +917,17 @@ function ReleaseHold({
         <label className="checkbox-label">
           <input type="checkbox" required />
           <span>
-            I have purpose-specific authority from counsel to release this
-            preservation hold.
+            {uiText(
+              "I have purpose-specific authority from counsel to release this preservation hold.",
+            )}
           </span>
         </label>
         <div className="notice amber">
           <Icon name="alert" size={18} />
           <span>
-            A released hold cannot be reactivated. A new preservation decision
-            must be recorded as a new hold.
+            {uiText(
+              "A released hold cannot be reactivated. A new preservation decision must be recorded as a new hold.",
+            )}
           </span>
         </div>
         <div className="form-actions">
@@ -854,10 +937,10 @@ function ReleaseHold({
             onClick={close}
             disabled={busy}
           >
-            Cancel
+            {uiText("Cancel")}
           </button>
           <button className="button primary" disabled={busy}>
-            {busy ? "Recording…" : "Record authorized release"}
+            {busy ? uiText("Recording…") : uiText("Record authorized release")}
           </button>
         </div>
       </form>
@@ -889,7 +972,9 @@ function IssueMatrix({
     <Modal title={issue.title} close={close} wide>
       <p className="muted">
         {issue.description ||
-          "Connect the record to this issue through explicit reviewer interpretations."}
+          uiText(
+            "Connect the record to this issue through explicit reviewer interpretations.",
+          )}
       </p>
       <ErrorBox error={detail.error} retry={detail.refresh} />
       <ErrorBox error={error} />
@@ -897,7 +982,7 @@ function IssueMatrix({
         <section className="panel issue-review-control">
           <div className="section-heading">
             <div>
-              <h3>Human issue review</h3>
+              <h3>{uiText("Human issue review")}</h3>
               <Badge
                 value={
                   detail.data.review.stale
@@ -907,12 +992,15 @@ function IssueMatrix({
                 tone={detail.data.review.stale ? "amber" : undefined}
               />
             </div>
-            <span className="muted">v{detail.data.review.version}</span>
+            <span className="muted">
+              {uiText("v{0}", { "0": detail.data.review.version })}
+            </span>
           </div>
           {detail.data.review.stale && (
             <div className="notice amber">
-              Linked evidence or review changed after the last issue decision.
-              Review the current scope again.
+              {uiText(
+                "Linked evidence or review changed after the last issue decision. Review the current scope again.",
+              )}
             </div>
           )}
           {detail.data.review.reason && (
@@ -940,20 +1028,20 @@ function IssueMatrix({
               }}
             >
               <label>
-                Issue decision
+                {uiText("Issue decision")}
                 <select name="state" defaultValue="needs_review">
-                  <option value="needs_review">Needs review</option>
-                  <option value="disputed">Disputed</option>
+                  <option value="needs_review">{uiText("Needs review")}</option>
+                  <option value="disputed">{uiText("Disputed")}</option>
                   <option
                     value="reviewed"
                     disabled={!can(matter.role, "privilege")}
                   >
-                    Reviewed by attorney or matter lead
+                    {uiText("Reviewed by attorney or matter lead")}
                   </option>
                 </select>
               </label>
               <label>
-                Issue review reason
+                {uiText("Issue review reason")}
                 <textarea
                   name="reason"
                   required
@@ -963,7 +1051,7 @@ function IssueMatrix({
                 />
               </label>
               <button className="button secondary compact" disabled={busy}>
-                Record issue decision
+                {uiText("Record issue decision")}
               </button>
             </form>
           )}
@@ -973,13 +1061,15 @@ function IssueMatrix({
         <Loading />
       ) : (
         <div className="matrix-columns">
-          {[
-            ["supports", "Supporting"],
-            ["contradicts", "Contradictory"],
-            ["unclear", "Unclear"],
-          ].map(([side, text]) => (
+          {(
+            [
+              ["supports", "Supporting"],
+              ["contradicts", "Contradictory"],
+              ["unclear", "Unclear"],
+            ] as const
+          ).map(([side, text]) => (
             <section key={side} className={`matrix-column ${side}`}>
-              <h3>{text}</h3>
+              <h3>{uiText(text)}</h3>
               {detail.data?.evidence
                 .filter((item) => item.side === side)
                 .map((item) => (
@@ -996,7 +1086,9 @@ function IssueMatrix({
                   </Link>
                 ))}
               {!detail.data?.evidence.some((item) => item.side === side) && (
-                <p className="muted">No linked evidence on this page.</p>
+                <p className="muted">
+                  {uiText("No linked evidence on this page.")}
+                </p>
               )}
             </section>
           ))}
@@ -1043,36 +1135,40 @@ function IssueMatrix({
             }
           }}
         >
-          <h3>Link an evidence source</h3>
+          <h3>{uiText("Link an evidence source")}</h3>
           <div className="form-grid">
             <label>
-              Evidence ID
+              {uiText("Evidence ID")}
               <input
                 name="evidence_id"
                 required
-                placeholder="Copy the evidence ID from its source inspector"
+                placeholder={uiText(
+                  "Copy the evidence ID from its source inspector",
+                )}
               />
             </label>
             <label>
-              Relationship
+              {uiText("Relationship")}
               <select name="side">
-                <option value="supports">Supporting</option>
-                <option value="contradicts">Contradictory</option>
-                <option value="unclear">Unclear</option>
+                <option value="supports">{uiText("Supporting")}</option>
+                <option value="contradicts">{uiText("Contradictory")}</option>
+                <option value="unclear">{uiText("Unclear")}</option>
               </select>
             </label>
           </div>
           <label>
-            Interpretation note
+            {uiText("Interpretation note")}
             <textarea
               name="note"
               rows={2}
               maxLength={10000}
-              placeholder="Explain this human interpretation and any uncertainty"
+              placeholder={uiText(
+                "Explain this human interpretation and any uncertainty",
+              )}
             />
           </label>
           <button className="button primary compact" disabled={busy}>
-            {busy ? "Linking…" : "Link evidence"}
+            {busy ? uiText("Linking…") : uiText("Link evidence")}
             <Icon name="plus" size={15} />
           </button>
         </form>

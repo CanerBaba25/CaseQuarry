@@ -38,13 +38,19 @@ def my_work(
     cursor: str | None = Query(None, max_length=4096),
     due: Literal["all", "overdue", "upcoming", "no_due"] = "all",
     state: Literal["all", "open", "in_progress"] = "all",
+    q: str = Query("", max_length=200),
+    priority: Literal["all", "low", "normal", "high", "urgent"] = "all",
+    sort: Literal["due", "priority"] = "due",
     actor: Actor = Depends(current_actor),
     db: Session = Depends(get_db),
 ):
     tenant_id, user_id = actor.user.tenant_id, actor.user.id
+    q = q.strip()
+    if "\x00" in q:
+        fail(422, "WORKLIST_QUERY_INVALID", "Task title queries cannot contain NUL characters.")
     current = now()
     today, snapshot = local_today(actor.user.time_zone, current), current
-    scope = {"kind": "my-work-v3", "tenant_id": tenant_id, "user_id": user_id, "due": due, "state": state, "today": today.isoformat(), "time_zone": actor.user.time_zone, "order": "due-matter-id"}
+    scope = {"kind": "my-work-v4", "tenant_id": tenant_id, "user_id": user_id, "due": due, "state": state, "q": q, "priority": priority, "sort": sort, "today": today.isoformat(), "time_zone": actor.user.time_zone, "order": "priority-due-matter-id" if sort == "priority" else "due-matter-id"}
     after = None
     expected_revision = None
     if cursor:
@@ -56,69 +62,92 @@ def my_work(
             after = payload["after"]
             expected_revision = payload["revision"]
             if (
-                not isinstance(after, list) or len(after) != 3
-                or any(not isinstance(value, str) or not 1 <= len(value) <= 36 for value in after[1:])
-                or after[0] is not None and (not isinstance(after[0], str) or len(after[0]) != 10)
+                not isinstance(after, list) or len(after) != (4 if sort == "priority" else 3)
                 or snapshot > current
                 or not isinstance(expected_revision, int) or isinstance(expected_revision, bool) or expected_revision < 0
             ):
                 raise ValueError()
-            after = [date.fromisoformat(after[0]) if after[0] else None, after[1], after[2]]
+            rank = None
+            if sort == "priority":
+                rank, *after = after
+                if not isinstance(rank, int) or isinstance(rank, bool) or not 0 <= rank <= 4:
+                    raise ValueError()
+            if (
+                any(not isinstance(value, str) or not 1 <= len(value) <= 36 for value in after[1:])
+                or after[0] is not None and (not isinstance(after[0], str) or len(after[0]) != 10)
+            ):
+                raise ValueError()
+            after = [rank, date.fromisoformat(after[0]) if after[0] else None, after[1], after[2]]
         except (KeyError, ValueError, TypeError):
             fail(422, "WORKLIST_CURSOR_INVALID", "Start your work list again; this page cursor belongs to another account, filter or date window.")
     # Summaries and page rows use one SQL snapshot of current authorization.
     # Materialize narrow keys, dates and status; retrieve large titles only for the
-    # bounded page, in this same authorized SQL snapshot. State totals ignore the
-    # selected filters; deadline totals use the selected state, ignoring due/page.
-    visible = _visible(
+    # bounded page, in this same authorized SQL snapshot. All counts match the
+    # literal query. Status totals ignore other filters; priority totals use the
+    # selected status; deadline totals additionally use the selected priority.
+    visible_query = _visible(
         select(
-            Task.id, Task.state, Task.created_at, Task.due_date,
+            Task.id, Task.state, Task.priority, Task.created_at, Task.due_date,
+            case((Task.priority == "urgent", 0), (Task.priority == "high", 1), (Task.priority == "normal", 2), (Task.priority == "low", 3), else_=4).label("priority_rank"),
             Case.id.label("matter_id"), Member.role,
         ).select_from(Task), tenant_id, user_id,
-    ).where(Task.state.in_(("open", "in_progress"))).cte("visible_work")
+    ).where(Task.state.in_(("open", "in_progress")))
+    if q:
+        visible_query = visible_query.where(Task.title.icontains(q, autoescape=True))
+    visible = visible_query.cte("visible_work")
     upcoming_end = today + timedelta(days=7)
     overdue = visible.c.due_date < today
     upcoming = visible.c.due_date.between(today, upcoming_end)
     undated = visible.c.due_date.is_(None)
     selected_state = true() if state == "all" else visible.c.state == state
+    selected_priority = true() if priority == "all" else visible.c.priority == priority
+    selected = and_(selected_state, selected_priority)
 
     def count_where(condition, name):
         return func.coalesce(func.sum(case((condition, 1), else_=0)), 0).label(name)
 
     summary = select(
-        count_where(selected_state, "total"),
-        count_where(and_(selected_state, overdue), "overdue"),
-        count_where(and_(selected_state, upcoming), "upcoming"),
-        count_where(and_(selected_state, undated), "no_due"),
+        count_where(selected, "total"),
+        count_where(and_(selected, overdue), "overdue"),
+        count_where(and_(selected, upcoming), "upcoming"),
+        count_where(and_(selected, undated), "no_due"),
         func.count().label("state_all"),
         count_where(visible.c.state == "open", "state_open"),
         count_where(visible.c.state == "in_progress", "state_in_progress"),
+        count_where(selected_state, "priority_all"),
+        *(count_where(and_(selected_state, visible.c.priority == value), f"priority_{value}") for value in ("low", "normal", "high", "urgent")),
     ).select_from(visible).cte("work_summary")
-    page_query = select(visible).where(visible.c.created_at <= snapshot, selected_state)
+    page_query = select(visible).where(visible.c.created_at <= snapshot, selected)
     if due != "all":
         page_query = page_query.where({"overdue": overdue, "upcoming": upcoming, "no_due": undated}[due])
     if after:
-        deadline, matter_id, task_id = after
+        rank, deadline, matter_id, task_id = after
         after_id = or_(visible.c.matter_id > matter_id, and_(visible.c.matter_id == matter_id, visible.c.id > task_id))
         if deadline is None:
-            page_query = page_query.where(undated, after_id)
+            after_due = and_(undated, after_id)
         else:
-            page_query = page_query.where(or_(visible.c.due_date > deadline, undated, and_(visible.c.due_date == deadline, after_id)))
-    page = page_query.order_by(visible.c.due_date.asc().nulls_last(), visible.c.matter_id, visible.c.id).limit(limit + 1).cte("work_page")
+            after_due = or_(visible.c.due_date > deadline, undated, and_(visible.c.due_date == deadline, after_id))
+        page_query = page_query.where(or_(visible.c.priority_rank > rank, and_(visible.c.priority_rank == rank, after_due)) if sort == "priority" else after_due)
+
+    def order(columns):
+        return ([columns.priority_rank] if sort == "priority" else []) + [columns.due_date.asc().nulls_last(), columns.matter_id, columns.id]
+
+    page = page_query.order_by(*order(visible.c)).limit(limit + 1).cte("work_page")
     # A committed edit may have an earlier timestamp than page one. Capture its
     # transactional revision with the rows, rather than relying on wall-clock order.
     page_scope = summary.outerjoin(page, true()).outerjoin(Task, and_(Task.id == page.c.id, Task.case_id == page.c.matter_id, Task.tenant_id == tenant_id)).outerjoin(Case, and_(Case.id == page.c.matter_id, Case.tenant_id == tenant_id))
     statement = select(summary, page, Task.title, Task.assigned_to, Task.created_by, Task.version, Task.updated_at, Case.matter_number, Case.title.label("matter_title"), revision_expression(tenant_id, user_id, state != "all").label("order_revision")).select_from(page_scope)
-    statement = statement.order_by(page.c.due_date.asc().nulls_last(), page.c.matter_id, page.c.id)
+    statement = statement.order_by(*order(page.c))
     rows = db.execute(statement).mappings().all()
     if cursor and rows[0]["order_revision"] != expected_revision:
-        fail(409, "WORKLIST_CHANGED", "Tasks, deadlines, assignments or access changed while paging. Refresh your work list to use the current order.")
+        fail(409, "WORKLIST_CHANGED", "Tasks, titles, priorities, deadlines, assignments or access changed while paging. Refresh your work list to use the current order.")
     counts = {key: rows[0][key] for key in ("total", "overdue", "upcoming", "no_due")}
     state_counts = {key: rows[0][f"state_{key}"] for key in ("all", "open", "in_progress")}
+    priority_counts = {key: rows[0][f"priority_{key}"] for key in ("all", "low", "normal", "high", "urgent")}
     page_rows = [row for row in rows if row["id"] is not None]
     items = [
         {
-            "id": row["id"], "title": row["title"], "state": row["state"],
+            "id": row["id"], "title": row["title"], "state": row["state"], "priority": row["priority"],
             "created_at": utc(row["created_at"]).isoformat(),
             "version": row["version"], "updated_at": utc(row["updated_at"]).isoformat(),
             "due_date": row["due_date"].isoformat() if row["due_date"] else None,
@@ -131,7 +160,7 @@ def my_work(
     if len(page_rows) > limit:
         row = page_rows[limit - 1]
         next_cursor = cursor_encode(
-            {"scope": scope, "snapshot": snapshot.isoformat(), "revision": rows[0]["order_revision"], "after": [row["due_date"].isoformat() if row["due_date"] else None, row["matter_id"], row["id"]]},
+            {"scope": scope, "snapshot": snapshot.isoformat(), "revision": rows[0]["order_revision"], "after": ([row["priority_rank"]] if sort == "priority" else []) + [row["due_date"].isoformat() if row["due_date"] else None, row["matter_id"], row["id"]]},
             request.app.state.cursor_secret,
         )
-    return {"user_id": user_id, "items": items, "next_cursor": next_cursor, "limit": limit, "due": due, "state": state, "server_today": today.isoformat(), "time_zone": actor.user.time_zone, "summary": counts, "state_counts": state_counts}
+    return {"user_id": user_id, "items": items, "next_cursor": next_cursor, "limit": limit, "due": due, "state": state, "q": q, "priority": priority, "sort": sort, "server_today": today.isoformat(), "time_zone": actor.user.time_zone, "summary": counts, "state_counts": state_counts, "priority_counts": priority_counts}

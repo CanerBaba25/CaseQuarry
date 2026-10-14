@@ -1,3 +1,4 @@
+import { uiText } from "@/lib/i18n";
 import { date } from "@/lib/api";
 import { Badge } from "./ui";
 
@@ -14,14 +15,15 @@ export function TaskDeadline({
   const overdue = !complete && value < today;
   const dueToday = !complete && value === today;
   return (
-    <span title={`Due ${date(value)}`}>
+    <span title={uiText("Due {0}", { "0": date(value) })}>
       <Badge
-        value={
+        value={overdue ? "Overdue" : dueToday ? "Due today" : "Due date"}
+        text={
           overdue
-            ? `Overdue · ${date(value)}`
+            ? `${uiText("Overdue")} · ${date(value)}`
             : dueToday
-              ? "Due today"
-              : `Due ${date(value)}`
+              ? uiText("Due today")
+              : uiText("Due {0}", { "0": date(value) })
         }
         tone={overdue ? "red" : dueToday ? "amber" : "neutral"}
       />

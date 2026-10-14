@@ -1,3 +1,11 @@
+import {
+  getInterfaceLanguage,
+  getInterfaceLocale,
+  uiKnownText,
+  uiText,
+} from "./i18n";
+import { messageLabels } from "./message-labels";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -95,7 +103,7 @@ export function post<T>(
 }
 
 export function number(value: number | undefined | null): string {
-  return new Intl.NumberFormat("en-US").format(value || 0);
+  return new Intl.NumberFormat(getInterfaceLocale()).format(value || 0);
 }
 let displayTimeZone = "UTC";
 const dateFormatters = new Map<string, Intl.DateTimeFormat>();
@@ -127,17 +135,17 @@ export function date(
   time = false,
   timeZone = displayTimeZone,
 ): string {
-  if (!value) return "Date unavailable";
+  if (!value) return uiText("Date unavailable");
   const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   if (dateOnly && parsed.toISOString().slice(0, 10) !== value) return value;
   const zone = dateOnly ? "UTC" : getDisplayTimeZone(timeZone);
   const includeTime = time && !dateOnly;
-  const key = `${zone}:${includeTime}`;
+  const key = `${getInterfaceLocale()}:${zone}:${includeTime}`;
   let formatter = dateFormatters.get(key);
   if (!formatter) {
-    formatter = new Intl.DateTimeFormat("en-US", {
+    formatter = new Intl.DateTimeFormat(getInterfaceLocale(), {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -156,7 +164,7 @@ export function date(
   return formatter.format(parsed);
 }
 export function bytes(value: number): string {
-  if (value < 1024) return `${value} B`;
+  if (value < 1024) return `${number(value)} B`;
   const units = ["KB", "MB", "GB", "TB"];
   let amount = value / 1024,
     i = 0;
@@ -164,8 +172,25 @@ export function bytes(value: number): string {
     amount /= 1024;
     i += 1;
   }
-  return `${amount.toFixed(1)} ${units[i]}`;
+  return `${new Intl.NumberFormat(getInterfaceLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(amount)} ${units[i]}`;
 }
 export function label(value: string): string {
   return value.replace(/[_-]/g, " ").replace(/^./, (c) => c.toUpperCase());
+}
+// Application codes only; user names, source text and tags must stay original.
+export function uiLabel(value: string): string {
+  const priority = /^(low|normal|high|urgent) priority$/.exec(value);
+  if (priority && getInterfaceLanguage() !== "en") {
+    return `${uiText("Priority")}: ${uiKnownText(label(priority[1]))}`;
+  }
+  if (
+    /^(pdf|csv|json|zip|html|ocr|imap|imaps|msg|mbox|pst|ost|totp|mfa|api)$/i.test(
+      value,
+    )
+  )
+    return value.toUpperCase();
+  const message = Object.prototype.hasOwnProperty.call(messageLabels, value)
+    ? messageLabels[value]
+    : label(value);
+  return uiKnownText(message);
 }

@@ -1,4 +1,5 @@
 "use client";
+import { uiText, type InterfaceMessage, type MessageKey } from "@/lib/i18n";
 
 import { useState } from "react";
 import { api, date } from "@/lib/api";
@@ -29,9 +30,9 @@ export const providers = [
   },
 ] as const;
 export function providerName(id: string) {
-  if (id === "none") return "None configured";
+  if (id === "none") return uiText("Not configured");
   return id === "local"
-    ? "Local Ollama"
+    ? uiText("Local Ollama")
     : providers.find((provider) => provider.id === id)?.name || id;
 }
 type Credential = {
@@ -58,8 +59,8 @@ export default function ProviderSettings({ user }: { user: User }) {
   const [edit, setEdit] = useState<Credential | null>(null);
   const [remove, setRemove] = useState<Credential | null>(null);
   const [firmPolicy, setFirmPolicy] = useState<CloudPolicy | null>(null);
-  const [message, setMessage] = useState("");
-  function updated(text: string) {
+  const [message, setMessage] = useState<InterfaceMessage>("");
+  function updated(text: MessageKey) {
     setEdit(null);
     setRemove(null);
     setMessage(text);
@@ -69,25 +70,24 @@ export default function ProviderSettings({ user }: { user: User }) {
     <section className="panel provider-settings">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">OPTIONAL SOURCE ASSISTANT</span>
-          <h2>Your provider connections</h2>
+          <span className="eyebrow">{uiText("OPTIONAL SOURCE ASSISTANT")}</span>
+          <h2>{uiText("Your provider connections")}</h2>
         </div>
         <Icon name="lock" />
       </div>
       <p className="muted">
-        Add your own API key and model ID if you want to use an external
-        provider. Keys are encrypted on the firm server and belong to your
-        account. Saving a connection sends no vendor request.
+        {uiText(
+          "Add your own API key and model ID if you want to use an external provider. Keys are encrypted on the firm server and belong to your account. Saving a connection sends no vendor request.",
+        )}
       </p>
       <p className="field-help">
-        API access and usage charges are separate from ChatGPT, Gemini, Grok or
-        Claude chat subscriptions. Firm approval, matter consent and
-        confirmation for each job are required before selected source excerpts
-        leave the firm server.
+        {uiText(
+          "API access and usage charges are separate from ChatGPT, Gemini, Grok or Claude chat subscriptions. Firm approval, matter consent and confirmation for each job are required before selected source excerpts leave the firm server.",
+        )}
       </p>
       {message && (
         <div className="notice green" role="status">
-          {message}
+          {uiText(message)}
         </div>
       )}
       <ErrorBox error={credentials.error} retry={credentials.refresh} />
@@ -112,23 +112,23 @@ export default function ProviderSettings({ user }: { user: User }) {
                     tone={credential?.configured ? "green" : "neutral"}
                   />
                 </div>
-                <p className="muted">{provider.description}</p>
+                <p className="muted">{uiText(provider.description)}</p>
                 <dl className="metadata-list">
                   <div>
-                    <dt>Model ID</dt>
+                    <dt>{uiText("Model ID")}</dt>
                     <dd className="mono">
-                      {credential?.model || "Choose when connecting"}
+                      {credential?.model || uiText("Choose when connecting")}
                     </dd>
                   </div>
                   <div>
-                    <dt>API key</dt>
+                    <dt>{uiText("API key")}</dt>
                     <dd className="mono">
-                      {credential?.masked_key || "None saved"}
+                      {credential?.masked_key || uiText("None saved")}
                     </dd>
                   </div>
                   {credential?.updated_at && (
                     <div>
-                      <dt>Updated · UTC</dt>
+                      <dt>{uiText("Updated · UTC")}</dt>
                       <dd>{date(credential.updated_at, true)}</dd>
                     </div>
                   )}
@@ -142,14 +142,16 @@ export default function ProviderSettings({ user }: { user: User }) {
                       setEdit(credential!);
                     }}
                   >
-                    {credential?.configured ? "Edit connection" : "Add API key"}
+                    {credential?.configured
+                      ? uiText("Edit connection")
+                      : uiText("Add API key")}
                   </button>
                   {credential?.configured && (
                     <button
                       className="button ghost compact danger-link"
                       onClick={() => setRemove(credential)}
                     >
-                      Remove key
+                      {uiText("Remove key")}
                     </button>
                   )}
                 </div>
@@ -161,11 +163,15 @@ export default function ProviderSettings({ user }: { user: User }) {
       <div className="provider-firm-policy">
         <div className="section-heading">
           <div>
-            <h3>Firm external processing policy</h3>
+            <h3>{uiText("Firm external processing policy")}</h3>
             <p className="muted">
               {policy.data?.effective_enabled
-                ? `Permitted providers: ${policy.data.allowed_providers.map(providerName).join(", ")}`
-                : "External processing is disabled for the firm."}
+                ? uiText("Permitted providers: {0}", {
+                    "0": policy.data.allowed_providers
+                      .map(providerName)
+                      .join(", "),
+                  })
+                : uiText("External processing is disabled for the firm.")}
             </p>
           </div>
           {user.role === "firm_admin" && (
@@ -174,15 +180,16 @@ export default function ProviderSettings({ user }: { user: User }) {
               disabled={!policy.data || policy.loading}
               onClick={() => setFirmPolicy(policy.data!)}
             >
-              Manage firm policy
+              {uiText("Manage firm policy")}
             </button>
           )}
         </div>
         <ErrorBox error={policy.error} retry={policy.refresh} />
         {policy.data?.server_capable === false && (
           <p className="field-help">
-            The server administrator has disabled external providers on this
-            installation.
+            {uiText(
+              "The server administrator has disabled external providers on this installation.",
+            )}
           </p>
         )}
       </div>
@@ -237,7 +244,9 @@ function CredentialEditor({
   const [error, setError] = useState<unknown>(null);
   return (
     <Modal
-      title={`${providerName(credential.provider)} connection`}
+      title={uiText("{0} connection", {
+        "0": providerName(credential.provider),
+      })}
       close={close}
     >
       <form
@@ -265,14 +274,15 @@ function CredentialEditor({
       >
         <ErrorBox error={error} />
         <p className="muted">
-          Use a provider API key with access to the model you enter. Your key is
-          never returned by the server after saving.
+          {uiText(
+            "Use a provider API key with access to the model you enter. Your key is never returned by the server after saving.",
+          )}
         </p>
         <label>
-          API key{" "}
+          {uiText("API key")}{" "}
           {credential.configured && (
             <span className="optional">
-              leave blank to keep your current key
+              {uiText("leave blank to keep your current key")}
             </span>
           )}
           <input
@@ -288,7 +298,7 @@ function CredentialEditor({
           />
         </label>
         <label>
-          Model ID
+          {uiText("Model ID")}
           <input
             value={model}
             onChange={(event) => setModel(event.target.value)}
@@ -300,12 +310,13 @@ function CredentialEditor({
           />
         </label>
         <p className="field-help">
-          Copy the exact model ID from your provider account. Saving does not
-          check the key or incur a model request.
+          {uiText(
+            "Copy the exact model ID from your provider account. Saving does not check the key or incur a model request.",
+          )}
         </p>
         <div className="form-actions">
           <button className="button primary" disabled={busy}>
-            {busy ? "Saving…" : "Save connection"}
+            {busy ? uiText("Saving…") : uiText("Save connection")}
           </button>
         </div>
       </form>
@@ -325,7 +336,9 @@ function RemoveCredential({
   const [error, setError] = useState<unknown>(null);
   return (
     <Modal
-      title={`Remove ${providerName(credential.provider)} key`}
+      title={uiText("Remove {0} key", {
+        "0": providerName(credential.provider),
+      })}
       close={close}
     >
       <form
@@ -349,11 +362,12 @@ function RemoveCredential({
       >
         <ErrorBox error={error} />
         <p className="muted">
-          This removes the encrypted key from your account and blocks queued
-          requests that have not been transmitted.
+          {uiText(
+            "This removes the encrypted key from your account and blocks queued requests that have not been transmitted.",
+          )}
         </p>
         <label>
-          Reason
+          {uiText("Reason")}
           <textarea
             name="reason"
             minLength={3}
@@ -365,7 +379,7 @@ function RemoveCredential({
         </label>
         <div className="form-actions">
           <button className="button primary" disabled={busy}>
-            {busy ? "Removing…" : "Remove key"}
+            {busy ? uiText("Removing…") : uiText("Remove key")}
           </button>
         </div>
       </form>
@@ -386,7 +400,7 @@ function FirmPolicyEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   return (
-    <Modal title="Firm external processing policy" close={close}>
+    <Modal title={uiText("Firm external processing policy")} close={close}>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -414,9 +428,9 @@ function FirmPolicyEditor({
       >
         <ErrorBox error={error} />
         <p className="muted">
-          Permitted providers can receive selected evidence excerpts only after
-          matter approval and a separate confirmation for each job. Provider
-          billing and retention terms apply.
+          {uiText(
+            "Permitted providers can receive selected evidence excerpts only after matter approval and a separate confirmation for each job. Provider billing and retention terms apply.",
+          )}
         </p>
         <label className="checkbox-label">
           <input
@@ -425,7 +439,7 @@ function FirmPolicyEditor({
             disabled={busy || !policy.server_capable}
             onChange={(event) => setEnabled(event.target.checked)}
           />
-          <span>Allow external providers for this firm</span>
+          <span>{uiText("Allow external providers for this firm")}</span>
         </label>
         {providers.map((provider) => (
           <label className="checkbox-label" key={provider.id}>
@@ -445,7 +459,7 @@ function FirmPolicyEditor({
           </label>
         ))}
         <label>
-          Reason
+          {uiText("Reason")}
           <textarea
             name="reason"
             minLength={3}
@@ -463,8 +477,9 @@ function FirmPolicyEditor({
             disabled={busy}
           />
           <span>
-            I approve external processing by the selected providers under the
-            firm’s data handling policy.
+            {uiText(
+              "I approve external processing by the selected providers under the firm’s data handling policy.",
+            )}
           </span>
         </label>
         <div className="form-actions">
@@ -472,7 +487,7 @@ function FirmPolicyEditor({
             className="button primary"
             disabled={busy || (enabled && !allowed.length)}
           >
-            {busy ? "Recording policy…" : "Save firm policy"}
+            {busy ? uiText("Recording policy…") : uiText("Save firm policy")}
           </button>
         </div>
       </form>

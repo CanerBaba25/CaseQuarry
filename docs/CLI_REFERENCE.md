@@ -48,6 +48,8 @@ Additional authenticated workflow groups cover sources/custodians/members, tasks
 
 ```sh
 uv run cq task create --case CASE_ID --body private-task.json
+uv run cq --output table --limit 20 task worklist --priority urgent --sort priority
+uv run cq --output json task worklist --query "attachment review" --state in_progress
 uv run cq assignment claim ASSIGNMENT_ID --case CASE_ID --body private-transition.json
 uv run cq --dry-run hold release HOLD_ID --case CASE_ID --body private-reason.json
 uv run cq api request GET /auth/sessions

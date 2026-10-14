@@ -1,7 +1,8 @@
 "use client";
+import { uiText } from "@/lib/i18n";
 
 import { useState } from "react";
-import { api, label, post } from "@/lib/api";
+import { api, uiLabel as label, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import type { Matter, User } from "@/lib/types";
@@ -35,10 +36,11 @@ export function MatterTeam({ matter, user }: { matter: Matter; user: User }) {
     <section className="panel team-panel">
       <div className="section-heading">
         <div>
-          <h2>Matter team</h2>
+          <h2>{uiText("Matter team")}</h2>
           <p className="muted">
-            Explicit matter access. Firm administration does not grant evidence
-            access.
+            {uiText(
+              "Explicit matter access. Firm administration does not grant evidence access.",
+            )}
           </p>
         </div>
         <button
@@ -47,7 +49,7 @@ export function MatterTeam({ matter, user }: { matter: Matter; user: User }) {
           disabled={!manage}
         >
           <Icon name="plus" size={15} />
-          Grant matter access
+          {uiText("Grant matter access")}
         </button>
       </div>
       <ErrorBox error={members.error} retry={members.refresh} />
@@ -58,8 +60,8 @@ export function MatterTeam({ matter, user }: { matter: Matter; user: User }) {
           <table>
             <thead>
               <tr>
-                <th>Team member</th>
-                <th>Matter role</th>
+                <th>{uiText("Team member")}</th>
+                <th>{uiText("Matter role")}</th>
                 <th />
               </tr>
             </thead>
@@ -69,7 +71,9 @@ export function MatterTeam({ matter, user }: { matter: Matter; user: User }) {
                   <td>
                     <strong>
                       {member.name}
-                      {member.user_id === user.id && <small> · You</small>}
+                      {member.user_id === user.id && (
+                        <small> {" " + uiText("· You")}</small>
+                      )}
                     </strong>
                     <small className="block">{member.email}</small>
                   </td>
@@ -82,7 +86,7 @@ export function MatterTeam({ matter, user }: { matter: Matter; user: User }) {
                       disabled={!manage}
                       onClick={() => setRemove(member)}
                     >
-                      Remove access
+                      {uiText("Remove access")}
                     </button>
                   </td>
                 </tr>
@@ -103,7 +107,10 @@ export function MatterTeam({ matter, user }: { matter: Matter; user: User }) {
         />
       )}
       {remove && (
-        <Modal title="Remove matter access" close={() => setRemove(null)}>
+        <Modal
+          title={uiText("Remove matter access")}
+          close={() => setRemove(null)}
+        >
           <RemoveMember
             matter={matter}
             member={remove}
@@ -167,19 +174,22 @@ function AddMember({
     }
   }
   return (
-    <Modal title="Grant matter access" close={close}>
+    <Modal title={uiText("Grant matter access")} close={close}>
       <form onSubmit={submit}>
         <p className="muted">
-          Grant access only to the intended person. The server checks account
-          tenancy and records the role grant.
+          {uiText(
+            "Grant access only to the intended person. The server checks account tenancy and records the role grant.",
+          )}
         </p>
         <ErrorBox error={error} />
         {created && (
           <div className="notice amber">
             <Icon name="people" size={17} />
             <span>
-              Local account created for {created.email}. Retry to finish
-              granting access to this matter.
+              {uiText(
+                "Local account created for {0}. Retry to finish granting access to this matter.",
+                { "0": created.email },
+              )}
             </span>
           </div>
         )}
@@ -190,14 +200,14 @@ function AddMember({
               className={`button secondary compact ${!newAccount ? "chosen" : ""}`}
               onClick={() => setNewAccount(false)}
             >
-              Existing account
+              {uiText("Existing account")}
             </button>
             <button
               type="button"
               className={`button secondary compact ${newAccount ? "chosen" : ""}`}
               onClick={() => setNewAccount(true)}
             >
-              Create local account
+              {uiText("Create local account")}
             </button>
           </div>
         )}
@@ -206,7 +216,7 @@ function AddMember({
             {!created && (
               <>
                 <label>
-                  Name
+                  {uiText("Name")}
                   <input
                     name="name"
                     required
@@ -215,7 +225,7 @@ function AddMember({
                   />
                 </label>
                 <label>
-                  Email
+                  {uiText("Email")}
                   <input
                     name="email"
                     type="email"
@@ -225,7 +235,7 @@ function AddMember({
                   />
                 </label>
                 <label>
-                  Initial password
+                  {uiText("Initial password")}
                   <input
                     name="password"
                     type="password"
@@ -240,17 +250,17 @@ function AddMember({
             <div className="notice subtle">
               <Icon name="lock" size={17} />
               <span>
-                This creates a local account. Share its initial credentials
-                through your firm's approved channel. No invitation email is
-                sent.
+                {uiText(
+                  "This creates a local account. Share its initial credentials through your firm's approved channel. No invitation email is sent.",
+                )}
               </span>
             </div>
           </>
         ) : users.data ? (
           <label>
-            Existing firm account
+            {uiText("Existing firm account")}
             <select name="user_id" required>
-              <option value="">Select an account</option>
+              <option value="">{uiText("Select an account")}</option>
               {users.data.items.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.name} · {account.email}
@@ -260,16 +270,18 @@ function AddMember({
           </label>
         ) : (
           <label>
-            Existing account ID
+            {uiText("Existing account ID")}
             <input
               name="user_id"
               required
-              placeholder="Account ID supplied by your firm administrator"
+              placeholder={uiText(
+                "Account ID supplied by your firm administrator",
+              )}
             />
           </label>
         )}
         <label>
-          Matter access role
+          {uiText("Matter access role")}
           <select name="role" defaultValue="reviewer">
             {roles.map((role) => (
               <option key={role} value={role}>
@@ -285,10 +297,10 @@ function AddMember({
             disabled={busy}
             onClick={close}
           >
-            Cancel
+            {uiText("Cancel")}
           </button>
           <button className="button primary" disabled={busy}>
-            {busy ? "Granting access…" : "Grant matter access"}
+            {busy ? uiText("Granting access…") : uiText("Grant matter access")}
             <Icon name="arrow" size={16} />
           </button>
         </div>
@@ -329,12 +341,15 @@ function RemoveMember({
       }}
     >
       <p className="muted">
-        Remove access for <strong>{member.name}</strong> ({member.email}) to
-        this matter. Their other authorized matters are unaffected.
+        {uiText("Remove access for") + " "}
+        <strong>{member.name}</strong> ({member.email}
+        {uiText(
+          ") to this matter. Their other authorized matters are unaffected.",
+        )}
       </p>
       <ErrorBox error={error} />
       <label>
-        Reason
+        {uiText("Reason")}
         <textarea
           name="reason"
           required
@@ -346,12 +361,16 @@ function RemoveMember({
       <label className="checkbox-label">
         <input type="checkbox" required />
         <span>
-          I am authorized to remove this person's access to the matter.
+          {uiText(
+            "I am authorized to remove this person's access to the matter.",
+          )}
         </span>
       </label>
       <div className="form-actions">
         <button className="button primary" disabled={busy}>
-          {busy ? "Removing access…" : "Remove authorized access"}
+          {busy
+            ? uiText("Removing access…")
+            : uiText("Remove authorized access")}
         </button>
       </div>
     </form>

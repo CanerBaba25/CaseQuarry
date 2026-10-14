@@ -49,7 +49,7 @@ def setup(body: SetupInput, request: Request, response: Response, db=Depends(get
     tenant = Tenant(name=body.firm_name.strip())
     db.add(tenant)
     db.flush()
-    user = User(tenant_id=tenant.id, email=body.email.strip().lower(), name=body.name.strip(), password_hash=PASSWORDS.hash(body.password), role="firm_admin")
+    user = User(tenant_id=tenant.id, email=body.email.strip().lower(), name=body.name.strip(), password_hash=PASSWORDS.hash(body.password), role="firm_admin", language=body.language)
     db.add(user)
     db.flush()
     _, token, csrf = create_session(db, user, request.app.state.settings.session_ttl_seconds)

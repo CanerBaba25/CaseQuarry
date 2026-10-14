@@ -1,8 +1,9 @@
 "use client";
+import { uiText } from "@/lib/i18n";
 
 import Link from "next/link";
 import { useState } from "react";
-import { date, label, number, post } from "@/lib/api";
+import { date, uiLabel as label, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import { evidenceUrl } from "@/lib/search-scope";
@@ -49,9 +50,11 @@ export default function ReviewQueue({
   return (
     <>
       <PageHeading
-        eyebrow="HUMAN REVIEW WORKFLOW"
-        title="A clear next step."
-        text="Claim a fixed evidence snapshot, record human decisions and finish only when every allocated item has been reviewed."
+        eyebrow={uiText("HUMAN REVIEW WORKFLOW")}
+        title={uiText("A clear next step.")}
+        text={uiText(
+          "Claim a fixed evidence snapshot, record human decisions and finish only when every allocated item has been reviewed.",
+        )}
       >
         <Link
           className="button secondary"
@@ -59,7 +62,7 @@ export default function ReviewQueue({
             review_status: ["unreviewed", "needs_review"],
           })}
         >
-          Open all pending evidence
+          {uiText("Open all pending evidence")}
         </Link>
         <button
           className="button primary"
@@ -67,7 +70,7 @@ export default function ReviewQueue({
           onClick={() => setCreate(true)}
         >
           <Icon name="plus" size={17} />
-          Create assignment
+          {uiText("Create assignment")}
         </button>
       </PageHeading>
       <div className="queue-toolbar panel">
@@ -80,7 +83,7 @@ export default function ReviewQueue({
               resetPages();
             }}
           />
-          <span>Assigned to me</span>
+          <span>{uiText("Assigned to me")}</span>
         </label>
         <label className="checkbox-label">
           <input
@@ -91,21 +94,23 @@ export default function ReviewQueue({
               resetPages();
             }}
           />
-          <span>Open assignments only</span>
+          <span>{uiText("Open assignments only")}</span>
         </label>
         <button className="button secondary compact" onClick={rows.refresh}>
-          Refresh queue
+          {uiText("Refresh queue")}
         </button>
       </div>
       <ErrorBox error={rows.error} retry={rows.refresh} />
       {rows.loading ? (
-        <Loading text="Opening allocated review snapshots…" />
+        <Loading text={uiText("Opening allocated review snapshots…")} />
       ) : !rows.data?.items.length ? (
         <div className="panel">
           <Empty
             icon="review"
-            title="No assignments in this scope"
-            text="A matter lead or review manager can allocate selected evidence or an existing review set. Open pending evidence to inspect the unallocated backlog."
+            title={uiText("No assignments in this scope")}
+            text={uiText(
+              "A matter lead or review manager can allocate selected evidence or an existing review set. Open pending evidence to inspect the unallocated backlog.",
+            )}
           />
         </div>
       ) : (
@@ -127,13 +132,15 @@ export default function ReviewQueue({
                         : "amber"
                   }
                 />
-                <span className="muted">v{row.version}</span>
+                <span className="muted">
+                  {uiText("v{0}", { "0": row.version })}
+                </span>
               </div>
               <h2>{row.title}</h2>
               <p>
                 {row.assignee
-                  ? `${row.assignee.name}${row.assignee.active ? "" : " · account deactivated"}`
-                  : "Available to claim"}
+                  ? `${row.assignee.name}${row.assignee.active ? "" : ` · ${uiText("Deactivated")}`}`
+                  : uiText("Available to claim")}
               </p>
               <div className="review-progress-track">
                 <span
@@ -144,8 +151,10 @@ export default function ReviewQueue({
               </div>
               <div className="assignment-card-bottom">
                 <span>
-                  {number(row.counts.reviewed)} of {number(row.counts.total)}{" "}
-                  human reviewed
+                  {uiText("{0} of {1} human reviewed", {
+                    "0": number(row.counts.reviewed),
+                    "1": number(row.counts.total),
+                  })}
                 </span>
                 <Icon name="arrow" size={17} />
               </div>
@@ -214,7 +223,7 @@ export function AssignmentCreateModal({
     [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null);
   return (
-    <Modal title="Create a review assignment" close={close}>
+    <Modal title={uiText("Create a review assignment")} close={close}>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -246,29 +255,31 @@ export function AssignmentCreateModal({
       >
         <ErrorBox error={error || members.error || sets.error} />
         <label>
-          Assignment title
+          {uiText("Assignment title")}
           <input name="title" required maxLength={200} />
         </label>
         <label>
-          Snapshot scope
+          {uiText("Snapshot scope")}
           <select
             value={scope}
             onChange={(event) => setScope(event.target.value)}
           >
-            <option value="set">Existing review set</option>
+            <option value="set">{uiText("Existing review set")}</option>
             <option value="selection">
               {evidenceIds
-                ? `${number(evidenceIds.length)} selected evidence items`
-                : "Explicit evidence IDs"}
+                ? uiText("{0} selected evidence items", {
+                    "0": number(evidenceIds.length),
+                  })
+                : uiText("Explicit evidence IDs")}
             </option>
           </select>
         </label>
         {scope === "set" ? (
           <label>
-            Review set
+            {uiText("Review set")}
             <select name="review_set_id" required defaultValue="">
               <option value="" disabled>
-                Choose a saved snapshot
+                {uiText("Choose a saved snapshot")}
               </option>
               {sets.data?.items.map((set) => (
                 <option
@@ -276,32 +287,38 @@ export function AssignmentCreateModal({
                   value={set.id}
                   disabled={set.count > 500 || !set.count}
                 >
-                  {set.name} · {number(set.count)} items
-                  {set.count > 500 ? " · exceeds limit" : ""}
+                  {uiText("{0} · {1} items{2}", {
+                    "0": set.name,
+                    "1": number(set.count),
+                    "2": set.count > 500 ? ` ${uiText("· exceeds limit")}` : "",
+                  })}
                 </option>
               ))}
             </select>
           </label>
         ) : evidenceIds ? (
           <p className="field-help">
-            {number(evidenceIds.length)} explicit items from your current page
-            selection.
+            {uiText("{0} explicit items from your current page selection.", {
+              "0": number(evidenceIds.length),
+            })}
           </p>
         ) : (
           <label>
-            Evidence IDs
+            {uiText("Evidence IDs")}
             <textarea
               name="evidence_ids"
               required
               rows={4}
-              placeholder="One ID per line, or comma separated"
+              placeholder={uiText("One ID per line, or comma separated")}
             />
           </label>
         )}
         <label>
-          Assigned reviewer
+          {uiText("Assigned reviewer")}
           <select name="assignee_id" defaultValue="">
-            <option value="">Unassigned · eligible reviewers may claim</option>
+            <option value="">
+              {uiText("Unassigned · eligible reviewers may claim")}
+            </option>
             {members.data?.items
               .filter((member) => can(member.role, "review"))
               .map((member) => (
@@ -312,7 +329,7 @@ export function AssignmentCreateModal({
           </select>
         </label>
         <label>
-          Reason
+          {uiText("Reason")}
           <textarea
             name="reason"
             required
@@ -324,17 +341,17 @@ export function AssignmentCreateModal({
         <div className="notice subtle">
           <Icon name="lock" size={17} />
           <span>
-            Assignments reserve up to 500 explicit evidence items. An item
-            cannot belong to another open assignment. Counts track current human
-            review decisions; privilege review remains separate.
+            {uiText(
+              "Assignments reserve up to 500 explicit evidence items. An item cannot belong to another open assignment. Counts track current human review decisions; privilege review remains separate.",
+            )}
           </span>
         </div>
         <div className="form-actions">
           <button type="button" className="button secondary" onClick={close}>
-            Cancel
+            {uiText("Cancel")}
           </button>
           <button className="button primary" disabled={busy}>
-            {busy ? "Allocating…" : "Create assignment"}
+            {busy ? uiText("Allocating…") : uiText("Create assignment")}
           </button>
         </div>
       </form>
@@ -375,7 +392,7 @@ function AssignmentWorkspace({
     changed();
   };
   return (
-    <Modal title={row?.title || "Review assignment"} close={close} wide>
+    <Modal title={row?.title || uiText("Review assignment")} close={close} wide>
       <ErrorBox error={detail.error || items.error} retry={refresh} />
       {detail.loading || items.loading ? (
         <Loading />
@@ -385,12 +402,16 @@ function AssignmentWorkspace({
             <div className="assignment-detail-heading">
               <div>
                 <Badge value={row.state} />
-                <span className="muted"> Snapshot · v{row.version}</span>
-                <h3>{row.assignee?.name || "Available to claim"}</h3>
+                <span className="muted">
+                  {uiText("Snapshot · v{0}", { "0": row.version })}
+                </span>
+                <h3>{row.assignee?.name || uiText("Available to claim")}</h3>
                 <p className="muted">
-                  {number(row.counts.reviewed)} human reviewed ·{" "}
-                  {number(row.counts.pending)} pending ·{" "}
-                  {number(row.counts.total)} allocated
+                  {uiText("{0} human reviewed · {1} pending · {2} allocated", {
+                    "0": number(row.counts.reviewed),
+                    "1": number(row.counts.pending),
+                    "2": number(row.counts.total),
+                  })}
                 </p>
               </div>
               <div className="button-row">
@@ -402,7 +423,7 @@ function AssignmentWorkspace({
                           className="button primary compact"
                           onClick={() => setAction("claim")}
                         >
-                          Claim assignment
+                          {uiText("Claim assignment")}
                         </button>
                       )}
                     {row.state === "assigned" && (owner || manager) && (
@@ -411,14 +432,14 @@ function AssignmentWorkspace({
                           className="button secondary compact"
                           onClick={() => setAction("release")}
                         >
-                          Release allocation
+                          {uiText("Release allocation")}
                         </button>
                         <button
                           className="button primary compact"
                           disabled={row.counts.pending > 0}
                           onClick={() => setAction("complete")}
                         >
-                          Complete assignment
+                          {uiText("Complete assignment")}
                         </button>
                       </>
                     )}
@@ -427,7 +448,7 @@ function AssignmentWorkspace({
                         className="button ghost compact danger-link"
                         onClick={() => setAction("cancel")}
                       >
-                        Cancel assignment
+                        {uiText("Cancel assignment")}
                       </button>
                     )}
                   </>
@@ -435,7 +456,10 @@ function AssignmentWorkspace({
               </div>
             </div>
             <p className="field-help">
-              Created {date(row.created_at, true)} · {row.reason}
+              {uiText("Created {0} · {1}", {
+                "0": date(row.created_at, true),
+                "1": row.reason,
+              })}
             </p>
             <div
               className={`assignment-workbench ${evidence ? "has-inspector" : ""}`}
@@ -525,8 +549,17 @@ function AssignmentAction({
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null);
+  const actionTitle = uiText(
+    action === "claim"
+      ? "Claim assignment"
+      : action === "complete"
+        ? "Complete assignment"
+        : action === "release"
+          ? "Release allocation"
+          : "Cancel assignment",
+  );
   return (
-    <Modal title={`${label(action)} assignment`} close={close}>
+    <Modal title={actionTitle} close={close}>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -548,24 +581,30 @@ function AssignmentAction({
       >
         <p className="muted">
           {action === "claim"
-            ? "Allocate this fixed snapshot to your review queue."
+            ? uiText("Allocate this fixed snapshot to your review queue.")
             : action === "complete"
-              ? "Confirm the allocated items have received human review. This does not authorize export or determine privilege."
+              ? uiText(
+                  "Confirm the allocated items have received human review. This does not authorize export or determine privilege.",
+                )
               : action === "release"
-                ? "Return this allocation to the unassigned queue. Existing review decisions are preserved."
-                : "Close this allocation and release its reservation. Existing review decisions and assignment history are preserved."}
+                ? uiText(
+                    "Return this allocation to the unassigned queue. Existing review decisions are preserved.",
+                  )
+                : uiText(
+                    "Close this allocation and release its reservation. Existing review decisions and assignment history are preserved.",
+                  )}
         </p>
         <ErrorBox error={error} />
         <label>
-          Reason
+          {uiText("Reason")}
           <input name="reason" required minLength={3} maxLength={2000} />
         </label>
         <div className="form-actions">
           <button type="button" className="button secondary" onClick={close}>
-            Back
+            {uiText("Back")}
           </button>
           <button className="button primary" disabled={busy}>
-            {busy ? "Saving…" : `${label(action)} assignment`}
+            {busy ? uiText("Saving…") : actionTitle}
           </button>
         </div>
       </form>

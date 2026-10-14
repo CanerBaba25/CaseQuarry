@@ -1,4 +1,5 @@
 "use client";
+import { uiText, type MessageKey } from "@/lib/i18n";
 
 import { useEffect, useId, useRef, useState } from "react";
 import { number } from "@/lib/api";
@@ -27,7 +28,7 @@ export default function CommandPalette({
   navigate,
 }: {
   caseId: string | null;
-  navigation: string[][];
+  navigation: [string, MessageKey, string][];
   administrator: boolean;
   close: () => void;
   navigate: (path: string) => void;
@@ -56,39 +57,39 @@ export default function CommandPalette({
   const searching = query.trim() !== search || matters.loading;
   const pages: Action[] = [
     {
-      title: "All matters",
+      title: uiText("All matters"),
       path: "/app",
       icon: "matters",
-      detail: "Firm workspace",
+      detail: uiText("Firm workspace"),
     },
     {
-      title: "Create a matter",
+      title: uiText("Create a matter"),
       path: "/app/matters/new",
       icon: "plus",
-      detail: "Start an investigation",
+      detail: uiText("Start an investigation"),
     },
     {
-      title: "Account security",
+      title: uiText("Account security"),
       path: "/app/settings",
       icon: "shield",
-      detail: "Sessions, password and connections",
+      detail: uiText("Sessions, password and connections"),
     },
     ...(administrator
       ? [
           {
-            title: "Firm administration",
+            title: uiText("Firm administration"),
             path: "/app/admin",
             icon: "people",
-            detail: "Manage firm accounts and policy",
+            detail: uiText("Manage firm accounts and policy"),
           },
         ]
       : []),
     ...(caseId
       ? navigation.map(([key, title, icon]) => ({
-          title,
+          title: uiText(title),
           path: `/app/matters/${caseId}/${key}`,
           icon,
-          detail: "Current matter",
+          detail: uiText("Current matter"),
         }))
       : []),
   ].filter((item) =>
@@ -140,7 +141,7 @@ export default function CommandPalette({
     );
   }
   return (
-    <Modal title="Quick navigation" close={close}>
+    <Modal title={uiText("Quick navigation")} close={close}>
       <div className="command-palette">
         <label className="palette-search">
           <Icon name="search" />
@@ -149,8 +150,8 @@ export default function CommandPalette({
             value={query}
             maxLength={200}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search matter title, number, client or page…"
-            aria-label="Search navigation"
+            placeholder={uiText("Search matter title, number, client or page…")}
+            aria-label={uiText("Search navigation")}
             role="combobox"
             aria-autocomplete="list"
             aria-expanded="true"
@@ -180,7 +181,8 @@ export default function CommandPalette({
         </label>
         <div className="palette-scope">
           <span>
-            <Icon name="lock" size={13} /> Only matters you can access
+            <Icon name="lock" size={13} />{" "}
+            {" " + uiText("Only matters you can access")}
           </span>
           <label className="checkbox-label">
             <input
@@ -191,33 +193,37 @@ export default function CommandPalette({
                 setCursors([null]);
               }}
             />{" "}
-            Include archived matters
+            {uiText("Include archived matters")}
           </label>
         </div>
         <div
           className="palette-results"
           id={`${id}-results`}
           role="listbox"
-          aria-label="Navigation results"
+          aria-label={uiText("Navigation results")}
           aria-busy={searching}
         >
           {Boolean(pages.length) && (
             <div className="palette-group-label" role="presentation">
-              Pages & commands
+              {uiText("Pages & commands")}
             </div>
           )}
           {pages.map(option)}
           <div className="palette-group-label" role="presentation">
-            Matters{" "}
+            {uiText("Matters")}{" "}
             <span>
               {!searching && matters.data ? number(matters.data.total) : ""}
             </span>
           </div>
           {found.map((item, index) => option(item, pages.length + index))}
-          {searching && <Loading text="Searching authorized matters…" />}
+          {searching && (
+            <Loading text={uiText("Searching authorized matters…")} />
+          )}
           {!searching && !matters.error && !found.length && (
             <p className="palette-empty">
-              No matching matters. Try a title, client or matter number.
+              {uiText(
+                "No matching matters. Try a title, client or matter number.",
+              )}
             </p>
           )}
         </div>
@@ -230,9 +236,9 @@ export default function CommandPalette({
               disabled={cursors.length === 1 || searching}
               onClick={() => setCursors((current) => current.slice(0, -1))}
             >
-              Previous matters
+              {uiText("Previous matters")}
             </button>
-            <span>{found.length} on this page</span>
+            <span>{uiText("{0} on this page", { "0": found.length })}</span>
             <button
               type="button"
               className="button secondary compact"
@@ -245,20 +251,20 @@ export default function CommandPalette({
                   ]);
               }}
             >
-              Next matters
+              {uiText("Next matters")}
             </button>
           </div>
         )}
         <div className="palette-keyboard">
           <span>
             <kbd>↑</kbd>
-            <kbd>↓</kbd> Navigate
+            <kbd>↓</kbd> {" " + uiText("Navigate")}
           </span>
           <span>
-            <kbd>Enter</kbd> Open
+            <kbd>Enter</kbd> {" " + uiText("Open")}
           </span>
           <span>
-            <kbd>Esc</kbd> Close
+            <kbd>Esc</kbd> {" " + uiText("Close")}
           </span>
         </div>
       </div>

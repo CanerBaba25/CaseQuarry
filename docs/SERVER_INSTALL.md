@@ -56,6 +56,8 @@ For an upgrade, stop services, take that coordinated backup, install the new ver
 
 The 0.3 → 0.4 upgrade applies `0005_task_due_dates` and `0006_user_time_zones` after `0004_firm_sync_providers`. Existing tasks keep an unset due date, and existing accounts start with the UTC time zone. These are calendar/display preferences, not computed legal deadlines. The installer applies both migrations before services start. In a source installation, run `uv run python -m casequarry.database migrate` with the same private `.env` after the verified backup. Compare retained row IDs, original hashes and audit chains and check the schema status before restarting API/worker.
 
+The 0.5 → 0.6 upgrade applies `0008_task_priorities` and `0009_user_language` after `0007_task_versions`. Existing tasks receive normal priority without changing their versions, timestamps or audit events; existing accounts start in English. The packaged installer applies these migrations before services start. Source installations use the migration command above. Reload connected clients afterward and restart older My work pagination from the first page.
+
 ## Compose deployment
 
 The source distribution includes PostgreSQL/API/worker/web Compose configuration. `tasks.py init` generates private secrets, and the migration service runs before the API. PostgreSQL is unpublished on an internal network; only API/worker gain outbound connectivity for explicitly authorized vendor requests. The optional HTTPS overlay is:

@@ -1,7 +1,8 @@
 "use client";
+import { uiText } from "@/lib/i18n";
 
 import { useResource } from "@/lib/hooks";
-import { label } from "@/lib/api";
+import { uiLabel as label } from "@/lib/api";
 import { Badge, ErrorBox, Icon, Loading } from "./ui";
 
 type Adapter = {
@@ -28,14 +29,14 @@ export default function ImportCapabilities({ caseId }: { caseId: string }) {
       <summary>
         <span>
           <Icon name="file" size={19} />
-          <strong>Import capabilities on this installation</strong>
+          <strong>{uiText("Import capabilities on this installation")}</strong>
         </span>
         <Icon name="chevron" size={16} />
       </summary>
       <p className="muted">
-        Format readiness reflects the installed parsers and optional local
-        tools. Unsupported and partial records remain preserved and visible in
-        import reports.
+        {uiText(
+          "Format readiness reflects the installed parsers and optional local tools. Unsupported and partial records remain preserved and visible in import reports.",
+        )}
       </p>
       <ErrorBox error={resource.error} retry={resource.refresh} />
       {resource.loading ? (
@@ -46,10 +47,10 @@ export default function ImportCapabilities({ caseId }: { caseId: string }) {
             <table>
               <thead>
                 <tr>
-                  <th>Formats</th>
-                  <th>Readiness</th>
-                  <th>Engine</th>
-                  <th>Handling and limits</th>
+                  <th>{uiText("Formats")}</th>
+                  <th>{uiText("Readiness")}</th>
+                  <th>{uiText("Engine")}</th>
+                  <th>{uiText("Handling and limits")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -68,7 +69,7 @@ export default function ImportCapabilities({ caseId }: { caseId: string }) {
                         }
                       />
                     </td>
-                    <td>{adapter.engine || "Not configured"}</td>
+                    <td>{adapter.engine || uiText("Not configured")}</td>
                     <td>
                       {adapter.detail}
                       {adapter.limits && (
@@ -89,26 +90,28 @@ export default function ImportCapabilities({ caseId }: { caseId: string }) {
               </tbody>
             </table>
           </div>
-          <h3>Authorized collection connectors</h3>
+          <h3>{uiText("Authorized collection connectors")}</h3>
           <div className="connector-list">
             {resource.data?.connectors.map((connector) => (
               <div key={connector.id}>
                 <strong>{label(connector.id)}</strong>
                 <Badge value={connector.status} />
                 <p>
-                  {connector.read_only ? "Read-only collection" : "Collection"}{" "}
+                  {connector.read_only
+                    ? uiText("Read-only collection")
+                    : uiText("Collection")}{" "}
                   · {connector.mode.toUpperCase()} ·{" "}
                   {connector.requires_explicit_scope
-                    ? "Explicit authorized scope required"
-                    : "See collection policy"}
+                    ? uiText("Explicit authorized scope required")
+                    : uiText("See collection policy")}
                 </p>
               </div>
             ))}
           </div>
           <p className="field-help">
-            These acquisition connectors run through the local command line. Web
-            uploads use the preserved files you explicitly select; no mailbox
-            connection or external consent is initiated here.
+            {uiText(
+              "These acquisition connectors run through the local command line. Web uploads use the preserved files you explicitly select; no mailbox connection or external consent is initiated here.",
+            )}
           </p>
         </>
       )}

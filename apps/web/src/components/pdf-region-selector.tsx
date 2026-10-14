@@ -1,4 +1,5 @@
 "use client";
+import { uiText } from "@/lib/i18n";
 
 import { useEffect, useRef, useState } from "react";
 import { ErrorBox, Icon, Loading } from "./ui";
@@ -115,18 +116,18 @@ export default function PdfRegionSelector({
     <section className="pdf-region-selector">
       <div className="section-heading">
         <div>
-          <h3>Verified source-page preview</h3>
+          <h3>{uiText("Verified source-page preview")}</h3>
           <p className="field-help">
-            Drag a rectangle over this raster page, or enter exact normalized
-            coordinates below. Original PDF objects and scripts are not
-            embedded.
+            {uiText(
+              "Drag a rectangle over this raster page, or enter exact normalized coordinates below. Original PDF objects and scripts are not embedded.",
+            )}
           </p>
         </div>
         <label className="inline-select">
-          Page
+          {uiText("Page")}
           <input
             type="number"
-            aria-label="PDF preview page"
+            aria-label={uiText("PDF preview page")}
             min={1}
             max={current?.pages || 50}
             value={page}
@@ -140,17 +141,17 @@ export default function PdfRegionSelector({
                 setPage(value);
             }}
           />
-          <span>of {current?.pages || "—"}</span>
+          <span>{uiText("of {0}", { "0": current?.pages || "—" })}</span>
         </label>
       </div>
       <ErrorBox error={error} />
       {!current && !error ? (
-        <Loading text="Rendering and verifying source page…" />
+        <Loading text={uiText("Rendering and verifying source page…")} />
       ) : (
         current && (
           <div
             className="pdf-region-surface"
-            aria-label="PDF region selection surface"
+            aria-label={uiText("PDF region selection surface")}
             onPointerDown={(event) => {
               if (!image.current || regions.length >= 200 || event.button !== 0)
                 return;
@@ -186,7 +187,10 @@ export default function PdfRegionSelector({
             <img
               ref={image}
               src={current.url}
-              alt={`Verified raster of source PDF page ${page}; use the coordinate form to create redactions with a keyboard.`}
+              alt={uiText(
+                "Verified raster of source PDF page {0}; use the coordinate form to create redactions with a keyboard.",
+                { "0": page },
+              )}
               draggable={false}
             />
             {[
@@ -208,9 +212,11 @@ export default function PdfRegionSelector({
         )
       )}
       <p className="field-help">
-        <Icon name="lock" size={13} /> Coordinates use the exact source page
-        shown above. Generated sanitized copies still require a distinct human
-        approval.
+        <Icon name="lock" size={13} />{" "}
+        {" " +
+          uiText(
+            "Coordinates use the exact source page shown above. Generated sanitized copies still require a distinct human approval.",
+          )}
       </p>
     </section>
   );

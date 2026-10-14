@@ -6,6 +6,7 @@ export type User = {
   role: string;
   csrf_token: string;
   time_zone?: string;
+  language?: string;
   active?: boolean;
   mfa_enabled?: boolean;
 };

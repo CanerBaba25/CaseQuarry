@@ -1,4 +1,5 @@
 "use client";
+import { uiMessage, uiText, type InterfaceMessage } from "@/lib/i18n";
 
 import { useEffect, useId, useState } from "react";
 import { api, date, timeZoneSupported } from "@/lib/api";
@@ -21,7 +22,7 @@ export default function TimeZoneSettings({
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<InterfaceMessage>("");
   const [now, setNow] = useState<string | null>(null);
   const id = useId();
   useEffect(() => {
@@ -54,7 +55,11 @@ export default function TimeZoneSettings({
     setSelected(deviceZone);
     setQuery("");
     setError(null);
-    setMessage(`Selected ${deviceZone}. Save to apply it to your account.`);
+    setMessage(
+      uiMessage("Selected {0}. Save to apply it to your account.", {
+        "0": deviceZone,
+      }),
+    );
   }
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -86,32 +91,38 @@ export default function TimeZoneSettings({
           <Icon name="clock" size={22} />
         </span>
         <div>
-          <h2 id={`${id}-title`}>Your timezone</h2>
+          <h2 id={`${id}-title`}>{uiText("Your timezone")}</h2>
           <p>
-            Keep timestamps and your task calendar consistent across devices.
+            {uiText(
+              "Keep timestamps and your task calendar consistent across devices.",
+            )}
           </p>
         </div>
-        <span className={styles.current}>{user.time_zone || "UTC"}</span>
+        <span className={styles.current}>
+          {user.time_zone || uiText("UTC")}
+        </span>
       </div>
       <ErrorBox error={zones.error} retry={zones.refresh} />
       <ErrorBox error={error} />
       {zones.loading && !zones.data ? (
-        <Loading text="Loading available timezones…" />
+        <Loading text={uiText("Loading available timezones…")} />
       ) : (
         <form onSubmit={submit} className={styles.form}>
           <div className={styles.fields}>
             <label>
-              Find a timezone
+              {uiText("Find a timezone")}
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search a region or city, for example Toronto"
+                placeholder={uiText(
+                  "Search a region or city, for example Toronto",
+                )}
                 maxLength={100}
                 aria-describedby={`${id}-matching`}
               />
             </label>
             <label>
-              Timezone
+              {uiText("Timezone")}
               <select
                 value={selected}
                 onChange={(event) => {
@@ -120,7 +131,7 @@ export default function TimeZoneSettings({
                   setMessage("");
                 }}
                 aria-describedby={`${id}-help`}
-                aria-label="Timezone"
+                aria-label={uiText("Timezone")}
                 disabled={!zones.data || busy}
               >
                 {options.map((zone) => (
@@ -133,23 +144,30 @@ export default function TimeZoneSettings({
           </div>
           <div className={styles.detail}>
             <small id={`${id}-matching`}>
-              {matching.length} matching zones. Your selected zone and UTC
-              remain available.
+              {uiText(
+                "{0} matching zones. Your selected zone and UTC remain available.",
+                { "0": matching.length },
+              )}
             </small>
             <span>
-              {now ? `Current time: ${date(now, true, selected)}` : ""}
+              {now
+                ? uiText("Current time: {0}", {
+                    "0": date(now, true, selected),
+                  })
+                : ""}
             </span>
           </div>
           <p id={`${id}-help`} className={styles.help}>
-            Saved to your account on the firm server. Date-only task deadlines
-            keep their calendar date; raw evidence timestamps and UTC search
-            boundaries are preserved.
+            {uiText(
+              "Saved to your account on the firm server. Date-only task deadlines keep their calendar date; raw evidence timestamps and UTC search boundaries are preserved.",
+            )}
           </p>
           {!supported && (
             <p className="notice">
-              This browser cannot display {selected}. Timestamps fall back to
-              UTC here; your saved preference remains available to supported
-              clients.
+              {uiText(
+                "This browser cannot display {0}. Timestamps fall back to UTC here; your saved preference remains available to supported clients.",
+                { "0": selected },
+              )}
             </p>
           )}
           <div className={styles.actions}>
@@ -160,7 +178,7 @@ export default function TimeZoneSettings({
               onClick={chooseDeviceZone}
             >
               <Icon name="clock" size={15} />
-              Use device timezone
+              {uiText("Use device timezone")}
             </button>
             <button
               type="submit"
@@ -169,12 +187,12 @@ export default function TimeZoneSettings({
                 !zones.data || busy || selected === (user.time_zone || "UTC")
               }
             >
-              {busy ? "Saving timezone…" : "Save timezone"}
+              {busy ? uiText("Saving timezone…") : uiText("Save timezone")}
             </button>
           </div>
           {message && (
             <p role="status" className={styles.message}>
-              {message}
+              {uiText(message)}
             </p>
           )}
         </form>

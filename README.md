@@ -22,30 +22,30 @@ TypeScript/React for the interface, Python for its API and document processing, 
 Rust for streaming integrity checks and the native desktop client. PostgreSQL stores
 the shared firm data; browsers and desktop clients connect to the same firm server.
 
-> **Release 0.5.1.** Installable Windows, macOS and Linux desktop clients and Windows/Linux web-server
-> packages, with PostgreSQL firm sync, conflict-safe task editing and optional provider connections.
+> **Release 0.6.0.** Installable Windows, macOS and Linux desktop clients and Windows/Linux web-server
+> packages, with 13 interface languages, task priorities, PostgreSQL firm sync and optional provider connections.
 > Production capacity and the two-million-email scale target remain unvalidated.
 
 ![CaseQuarry workspace showing a real synthetic matter, evidence counts and review progress](docs/assets/workspace.png)
 
-*Actual application view using synthetic records. Counts come from persisted API data.*
+_Actual application view using synthetic records. Counts come from persisted API data._
 
 ## What you can do
 
-| Workflow | Available in 0.5.1 |
-|---|---|
-| Preserve | SHA-256 originals, source paths, MBOX offsets, duplicates and attachment families |
-| Import | Resumable uploads, bounded OCR, durable jobs and retries that preserve extraction history |
-| Search | Boolean/phrase/field/date search, exact sender/recipient filters, facets, grouping and pagination |
-| Investigate | Email readers, scoped traffic charts, communication maps, threads, timelines and candidate comparisons |
-| Review | Versioned decisions, exclusive work assignments, review queues, tags, notes and saved scope snapshots |
-| Organize | Matters, members, custodians, sources, issues, task descriptions/deadlines, personal worklists and legal holds |
-| Disclose | Irreversible text/PDF redactions, independent approval, sequential Bates numbers and CSV/DAT/OPT loadfiles |
-| Export | Metadata and reviewed native ZIP packages, with fresh scope and hash verification |
-| Secure | Tenant/matter roles, password/session controls, administrator controls, MFA and audit chains |
-| Assist | Optional local or OpenAI/Gemini/Grok/Claude source quotations with verified citations and human review |
-| Collaborate | Shared PostgreSQL firm server, automatic refresh and versioned review/task decisions |
-| Operate | Browser and native Windows/macOS/Linux clients, server packages, authenticated CLI, integrity tools and backups |
+| Workflow    | Available in 0.6.0                                                                                                      |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Preserve    | SHA-256 originals, source paths, MBOX offsets, duplicates and attachment families                                       |
+| Import      | Resumable uploads, bounded OCR, durable jobs and retries that preserve extraction history                               |
+| Search      | Boolean/phrase/field/date search, exact sender/recipient filters, facets, grouping and pagination                       |
+| Investigate | Email readers, scoped traffic charts, communication maps, threads, timelines and candidate comparisons                  |
+| Review      | Versioned decisions, exclusive work assignments, review queues, tags, notes and saved scope snapshots                   |
+| Organize    | Matters, members, custodians, sources, issues, task priorities/deadlines, searchable personal worklists and legal holds |
+| Disclose    | Irreversible text/PDF redactions, independent approval, sequential Bates numbers and CSV/DAT/OPT loadfiles              |
+| Export      | Metadata and reviewed native ZIP packages, with fresh scope and hash verification                                       |
+| Secure      | Tenant/matter roles, password/session controls, administrator controls, MFA and audit chains                            |
+| Assist      | Optional local or OpenAI/Gemini/Grok/Claude source quotations with verified citations and human review                  |
+| Collaborate | Shared PostgreSQL firm server, automatic refresh and versioned review/task decisions                                    |
+| Operate     | Browser and native Windows/macOS/Linux clients, server packages, authenticated CLI, integrity tools and backups         |
 
 ### A clearer daily workspace
 
@@ -53,14 +53,21 @@ The refreshed website uses grouped navigation, readable tables, responsive layou
 light/dark themes. Switch the matter dashboard between cards and a list, or use the
 keyboard command palette to find accessible matters across the server.
 
-**My work** puts your nearest deadlines first. Filter open or in-progress work, then
-overdue, upcoming and undated assignments. Open a task to edit its title, description,
-status, assignee and due date, or complete authorized tasks directly from the dashboard.
+**My work** puts your nearest deadlines first, or sorts urgent assignments to the top.
+Search task titles and filter by priority, status or deadline. Open a task to edit its title,
+description, priority, status, assignee and due date, or complete authorized tasks directly from the dashboard.
 Concurrent saves retain your draft and require conflict resolution before another save.
 Counts cover your accessible active
 matters, not just the current page. Choose your timezone in account settings for
 timestamp displays and deadline classification; entered calendar dates stay intact.
 These are team-entered plans rather than calculated court deadlines.
+
+Choose **English, Russian, French, Spanish, German, Turkish, Greek, Italian,
+Portuguese, Ukrainian, Simplified Chinese, Traditional Chinese or Hindi**. Your
+account language follows you across browsers and desktop workspaces. The desktop
+connection screen also has a device language setting and translated native menus.
+Changing language preserves form drafts and leaves case names, evidence, notes and
+documents in their original language. See [language settings](docs/LANGUAGES.md).
 
 Move between evidence items with **Previous item** and **Next item**, preserving the
 visible page order. Unsaved tags or notes block these buttons until saved or cleared.
@@ -93,14 +100,14 @@ Native exports are a separate workflow and can contain original content; see the
 
 Choose the assets on the [Releases page](https://github.com/CanerBaba25/CaseQuarry/releases):
 
-| Download | Use it for |
-|---|---|
-| `CaseQuarry_0.5.1_x64-setup.exe` | Install the Windows desktop client on each workstation |
-| `CaseQuarry_0.5.1_universal.dmg` | Install on an Apple Silicon or Intel MacBook |
-| `CaseQuarry_0.5.1_amd64.deb` | Install the Linux client on Ubuntu 24.04 x64 |
-| `casequarry-server-*-windows-x64.zip` | Install the shared web/API server on Windows |
-| `casequarry-server-*-linux-x64.zip` | Install the shared web/API server on Linux |
-| `*-source.zip` | Build, inspect or modify the application |
+| Download                              | Use it for                                             |
+| ------------------------------------- | ------------------------------------------------------ |
+| `CaseQuarry_0.6.0_x64-setup.exe`      | Install the Windows desktop client on each workstation |
+| `CaseQuarry_0.6.0_universal.dmg`      | Install on an Apple Silicon or Intel MacBook           |
+| `CaseQuarry_0.6.0_amd64.deb`          | Install the Linux client on Ubuntu 24.04 x64           |
+| `casequarry-server-*-windows-x64.zip` | Install the shared web/API server on Windows           |
+| `casequarry-server-*-linux-x64.zip`   | Install the shared web/API server on Linux             |
+| `*-source.zip`                        | Build, inspect or modify the application               |
 
 SHA-256 sidecars accompany each package. The Windows installer is unsigned and the
 Mac app is not notarized; follow the platform guide for the operating system’s
@@ -145,9 +152,10 @@ open its directory, and run the same commands starting with `uv sync --locked`.
 
 **Upgrading an existing installation:** stop the application, preserve a verified
 backup, run `uv sync --locked`, then `uv run python scripts/tasks.py migrate` before restarting.
-Version 0.5.0 adds `0007_task_versions` after the existing deadline/timezone migrations;
-startup refuses stale schemas. Reload open web/desktop workspaces after upgrading the
-server: task edits now require the current task version. See the [task API](docs/TASK_API.md).
+Version 0.6.0 adds `0008_task_priorities` and `0009_user_language` after
+`0007_task_versions`; startup refuses stale schemas. Existing tasks receive normal
+priority and existing accounts start in English. Reload open web/desktop workspaces
+after upgrading the server. See the [task API](docs/TASK_API.md).
 Existing SQLite installations require the documented guarded transfer to an empty
 PostgreSQL database. Keep the original database and a verified recovery backup.
 
@@ -190,14 +198,14 @@ for evaluation and public bug reports.
 
 The recorded **0.1.0** local SQLite run imported **10,000 synthetic emails and 100 mixed documents**:
 
-| Measurement | Recorded result |
-|---|---:|
-| Preserved occurrences, including attachments/container | 10,902 |
-| Exact duplicate occurrences | 199 |
-| Failed / unsupported items | 0 / 0 |
-| Import time | 163.49 seconds |
-| Grouped phrase search p95 | 244.94 ms |
-| Peak API + embedded worker memory | 157.20 MiB |
+| Measurement                                            | Recorded result |
+| ------------------------------------------------------ | --------------: |
+| Preserved occurrences, including attachments/container |          10,902 |
+| Exact duplicate occurrences                            |             199 |
+| Failed / unsupported items                             |           0 / 0 |
+| Import time                                            |  163.49 seconds |
+| Grouped phrase search p95                              |       244.94 ms |
+| Peak API + embedded worker memory                      |      157.20 MiB |
 
 Ten image documents remained partial because OCR was unavailable in that earlier run.
 Version 0.2.0 separately verifies real scanned PDF/image OCR and immutable retries;
@@ -205,17 +213,20 @@ the larger benchmark has not yet been repeated with the new extraction pipeline.
 Percentiles use 15 queries; these results are not a production SLA or a multi-million
 capacity claim. See [benchmark scope and method](docs/BENCHMARKS.md).
 
-The complete local Python suite passed **447 tests**, with PostgreSQL checks enabled
+The complete local Python suite passed **505 tests**, with PostgreSQL checks enabled
 and no skipped tests. Coverage includes task conflicts and delayed commits,
 timezone boundaries, permission revocation, concurrent uploads, session expiration,
 last-lead races, legal holds and upgrades.
 The evidence-query improvement preserved **39 complete comparison responses** and
 passed **16 focused projection/detail checks** across SQLite and PostgreSQL.
 The Rust integrity component passed **11 tests**, and the native desktop client
-passed **eight Rust tests**, an actual WebView2 runtime diagnostic and three isolated
-install/launch/uninstall checks. Real-browser checks cover evidence import/search,
+passed **ten Rust tests** and an actual WebView2 runtime diagnostic. Native Windows
+checks also cover all 13 interface languages and 143 translated menu labels.
+Real-browser checks cover evidence import/search,
 review and production approvals, shared task refresh, account isolation, provider
 controls, the redesigned dashboard, timezone persistence and 375px mobile views.
+Nine multilingual workflow stages cover all 13 languages, preserved drafts,
+Chinese and Hindi mobile views, original diagnostics and account isolation.
 Native release checks install and launch the Ubuntu package and exercise the same
 universal Mac app on Intel and Apple Silicon runners.
 Controlled HTTP responses exercise all
@@ -226,15 +237,15 @@ from the public source distribution.
 
 ## Documentation
 
-| Audience | Guides |
-|---|---|
-| Install | [Firm server](docs/SERVER_INSTALL.md), [Desktop client](docs/DESKTOP.md), [Windows](docs/INSTALL_WINDOWS.md), [macOS](docs/INSTALL_MACOS.md), [Linux](docs/INSTALL_LINUX.md) |
-| Review evidence | [Reviewer guide](docs/REVIEWER_GUIDE.md), [CLI reference](docs/CLI_REFERENCE.md), [Task API](docs/TASK_API.md) |
-| Acquire files and mail | [Supported adapters and limits](docs/ADAPTERS.md) |
-| Administer | [Administrator guide](docs/ADMIN_GUIDE.md), [Backup and recovery](docs/BACKUP_RECOVERY.md) |
-| Assess controls | [Threat model](docs/THREAT_MODEL.md), [Data handling](docs/DATA_HANDLING.md), [Evidence integrity](docs/EVIDENCE_INTEGRITY.md) |
-| Assess optional models | [Provider connections](docs/CLOUD_AI_GUIDE.md), [Analysis safety and runtime policy](docs/AI_SAFETY.md) |
-| Understand the code | [Architecture](docs/ARCHITECTURE.md), [Release notes](RELEASE_NOTES.md) |
+| Audience               | Guides                                                                                                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Install                | [Firm server](docs/SERVER_INSTALL.md), [Desktop client](docs/DESKTOP.md), [Windows](docs/INSTALL_WINDOWS.md), [macOS](docs/INSTALL_MACOS.md), [Linux](docs/INSTALL_LINUX.md) |
+| Review evidence        | [Reviewer guide](docs/REVIEWER_GUIDE.md), [CLI reference](docs/CLI_REFERENCE.md), [Task API](docs/TASK_API.md)                                                               |
+| Acquire files and mail | [Supported adapters and limits](docs/ADAPTERS.md)                                                                                                                            |
+| Administer             | [Administrator guide](docs/ADMIN_GUIDE.md), [Language settings](docs/LANGUAGES.md), [Backup and recovery](docs/BACKUP_RECOVERY.md)                                           |
+| Assess controls        | [Threat model](docs/THREAT_MODEL.md), [Data handling](docs/DATA_HANDLING.md), [Evidence integrity](docs/EVIDENCE_INTEGRITY.md)                                               |
+| Assess optional models | [Provider connections](docs/CLOUD_AI_GUIDE.md), [Analysis safety and runtime policy](docs/AI_SAFETY.md)                                                                      |
+| Understand the code    | [Architecture](docs/ARCHITECTURE.md), [Feature comparison](docs/FEATURE_COMPARISON.md), [Release notes](RELEASE_NOTES.md)                                                    |
 
 PostgreSQL workflows are checked against a real server. Container configuration is
 included; Docker runtime operation, production recovery, real-model quality and

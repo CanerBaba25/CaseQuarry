@@ -1,7 +1,8 @@
 "use client";
+import { uiMessage, uiText, type InterfaceMessage } from "@/lib/i18n";
 
 import { useState } from "react";
-import { api, date, label, number, post } from "@/lib/api";
+import { api, date, uiLabel as label, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import type { AuditEvent, User } from "@/lib/types";
 import { Badge, Empty, ErrorBox, Icon, Loading, Modal } from "./ui";
@@ -22,45 +23,50 @@ export default function FirmAdministration({ user }: { user: User }) {
     user.role === "firm_admin" ? "/users" : null,
   );
   const [edit, setEdit] = useState<User | "new" | null>(null),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useState<InterfaceMessage>("");
   if (user.role !== "firm_admin")
     return (
       <Empty
         icon="lock"
-        title="Administrator access required"
-        text="Firm account administration is available only to firm administrators. Matter access remains separately controlled."
+        title={uiText("Administrator access required")}
+        text={uiText(
+          "Firm account administration is available only to firm administrators. Matter access remains separately controlled.",
+        )}
       />
     );
   return (
     <>
       <PageHeading
-        eyebrow="FIRM ADMINISTRATION"
-        title="Keep access deliberate."
-        text="Manage local accounts and inspect system activity. Firm role changes affect account administration; existing matter roles are managed separately within each matter."
+        eyebrow={uiText("FIRM ADMINISTRATION")}
+        title={uiText("Keep access deliberate.")}
+        text={uiText(
+          "Manage local accounts and inspect system activity. Firm role changes affect account administration; existing matter roles are managed separately within each matter.",
+        )}
       >
         <button className="button primary" onClick={() => setEdit("new")}>
           <Icon name="plus" size={17} />
-          Create local account
+          {uiText("Create local account")}
         </button>
       </PageHeading>
       {message && (
         <div className="notice green" role="status">
           <Icon name="check" size={17} />
-          {message}
+          {uiText(message)}
         </div>
       )}
       <ErrorBox error={users.error} retry={users.refresh} />
       <section className="panel">
         <div className="section-heading">
           <div>
-            <h2>Firm accounts</h2>
+            <h2>{uiText("Firm accounts")}</h2>
             <p className="muted">
-              Up to 200 accounts. Deactivation and role changes revoke the
-              affected account’s sessions.
+              {uiText(
+                "Up to 200 accounts. Deactivation and role changes revoke the affected account’s sessions.",
+              )}
             </p>
           </div>
           <button className="button secondary compact" onClick={users.refresh}>
-            Refresh accounts
+            {uiText("Refresh accounts")}
           </button>
         </div>
         {users.loading ? (
@@ -70,12 +76,12 @@ export default function FirmAdministration({ user }: { user: User }) {
             <table>
               <thead>
                 <tr>
-                  <th>Account</th>
-                  <th>Firm role</th>
-                  <th>Access</th>
-                  <th>Authenticator</th>
+                  <th>{uiText("Account")}</th>
+                  <th>{uiText("Firm role")}</th>
+                  <th>{uiText("Access")}</th>
+                  <th>{uiText("Authenticator")}</th>
                   <th>
-                    <span className="sr-only">Account action</span>
+                    <span className="sr-only">{uiText("Account action")}</span>
                   </th>
                 </tr>
               </thead>
@@ -85,7 +91,7 @@ export default function FirmAdministration({ user }: { user: User }) {
                     <td>
                       <strong>
                         {account.name}
-                        {account.id === user.id ? " · You" : ""}
+                        {account.id === user.id ? uiText("· You") : ""}
                       </strong>
                       <small className="block">{account.email}</small>
                     </td>
@@ -98,14 +104,18 @@ export default function FirmAdministration({ user }: { user: User }) {
                         tone={account.active ? "green" : "red"}
                       />
                     </td>
-                    <td>{account.mfa_enabled ? "Enabled" : "Not enabled"}</td>
+                    <td>
+                      {account.mfa_enabled
+                        ? uiText("Enabled")
+                        : uiText("Not enabled")}
+                    </td>
                     <td>
                       <button
                         className="button secondary compact"
                         onClick={() => setEdit(account)}
                         disabled={account.id === user.id}
                       >
-                        Edit account
+                        {uiText("Edit account")}
                       </button>
                     </td>
                   </tr>
@@ -115,10 +125,9 @@ export default function FirmAdministration({ user }: { user: User }) {
           </div>
         )}
         <p className="field-help">
-          Deactivation blocks access across all matters. A firm role change
-          preserves existing matter memberships and their roles. Ask another
-          administrator to change your own role or account status. At least one
-          active firm administrator must remain.
+          {uiText(
+            "Deactivation blocks access across all matters. A firm role change preserves existing matter memberships and their roles. Ask another administrator to change your own role or account status. At least one active firm administrator must remain.",
+          )}
         </p>
       </section>
       <SystemAudit />
@@ -132,7 +141,9 @@ export default function FirmAdministration({ user }: { user: User }) {
             setMessage(
               revoked === null
                 ? "Local account created. Grant matter access separately and share credentials through your authorized secure channel."
-                : `Account updated. ${number(revoked)} sessions revoked.`,
+                : uiMessage("Account updated. {0} sessions revoked.", {
+                    "0": number(revoked),
+                  }),
             );
           }}
         />
@@ -154,7 +165,11 @@ function AccountModal({
     [error, setError] = useState<unknown>(null);
   return (
     <Modal
-      title={account ? `Edit ${account.name}` : "Create a local account"}
+      title={
+        account
+          ? uiText("Edit {0}", { "0": account.name })
+          : uiText("Create a local account")
+      }
       close={close}
     >
       <form
@@ -200,21 +215,21 @@ function AccountModal({
           <>
             <p className="muted">{account.email}</p>
             <label>
-              Account access
+              {uiText("Account access")}
               <select name="active" defaultValue={String(account.active)}>
-                <option value="true">Active</option>
-                <option value="false">Deactivated</option>
+                <option value="true">{uiText("Active")}</option>
+                <option value="false">{uiText("Deactivated")}</option>
               </select>
             </label>
           </>
         ) : (
           <>
             <label>
-              Name
+              {uiText("Name")}
               <input name="name" required maxLength={200} autoComplete="off" />
             </label>
             <label>
-              Email
+              {uiText("Email")}
               <input
                 name="email"
                 type="email"
@@ -224,7 +239,7 @@ function AccountModal({
               />
             </label>
             <label>
-              Initial password
+              {uiText("Initial password")}
               <input
                 name="password"
                 type="password"
@@ -235,12 +250,14 @@ function AccountModal({
               />
             </label>
             <p className="field-help">
-              This creates a local account. No invitation email is sent.
+              {uiText(
+                "This creates a local account. No invitation email is sent.",
+              )}
             </p>
           </>
         )}
         <label>
-          Firm role
+          {uiText("Firm role")}
           <select name="role" defaultValue={account?.role || "reviewer"}>
             {roles.map((role) => (
               <option key={role} value={role}>
@@ -252,7 +269,7 @@ function AccountModal({
         {account && (
           <>
             <label>
-              Reason for change
+              {uiText("Reason for change")}
               <textarea
                 name="reason"
                 required
@@ -264,22 +281,23 @@ function AccountModal({
             <label className="checkbox-label">
               <input type="checkbox" required />
               <span>
-                I confirm this account access change and any resulting session
-                revocation.
+                {uiText(
+                  "I confirm this account access change and any resulting session revocation.",
+                )}
               </span>
             </label>
           </>
         )}
         <div className="form-actions">
           <button type="button" className="button secondary" onClick={close}>
-            Cancel
+            {uiText("Cancel")}
           </button>
           <button className="button primary" disabled={busy}>
             {busy
-              ? "Saving…"
+              ? uiText("Saving…")
               : account
-                ? "Save account change"
-                : "Create account"}
+                ? uiText("Save account change")
+                : uiText("Create account")}
           </button>
         </div>
       </form>
@@ -304,10 +322,11 @@ function SystemAudit() {
     <section className="section">
       <div className="section-heading">
         <div>
-          <h2>System audit trail</h2>
+          <h2>{uiText("System audit trail")}</h2>
           <p className="muted">
-            Account and system actions in your firm. Matter evidence actions
-            stay in their own matter audit trail.
+            {uiText(
+              "Account and system actions in your firm. Matter evidence actions stay in their own matter audit trail.",
+            )}
           </p>
         </div>
         <button
@@ -326,7 +345,7 @@ function SystemAudit() {
           }}
         >
           <Icon name="shield" size={16} />
-          {busy ? "Verifying…" : "Verify system chain"}
+          {busy ? uiText("Verifying…") : uiText("Verify system chain")}
         </button>
       </div>
       <ErrorBox error={error || audit.error} retry={audit.refresh} />
@@ -336,8 +355,12 @@ function SystemAudit() {
           role="status"
         >
           {verification.valid
-            ? `System chain verified across ${number(verification.events_checked)} events.`
-            : "System chain verification failed. Investigate before relying on this record."}
+            ? uiText("System chain verified across {0} events.", {
+                "0": number(verification.events_checked),
+              })
+            : uiText(
+                "System chain verification failed. Investigate before relying on this record.",
+              )}
         </div>
       )}
       {audit.loading ? (
@@ -347,10 +370,10 @@ function SystemAudit() {
           <table>
             <thead>
               <tr>
-                <th>Date · UTC</th>
-                <th>Action</th>
-                <th>Actor</th>
-                <th>Target</th>
+                <th>{uiText("Date · UTC")}</th>
+                <th>{uiText("Action")}</th>
+                <th>{uiText("Actor")}</th>
+                <th>{uiText("Target")}</th>
               </tr>
             </thead>
             <tbody>
@@ -360,7 +383,7 @@ function SystemAudit() {
                   <td>
                     <strong>{label(event.event_type)}</strong>
                     <details className="audit-metadata">
-                      <summary>Action details</summary>
+                      <summary>{uiText("Action details")}</summary>
                       <pre>
                         {JSON.stringify(
                           event.metadata || event.safe_metadata || {},
@@ -370,7 +393,7 @@ function SystemAudit() {
                       </pre>
                     </details>
                   </td>
-                  <td className="mono">{event.actor_id || "System"}</td>
+                  <td className="mono">{event.actor_id || uiText("System")}</td>
                   <td className="mono">{event.target_id || "—"}</td>
                 </tr>
               ))}
@@ -379,8 +402,10 @@ function SystemAudit() {
           {!audit.data?.items.length && (
             <Empty
               icon="shield"
-              title="No system events"
-              text="Authorized account and security changes will be recorded here."
+              title={uiText("No system events")}
+              text={uiText(
+                "Authorized account and security changes will be recorded here.",
+              )}
             />
           )}
         </div>
@@ -405,8 +430,9 @@ function SystemAudit() {
         }
       />
       <p className="field-help">
-        Hash chaining checks integrity within this deployment. It is not an
-        independently protected, tamper-proof guarantee.
+        {uiText(
+          "Hash chaining checks integrity within this deployment. It is not an independently protected, tamper-proof guarantee.",
+        )}
       </p>
     </section>
   );

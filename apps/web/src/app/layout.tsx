@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import LocaleProvider from "@/components/locale-provider";
 
 export const metadata: Metadata = {
   title: "CaseQuarry — Evidence workspace",
@@ -16,7 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <LocaleProvider>{children}</LocaleProvider>
+      </body>
     </html>
   );
 }

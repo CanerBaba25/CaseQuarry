@@ -12,7 +12,17 @@ from . import audit
 from .case_domain import lock_case_action
 from .models import Case, Evidence, Hold, Issue, IssueLink, Member, Task, User, now
 from .production_models import IssueReview
-from .schemas import DateOnly, HoldInput, Input, IssueInput, IssueLinkInput, Reason, TaskInput
+from .schemas import (
+    DateOnly,
+    HoldInput,
+    Input,
+    IssueInput,
+    IssueLinkInput,
+    Reason,
+    TaskInput,
+    TaskPriority,
+    TaskText,
+)
 from .search import cursor_decode, cursor_encode
 from .security import PERMISSIONS, Actor, authorize_case, current_actor, fail, get_db, utc
 from .task_order import bump_created, bump_visible, creation_revision
@@ -23,8 +33,9 @@ router = APIRouter(prefix="/api/v1")
 
 class TaskPatch(Input):
     expected_version: int | None = Field(default=None, ge=1, strict=True)
-    title: str | None = Field(default=None, min_length=1, max_length=300)
-    description: str | None = Field(default=None, max_length=10000)
+    title: TaskText | None = Field(default=None, min_length=1, max_length=300)
+    description: TaskText | None = Field(default=None, max_length=10000)
+    priority: TaskPriority | None = None
     state: Literal["open", "in_progress", "done", "cancelled"] | None = None
     assigned_to: str | None = None
     due_date: DateOnly | None = None
@@ -191,7 +202,7 @@ def add_issue_evidence(case_id: str, issue_id: str, body: IssueLinkInput, reques
 
 
 def task_json(row, *, detail=False):
-    value = {"id": row.id, "case_id": row.case_id, "title": row.title, "state": row.state, "assigned_to": row.assigned_to, "created_by": row.created_by, "created_at": utc(row.created_at).isoformat(), "updated_at": utc(row.updated_at).isoformat(), "version": row.version, "due_date": row.due_date.isoformat() if row.due_date else None}
+    value = {"id": row.id, "case_id": row.case_id, "title": row.title, "state": row.state, "priority": row.priority, "assigned_to": row.assigned_to, "created_by": row.created_by, "created_at": utc(row.created_at).isoformat(), "updated_at": utc(row.updated_at).isoformat(), "version": row.version, "due_date": row.due_date.isoformat() if row.due_date else None}
     if detail:
         value["description"] = row.description
     return value
@@ -244,7 +255,7 @@ def list_tasks(case_id: str, request: Request, limit: int = Query(50, ge=1, le=2
         except (KeyError, ValueError, TypeError):
             fail(422, "TASK_CURSOR_INVALID", "Start the task list again; this cursor belongs to another scope.")
     authorized = _visible_case_query(actor.user, case_id).cte("authorized_task_case")
-    query = select(Task.id, Task.case_id, Task.title, Task.state, Task.assigned_to, Task.created_by, Task.created_at, Task.updated_at, Task.version, Task.due_date).join(authorized, authorized.c.id == Task.case_id).where(Task.tenant_id == actor.user.tenant_id, Task.case_id == case_id, Task.created_at <= snapshot)
+    query = select(Task.id, Task.case_id, Task.title, Task.state, Task.priority, Task.assigned_to, Task.created_by, Task.created_at, Task.updated_at, Task.version, Task.due_date).join(authorized, authorized.c.id == Task.case_id).where(Task.tenant_id == actor.user.tenant_id, Task.case_id == case_id, Task.created_at <= snapshot)
     if after:
         query = query.where(Task.id > after)
     page = query.order_by(Task.id).limit(limit + 1).cte("task_page")
@@ -270,14 +281,14 @@ def create_task(case_id: str, body: TaskInput, request: Request, actor: Actor = 
     lock_case_action(db, actor.user, case_id, "review", (body.assigned_to,))
     _assignee(db, actor.user, case_id, body.assigned_to)
     created_at = now()
-    row = Task(tenant_id=actor.user.tenant_id, case_id=case_id, title=body.title.strip(), description=body.description, assigned_to=body.assigned_to, created_by=actor.user.id, due_date=body.due_date, created_at=created_at, updated_at=created_at)
+    row = Task(tenant_id=actor.user.tenant_id, case_id=case_id, title=body.title.strip(), description=body.description, priority=body.priority, assigned_to=body.assigned_to, created_by=actor.user.id, due_date=body.due_date, created_at=created_at, updated_at=created_at)
     if not row.title:
         fail(422, "TASK_TITLE_REQUIRED", "Provide a task title.")
     db.add(row)
     db.flush()
     bump_created(db, actor.user.tenant_id, case_id)
     bump_visible(db, actor.user.tenant_id, case_id, {row.assigned_to})
-    _record(db, actor, request, case_id, "task.created", "task", row, {"assigned_to": row.assigned_to, "due_date": row.due_date.isoformat() if row.due_date else None, "version": row.version})
+    _record(db, actor, request, case_id, "task.created", "task", row, {"assigned_to": row.assigned_to, "due_date": row.due_date.isoformat() if row.due_date else None, "priority": row.priority, "version": row.version})
     return task_detail_json(row, actor.user)
 
 
@@ -297,8 +308,8 @@ def update_task(case_id: str, task_id: str, body: TaskPatch, request: Request, a
     if "assigned_to" in changes:
         _assignee(db, actor.user, case_id, changes["assigned_to"])
     for key, value in changes.items():
-        if key in {"title", "state", "description"} and value is None:
-            fail(422, "TASK_VALUE_INVALID", "Task title, state and description cannot be null.")
+        if key in {"title", "state", "description", "priority"} and value is None:
+            fail(422, "TASK_VALUE_INVALID", "Task title, state, description and priority cannot be null.")
         if key == "title":
             value = value.strip()
             if not value:
@@ -312,8 +323,9 @@ def update_task(case_id: str, task_id: str, body: TaskPatch, request: Request, a
 
     after = {key: audit_value(getattr(row, key)) for key in changes}
     due_changed = "due_date" in changes and before["due_date"] != row.due_date
+    triage_changed = any(key in changes and before[key] != getattr(row, key) for key in ("title", "priority"))
     entered_open_work = old_state not in {"open", "in_progress"} and row.state in {"open", "in_progress"}
-    if (due_changed or old_assignee != row.assigned_to or entered_open_work) and (old_state in {"open", "in_progress"} or row.state in {"open", "in_progress"}):
+    if (due_changed or triage_changed or old_assignee != row.assigned_to or entered_open_work) and (old_state in {"open", "in_progress"} or row.state in {"open", "in_progress"}):
         bump_visible(db, actor.user.tenant_id, case_id, {old_assignee, row.assigned_to})
     elif old_state != row.state and (old_state in {"open", "in_progress"} or row.state in {"open", "in_progress"}):
         bump_visible(db, actor.user.tenant_id, case_id, {old_assignee, row.assigned_to}, state_only=True)

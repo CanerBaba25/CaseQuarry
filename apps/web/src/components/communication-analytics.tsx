@@ -1,4 +1,5 @@
 "use client";
+import { uiText } from "@/lib/i18n";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -56,17 +57,17 @@ export function CommunicationScopeForm({
         }}
       >
         <label>
-          From · UTC
+          {uiText("From · UTC")}
           <input type="date" name="date_from" />
         </label>
         <label>
-          Through · UTC
+          {uiText("Through · UTC")}
           <input type="date" name="date_to" />
         </label>
         <label>
-          Source
+          {uiText("Source")}
           <select name="source_id">
-            <option value="">All sources</option>
+            <option value="">{uiText("All sources")}</option>
             {sources.data?.items.map((source) => (
               <option key={source.id} value={source.id}>
                 {source.label}
@@ -75,9 +76,9 @@ export function CommunicationScopeForm({
           </select>
         </label>
         <label>
-          Custodian
+          {uiText("Custodian")}
           <select name="custodian_id">
-            <option value="">All custodians</option>
+            <option value="">{uiText("All custodians")}</option>
             {custodians.data?.items.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.display_name}
@@ -87,14 +88,14 @@ export function CommunicationScopeForm({
         </label>
         <button className="button primary compact">
           <Icon name="filter" size={16} />
-          Apply scope
+          {uiText("Apply scope")}
         </button>
         <button
           className="button ghost compact"
           type="reset"
           onClick={() => apply({})}
         >
-          Reset
+          {uiText("Reset")}
         </button>
       </form>
       <ErrorBox error={sources.error || custodians.error} />
@@ -133,16 +134,18 @@ export default function CommunicationAnalytics({ matter }: { matter: Matter }) {
   return (
     <>
       <PageHeading
-        eyebrow="EMAIL ANALYTICS"
-        title="Follow the volume."
-        text="Source-backed traffic aggregates with exact message scopes. Every chart respects this matter’s access and preserves duplicate source occurrences."
+        eyebrow={uiText("EMAIL ANALYTICS")}
+        title={uiText("Follow the volume.")}
+        text={uiText(
+          "Source-backed traffic aggregates with exact message scopes. Every chart respects this matter’s access and preserves duplicate source occurrences.",
+        )}
       >
         <Link
           className="button secondary"
           href={evidenceUrl(matter.id, selectedFilters, true)}
         >
           <Icon name="email" size={17} />
-          Open email scope
+          {uiText("Open email scope")}
         </Link>
       </PageHeading>
       <CommunicationScopeForm
@@ -154,24 +157,24 @@ export default function CommunicationAnalytics({ matter }: { matter: Matter }) {
       />
       <ErrorBox error={resource.error} retry={resource.refresh} />
       {resource.loading ? (
-        <Loading text="Aggregating collected email traffic…" />
+        <Loading text={uiText("Aggregating collected email traffic…")} />
       ) : (
         resource.data && (
           <>
             <div className="metrics-grid analytics-metrics">
               <div className="metric-card">
-                <span>Returned dated occurrences</span>
+                <span>{uiText("Returned dated occurrences")}</span>
                 <strong>
                   {number(items.reduce((count, item) => count + item.count, 0))}
                 </strong>
                 <small>
                   {resource.data.truncated
-                    ? "Returned buckets only; additional dates omitted"
-                    : "All matching dated email occurrences"}
+                    ? uiText("Returned buckets only; additional dates omitted")
+                    : uiText("All matching dated email occurrences")}
                 </small>
               </div>
               <div className="metric-card">
-                <span>Undated email occurrences</span>
+                <span>{uiText("Undated email occurrences")}</span>
                 <strong>{number(resource.data.missing_date_count)}</strong>
                 <Link
                   href={evidenceUrl(
@@ -185,72 +188,84 @@ export default function CommunicationAnalytics({ matter }: { matter: Matter }) {
                     true,
                   )}
                 >
-                  Inspect missing timestamps <Icon name="arrow" size={13} />
+                  {uiText("Inspect missing timestamps") + " "}
+                  <Icon name="arrow" size={13} />
                 </Link>
               </div>
               <div className="metric-card">
-                <span>Returned UTC periods</span>
+                <span>{uiText("Returned UTC periods")}</span>
                 <strong>{number(items.length)}</strong>
                 <small>
                   {resource.data.truncated
-                    ? "First 500 chronological periods"
-                    : "Database aggregate; no inferred dates"}
+                    ? uiText("First 500 chronological periods")
+                    : uiText("Database aggregate; no inferred dates")}
                 </small>
               </div>
             </div>
             <div className="notice subtle">
               <Icon name="timeline" size={17} />
               <span>
-                Date-only boundaries include the selected end day in UTC.
-                Undated emails in this source/custodian scope cannot be assigned
-                to any date range. Unique originals count byte-exact message
-                objects separately.
+                {uiText(
+                  "Date-only boundaries include the selected end day in UTC. Undated emails in this source/custodian scope cannot be assigned to any date range. Unique originals count byte-exact message objects separately.",
+                )}
               </span>
             </div>
             <section className="panel traffic-panel">
               <div className="section-heading">
                 <div>
-                  <h2>Collected email traffic</h2>
+                  <h2>{uiText("Collected email traffic")}</h2>
                   <p className="muted">
-                    Open a period to inspect its dated messages.
+                    {uiText("Open a period to inspect its dated messages.")}
                   </p>
                 </div>
                 <label className="inline-select">
-                  Period
+                  {uiText("Period")}
                   <select
-                    aria-label="Traffic period"
+                    aria-label={uiText("Traffic period")}
                     value={grouping}
                     onChange={(event) => {
                       setGrouping(event.target.value);
                       setPage(0);
                     }}
                   >
-                    <option value="day">Day</option>
-                    <option value="month">Month</option>
-                    <option value="year">Year</option>
+                    <option value="day">{uiText("Day")}</option>
+                    <option value="month">{uiText("Month")}</option>
+                    <option value="year">{uiText("Year")}</option>
                   </select>
                 </label>
               </div>
               {!items.length ? (
                 <Empty
                   icon="timeline"
-                  title="No dated emails in this scope"
-                  text="Widen the collection or date filters. Undated records remain available separately."
+                  title={uiText("No dated emails in this scope")}
+                  text={uiText(
+                    "Widen the collection or date filters. Undated records remain available separately.",
+                  )}
                 />
               ) : (
                 <>
                   <div
                     className="traffic-chart"
                     role="group"
-                    aria-label="UTC traffic chart"
+                    aria-label={uiText("UTC traffic chart")}
                   >
                     {items.slice(page * 50, (page + 1) * 50).map((item) => (
                       <Link
                         key={item.key}
                         href={link(item.key)}
                         className="traffic-bar"
-                        aria-label={`${item.key}: ${number(item.count)} occurrences, ${number(item.unique_messages)} unique originals. Open messages.`}
-                        title={`${item.key}: ${number(item.count)} occurrences`}
+                        aria-label={uiText(
+                          "{0}: {1} occurrences, {2} unique originals. Open messages.",
+                          {
+                            "0": item.key,
+                            "1": number(item.count),
+                            "2": number(item.unique_messages),
+                          },
+                        )}
+                        title={uiText("{0}: {1} occurrences", {
+                          "0": item.key,
+                          "1": number(item.count),
+                        })}
                       >
                         <span className="traffic-bar-track">
                           <span
@@ -266,15 +281,19 @@ export default function CommunicationAnalytics({ matter }: { matter: Matter }) {
                   <div className="table-wrap">
                     <table>
                       <caption className="sr-only">
-                        Exact database counts for the displayed UTC periods
+                        {uiText(
+                          "Exact database counts for the displayed UTC periods",
+                        )}
                       </caption>
                       <thead>
                         <tr>
-                          <th>UTC period</th>
-                          <th>Source occurrences</th>
-                          <th>Unique original messages</th>
+                          <th>{uiText("UTC period")}</th>
+                          <th>{uiText("Source occurrences")}</th>
+                          <th>{uiText("Unique original messages")}</th>
                           <th>
-                            <span className="sr-only">Evidence scope</span>
+                            <span className="sr-only">
+                              {uiText("Evidence scope")}
+                            </span>
                           </th>
                         </tr>
                       </thead>
@@ -288,7 +307,8 @@ export default function CommunicationAnalytics({ matter }: { matter: Matter }) {
                             <td>{number(item.unique_messages)}</td>
                             <td>
                               <Link className="text-link" href={link(item.key)}>
-                                Open messages <Icon name="arrow" size={14} />
+                                {uiText("Open messages") + " "}
+                                <Icon name="arrow" size={14} />
                               </Link>
                             </td>
                           </tr>
@@ -297,7 +317,11 @@ export default function CommunicationAnalytics({ matter }: { matter: Matter }) {
                     </table>
                   </div>
                   <Pagination
-                    text={`Periods ${page * 50 + 1}–${Math.min((page + 1) * 50, items.length)} of ${number(items.length)} returned`}
+                    text={uiText("Periods {0}–{1} of {2} returned", {
+                      "0": page * 50 + 1,
+                      "1": Math.min((page + 1) * 50, items.length),
+                      "2": number(items.length),
+                    })}
                     previous={page ? () => setPage(page - 1) : undefined}
                     next={
                       (page + 1) * 50 < items.length

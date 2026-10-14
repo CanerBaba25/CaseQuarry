@@ -96,4 +96,4 @@ def create_session(db: Session, user: User, ttl_seconds: int):
 
 
 def user_json(user: User) -> dict:
-    return {"id": user.id, "email": user.email, "name": user.name, "tenant_id": user.tenant_id, "role": user.role, "active": user.active, "mfa_enabled": user.mfa_enabled, "time_zone": user.time_zone}
+    return {"id": user.id, "email": user.email, "name": user.name, "tenant_id": user.tenant_id, "role": user.role, "active": user.active, "mfa_enabled": user.mfa_enabled, "time_zone": user.time_zone, "language": user.language}

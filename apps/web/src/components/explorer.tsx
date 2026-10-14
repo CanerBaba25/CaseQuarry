@@ -1,4 +1,11 @@
 "use client";
+import {
+  getInterfaceLanguage,
+  uiMessage,
+  uiText,
+  type InterfaceMessage,
+  type MessageKey,
+} from "@/lib/i18n";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -9,7 +16,7 @@ import {
   bytes,
   date,
   getDisplayTimeZone,
-  label,
+  uiLabel as label,
   number,
   post,
 } from "@/lib/api";
@@ -266,14 +273,16 @@ export default function Explorer({
         <div>
           <span className="eyebrow">
             {matter.matter_number} ·{" "}
-            {reviewOnly ? "HUMAN REVIEW" : "THE EVIDENCE RECORD"}
+            {reviewOnly
+              ? uiText("HUMAN REVIEW")
+              : uiText("THE EVIDENCE RECORD")}
           </span>
           <h1>
             {reviewOnly
-              ? "Review queue"
+              ? uiText("Review queue")
               : emailOnly
-                ? "Email explorer"
-                : "Evidence explorer"}
+                ? uiText("Email explorer")
+                : uiText("Evidence explorer")}
           </h1>
         </div>
         <div className="explorer-heading-actions">
@@ -282,14 +291,14 @@ export default function Explorer({
             onClick={() => setDialog("saved")}
           >
             <Icon name="star" size={16} />
-            Save search
+            {uiText("Save search")}
           </button>
           <Link
             href={`/app/matters/${matter.id}/sources`}
             className="button primary compact"
           >
             <Icon name="upload" size={16} />
-            Import
+            {uiText("Import")}
           </Link>
         </div>
       </div>
@@ -304,15 +313,17 @@ export default function Explorer({
         <input
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder={'Search evidence… e.g. "payment approved" AND invoice'}
-          aria-label="Search evidence"
+          placeholder={uiText(
+            'Search evidence… e.g. "payment approved" AND invoice',
+          )}
+          aria-label={uiText("Search evidence")}
         />
         <button
           type="submit"
           className="button primary compact"
           disabled={loading}
         >
-          Search
+          {uiText("Search")}
           <Icon name="arrow" size={16} />
         </button>
       </form>
@@ -322,58 +333,67 @@ export default function Explorer({
           onClick={() => setFiltersOpen((value) => !value)}
         >
           <Icon name="filter" size={15} />
-          Filters{activeFilters.length ? ` (${activeFilters.length})` : ""}
+          {uiText("Filters")}
+          {activeFilters.length ? ` (${activeFilters.length})` : ""}
         </button>
         <div className="results-label" role="status">
           {loading
-            ? "Searching…"
-            : `${number(result?.total_hits)} ${result?.total_hits === 1 ? "result" : "results"}`}
-          <span>Keyword search · This matter</span>
+            ? uiText("Searching…")
+            : getInterfaceLanguage() === "en"
+              ? `${number(result?.total_hits)} ${result?.total_hits === 1 ? "result" : "results"}`
+              : `${uiText("Search results")}: ${number(result?.total_hits)}`}
+          <span>{uiText("Keyword search · This matter")}</span>
         </div>
         <div className="toolbar-selects">
           <label>
-            Sort
+            {uiText("Sort")}
             <select
-              aria-label="Sort evidence"
+              aria-label={uiText("Sort evidence")}
               value={`${spec.sort[0].field}:${spec.sort[0].order}`}
               onChange={(event) => {
                 const [field, order] = event.target.value.split(":");
                 update({ sort: [{ field, order }] });
               }}
             >
-              <option value="sent_at:desc">Newest first</option>
-              <option value="sent_at:asc">Oldest first</option>
-              <option value="title:asc">Title A–Z</option>
-              <option value="size:desc">Largest first</option>
-              <option value="size:asc">Smallest first</option>
-              <option value="sender:asc">Sender A–Z</option>
-              <option value="imported_at:desc">Recently imported</option>
-              <option value="imported_at:asc">First imported</option>
-              <option value="evidence_id:asc">Evidence ID</option>
+              <option value="sent_at:desc">{uiText("Newest first")}</option>
+              <option value="sent_at:asc">{uiText("Oldest first")}</option>
+              <option value="title:asc">{uiText("Title A–Z")}</option>
+              <option value="size:desc">{uiText("Largest first")}</option>
+              <option value="size:asc">{uiText("Smallest first")}</option>
+              <option value="sender:asc">{uiText("Sender A–Z")}</option>
+              <option value="imported_at:desc">
+                {uiText("Recently imported")}
+              </option>
+              <option value="imported_at:asc">
+                {uiText("First imported")}
+              </option>
+              <option value="evidence_id:asc">{uiText("Evidence ID")}</option>
             </select>
           </label>
           <label>
-            Group
+            {uiText("Group")}
             <select
-              aria-label="Group evidence"
+              aria-label={uiText("Group evidence")}
               value={spec.group_by || ""}
               onChange={(event) =>
                 update({ group_by: event.target.value || null })
               }
             >
-              <option value="">No grouping</option>
-              <option value="sender">Sender</option>
-              <option value="month">Month</option>
-              <option value="day">Day</option>
-              <option value="year">Year</option>
-              <option value="type">File type</option>
-              <option value="source">Source</option>
-              <option value="review_status">Review status</option>
-              <option value="thread">Thread</option>
-              <option value="custodian">Custodian</option>
-              <option value="privilege_status">Privilege status</option>
-              <option value="reviewer">Assigned reviewer</option>
-              <option value="tag">Tag</option>
+              <option value="">{uiText("No grouping")}</option>
+              <option value="sender">{uiText("Sender")}</option>
+              <option value="month">{uiText("Month")}</option>
+              <option value="day">{uiText("Day")}</option>
+              <option value="year">{uiText("Year")}</option>
+              <option value="type">{uiText("File type")}</option>
+              <option value="source">{uiText("Source")}</option>
+              <option value="review_status">{uiText("Review status")}</option>
+              <option value="thread">{uiText("Thread")}</option>
+              <option value="custodian">{uiText("Custodian")}</option>
+              <option value="privilege_status">
+                {uiText("Privilege status")}
+              </option>
+              <option value="reviewer">{uiText("Assigned reviewer")}</option>
+              <option value="tag">{uiText("Tag")}</option>
             </select>
           </label>
           <button
@@ -382,7 +402,7 @@ export default function Explorer({
             disabled={!canExport}
           >
             <Icon name="export" size={15} />
-            Export
+            {uiText("Export")}
           </button>
         </div>
       </div>
@@ -402,16 +422,27 @@ export default function Explorer({
               }}
             >
               <span>
-                {item.key === "person_id" ? "Participant" : label(item.key)}:{" "}
+                {item.key === "person_id"
+                  ? uiText("Participant")
+                  : label(item.key)}
+                :{" "}
                 {typeof item.value === "boolean"
                   ? item.value
-                    ? "Yes"
-                    : "No"
+                    ? uiText("Yes")
+                    : uiText("No")
                   : item.key === "person_id"
                     ? person.data?.name ||
                       person.data?.email ||
-                      "Selected header address"
-                    : label(String(item.value))}
+                      uiText("Selected header address")
+                    : [
+                          "item_types",
+                          "review_status",
+                          "privilege_status",
+                          "type",
+                          "parser_state",
+                        ].includes(item.key)
+                      ? label(String(item.value))
+                      : String(item.value)}
               </span>
               <Icon name="close" size={12} />
             </button>
@@ -420,7 +451,7 @@ export default function Explorer({
             className="clear-filters"
             onClick={() => update({ filters: {} })}
           >
-            Clear filters
+            {uiText("Clear filters")}
           </button>
         </div>
       )}
@@ -430,13 +461,13 @@ export default function Explorer({
       >
         <aside
           className={`filter-panel ${filtersOpen ? "open" : ""}`}
-          aria-label="Evidence filters"
+          aria-label={uiText("Evidence filters")}
         >
           <div className="filter-title">
-            <strong>Refine the record</strong>
+            <strong>{uiText("Refine the record")}</strong>
             <Icon name="filter" size={16} />
           </div>
-          <FilterSection title="Evidence type">
+          <FilterSection title={uiText("Evidence type")}>
             {(emailOnly ? ["email"] : types).map((type) => {
               const bucket = result?.facets
                 .find((item) =>
@@ -456,9 +487,9 @@ export default function Explorer({
                   <Icon name={type === "email" ? "email" : "file"} size={15} />
                   <span>
                     {type === "container"
-                      ? "Archive / mailbox"
+                      ? uiText("Archive / mailbox")
                       : type === "binary"
-                        ? "Other / unsupported"
+                        ? uiText("Other / unsupported")
                         : label(type)}
                   </span>
                   {bucket && <small>{number(bucket.count)}</small>}
@@ -466,7 +497,7 @@ export default function Explorer({
               );
             })}
           </FilterSection>
-          <FilterSection title="Review status">
+          <FilterSection title={uiText("Review status")}>
             {statuses.map((status) => (
               <label className="facet-option" key={status}>
                 <input
@@ -491,9 +522,9 @@ export default function Explorer({
               </label>
             ))}
           </FilterSection>
-          <FilterSection title="Collection">
+          <FilterSection title={uiText("Collection")}>
             <label className="filter-field">
-              Source
+              {uiText("Source")}
               <select
                 value={((spec.filters.source_ids || []) as string[])[0] || ""}
                 onChange={(event) =>
@@ -503,7 +534,7 @@ export default function Explorer({
                   )
                 }
               >
-                <option value="">All sources</option>
+                <option value="">{uiText("All sources")}</option>
                 {sources.data?.items.map((source) => (
                   <option key={source.id} value={source.id}>
                     {source.label}
@@ -512,7 +543,7 @@ export default function Explorer({
               </select>
             </label>
             <label className="filter-field">
-              Custodian
+              {uiText("Custodian")}
               <select
                 value={
                   ((spec.filters.custodian_ids || []) as string[])[0] || ""
@@ -524,7 +555,7 @@ export default function Explorer({
                   )
                 }
               >
-                <option value="">All custodians</option>
+                <option value="">{uiText("All custodians")}</option>
                 {custodians.data?.items.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.display_name}
@@ -533,23 +564,23 @@ export default function Explorer({
               </select>
             </label>
             <label className="filter-field">
-              Sender
+              {uiText("Sender")}
               <input
                 value={String(spec.filters.sender || "")}
                 onChange={(event) => filter("sender", event.target.value)}
-                placeholder="Email address"
+                placeholder={uiText("Email address")}
               />
             </label>
             <label className="filter-field">
-              Recipient
+              {uiText("Recipient")}
               <input
                 value={String(spec.filters.recipient || "")}
                 onChange={(event) => filter("recipient", event.target.value)}
-                placeholder="Address contains…"
+                placeholder={uiText("Address contains…")}
               />
             </label>
             <label className="filter-field">
-              Attachments
+              {uiText("Attachments")}
               <select
                 value={
                   typeof spec.filters.has_attachment === "boolean"
@@ -565,26 +596,28 @@ export default function Explorer({
                   )
                 }
               >
-                <option value="">With or without</option>
-                <option value="true">With attachments</option>
-                <option value="false">Without attachments</option>
+                <option value="">{uiText("With or without")}</option>
+                <option value="true">{uiText("With attachments")}</option>
+                <option value="false">{uiText("Without attachments")}</option>
               </select>
             </label>
             <ErrorBox error={sources.error || custodians.error} />
           </FilterSection>
-          <FilterSection title="Date · UTC">
+          <FilterSection title={uiText("Date · UTC")}>
             <label className="filter-field">
-              Date field
+              {uiText("Date field")}
               <select
                 value={String(spec.filters.date_field || "sent_at")}
                 onChange={(event) => filter("date_field", event.target.value)}
               >
-                <option value="sent_at">Source timestamp</option>
-                <option value="imported_at">Imported timestamp</option>
+                <option value="sent_at">{uiText("Source timestamp")}</option>
+                <option value="imported_at">
+                  {uiText("Imported timestamp")}
+                </option>
               </select>
             </label>
             <label className="filter-field">
-              From
+              {uiText("From")}
               <input
                 type="date"
                 value={String(spec.filters.date_from || "")}
@@ -592,7 +625,7 @@ export default function Explorer({
               />
             </label>
             <label className="filter-field">
-              To
+              {uiText("To")}
               <input
                 type="date"
                 value={String(spec.filters.date_to || "")}
@@ -600,7 +633,7 @@ export default function Explorer({
               />
             </label>
             <label className="filter-field">
-              Timestamp availability
+              {uiText("Timestamp availability")}
               <select
                 value={
                   typeof spec.filters.missing_date === "boolean"
@@ -616,15 +649,15 @@ export default function Explorer({
                   )
                 }
               >
-                <option value="">Dated and undated</option>
-                <option value="true">Missing timestamp</option>
-                <option value="false">Has timestamp</option>
+                <option value="">{uiText("Dated and undated")}</option>
+                <option value="true">{uiText("Missing timestamp")}</option>
+                <option value="false">{uiText("Has timestamp")}</option>
               </select>
             </label>
           </FilterSection>
-          <FilterSection title="Review & processing">
+          <FilterSection title={uiText("Review & processing")}>
             <label className="filter-field">
-              Privilege status
+              {uiText("Privilege status")}
               <select
                 value={
                   ((spec.filters.privilege_status || []) as string[])[0] || ""
@@ -636,7 +669,7 @@ export default function Explorer({
                   )
                 }
               >
-                <option value="">All determinations</option>
+                <option value="">{uiText("All determinations")}</option>
                 {["none", "suspected", "confirmed", "cleared"].map((value) => (
                   <option key={value} value={value}>
                     {label(value)}
@@ -645,7 +678,7 @@ export default function Explorer({
               </select>
             </label>
             <label className="filter-field">
-              Processing state
+              {uiText("Processing state")}
               <select
                 value={((spec.filters.parser_state || []) as string[])[0] || ""}
                 onChange={(event) =>
@@ -655,7 +688,7 @@ export default function Explorer({
                   )
                 }
               >
-                <option value="">All processing states</option>
+                <option value="">{uiText("All processing states")}</option>
                 {[
                   "indexed",
                   "stored",
@@ -673,12 +706,12 @@ export default function Explorer({
               </select>
             </label>
             <label className="filter-field">
-              Assigned reviewer
+              {uiText("Assigned reviewer")}
               <select
                 value={String(spec.filters.assigned_to || "")}
                 onChange={(event) => filter("assigned_to", event.target.value)}
               >
-                <option value="">All reviewers</option>
+                <option value="">{uiText("All reviewers")}</option>
                 {members.data?.items.map((item) => (
                   <option key={item.user_id} value={item.user_id}>
                     {item.name}
@@ -687,7 +720,7 @@ export default function Explorer({
               </select>
             </label>
             <label className="filter-field">
-              Tag
+              {uiText("Tag")}
               <input
                 value={((spec.filters.tags || []) as string[]).join(", ")}
                 onChange={(event) =>
@@ -699,7 +732,7 @@ export default function Explorer({
                       .filter(Boolean),
                   )
                 }
-                placeholder="Exact tags, comma separated"
+                placeholder={uiText("Exact tags, comma separated")}
               />
             </label>
             <label className="facet-option">
@@ -710,14 +743,14 @@ export default function Explorer({
                   filter("bookmarked", event.target.checked ? true : null)
                 }
               />
-              <span>Bookmarked only</span>
+              <span>{uiText("Bookmarked only")}</span>
             </label>
             <ErrorBox error={members.error} />
           </FilterSection>
-          <FilterSection title="Saved searches">
+          <FilterSection title={uiText("Saved searches")}>
             {saved.data?.items.length ? (
               <select
-                aria-label="Load saved search"
+                aria-label={uiText("Load saved search")}
                 value=""
                 onChange={(event) => {
                   const item = saved.data?.items.find(
@@ -729,7 +762,7 @@ export default function Explorer({
                   }
                 }}
               >
-                <option value="">Choose a saved search</option>
+                <option value="">{uiText("Choose a saved search")}</option>
                 {saved.data.items.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
@@ -737,23 +770,34 @@ export default function Explorer({
                 ))}
               </select>
             ) : (
-              <p className="muted">Save a query to return to it later.</p>
+              <p className="muted">
+                {uiText("Save a query to return to it later.")}
+              </p>
             )}
             <ErrorBox error={saved.error} />
           </FilterSection>
           <div className="filter-footnote">
             <Icon name="shield" size={16} />
             <p>
-              Search is limited to the evidence you can access in this matter.
+              {uiText(
+                "Search is limited to the evidence you can access in this matter.",
+              )}
             </p>
           </div>
         </aside>
-        <section className="results-panel" aria-label="Search results">
+        <section
+          className="results-panel"
+          aria-label={uiText("Search results")}
+        >
           {spec.group_by && result?.groups.length ? (
             <div className="group-summary">
               <div>
-                <strong>{label(spec.group_by)} groups</strong>
-                <small>Full-scope counts · up to 200 returned groups</small>
+                <strong>
+                  {uiText("{0} groups", { "0": label(spec.group_by) })}
+                </strong>
+                <small>
+                  {uiText("Full-scope counts · up to 200 returned groups")}
+                </small>
               </div>
               <div className="group-chips">
                 {result.groups.map((item) => (
@@ -766,7 +810,9 @@ export default function Explorer({
                     }
                     title={
                       !item.key || item.key === "Unknown"
-                        ? "Missing metadata cannot be drilled down in this preview. These items remain in the evidence results."
+                        ? uiText(
+                            "Missing metadata cannot be drilled down in this preview. These items remain in the evidence results.",
+                          )
                         : undefined
                     }
                     onClick={() => {
@@ -804,7 +850,13 @@ export default function Explorer({
                             ? members.data?.items.find(
                                 (member) => member.user_id === item.key,
                               )?.name || item.key
-                            : item.key || "Not recorded"}
+                            : [
+                                  "type",
+                                  "review_status",
+                                  "privilege_status",
+                                ].includes(spec.group_by || "")
+                              ? label(item.key)
+                              : item.key || uiText("Not recorded")}
                     </span>
                     <strong>{number(item.count)}</strong>
                   </button>
@@ -815,7 +867,8 @@ export default function Explorer({
           {selected.length > 0 && (
             <div className="selection-toolbar">
               <span>
-                <strong>{number(selected.length)}</strong> selected on this page
+                <strong>{number(selected.length)}</strong>{" "}
+                {" " + uiText("selected on this page")}
               </span>
               <div>
                 <button
@@ -823,26 +876,26 @@ export default function Explorer({
                   disabled={!canReview}
                   onClick={() => setDialog("bulk")}
                 >
-                  Review selected
+                  {uiText("Review selected")}
                 </button>
                 <button
                   className="button secondary compact"
                   onClick={() => setDialog("set")}
                   disabled={!canReview}
                 >
-                  Save review set
+                  {uiText("Save review set")}
                 </button>
                 {can(matter.role, "manage") && (
                   <button
                     className="button secondary compact"
                     onClick={() => setDialog("assign")}
                   >
-                    Assign selected
+                    {uiText("Assign selected")}
                   </button>
                 )}
                 <button
                   className="icon-button"
-                  aria-label="Clear selection"
+                  aria-label={uiText("Clear selection")}
                   onClick={() => setSelected([])}
                 >
                   <Icon name="close" size={15} />
@@ -852,19 +905,23 @@ export default function Explorer({
           )}
           <div className={`evidence-table-wrap ${loading ? "is-loading" : ""}`}>
             {loading || (!result && !error) ? (
-              <Loading text="Searching the evidence record…" />
+              <Loading text={uiText("Searching the evidence record…")} />
             ) : !result?.items.length ? (
               <Empty
                 icon="search"
                 title={
                   spec.query || activeFilters.length
-                    ? "No evidence matches this scope"
-                    : "Your record is ready to begin"
+                    ? uiText("No evidence matches this scope")
+                    : uiText("Your record is ready to begin")
                 }
                 text={
                   spec.query || activeFilters.length
-                    ? "Try a different query or widen your filters. Unprocessed sources remain in the import report."
-                    : "Import a source to preserve originals and make their extracted content searchable."
+                    ? uiText(
+                        "Try a different query or widen your filters. Unprocessed sources remain in the import report.",
+                      )
+                    : uiText(
+                        "Import a source to preserve originals and make their extracted content searchable.",
+                      )
                 }
               >
                 {!spec.query && !activeFilters.length && (
@@ -872,7 +929,7 @@ export default function Explorer({
                     className="button primary"
                     href={`/app/matters/${matter.id}/sources`}
                   >
-                    Import evidence
+                    {uiText("Import evidence")}
                     <Icon name="arrow" size={16} />
                   </Link>
                 )}
@@ -884,7 +941,7 @@ export default function Explorer({
                     <th className="checkbox-cell">
                       <input
                         type="checkbox"
-                        aria-label="Select all visible evidence"
+                        aria-label={uiText("Select all visible evidence")}
                         checked={allVisibleSelected}
                         onChange={() =>
                           setSelected(
@@ -895,9 +952,11 @@ export default function Explorer({
                         }
                       />
                     </th>
-                    <th>Evidence</th>
-                    <th>Date · {getDisplayTimeZone()}</th>
-                    <th>Status</th>
+                    <th>{uiText("Evidence")}</th>
+                    <th>
+                      {uiText("Date · {0}", { "0": getDisplayTimeZone() })}
+                    </th>
+                    <th>{uiText("Status")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -911,7 +970,7 @@ export default function Explorer({
                       <td className="checkbox-cell">
                         <input
                           type="checkbox"
-                          aria-label={`Select ${item.title}`}
+                          aria-label={uiText("Select {0}", { "0": item.title })}
                           checked={selected.includes(item.evidence_id)}
                           onChange={() =>
                             setSelected((current) =>
@@ -945,12 +1004,13 @@ export default function Explorer({
                               {item.has_attachments && (
                                 <span className="attachment-indicator">
                                   <Icon name="file" size={12} />
-                                  Attachments
+                                  {uiText("Attachments")}
                                 </span>
                               )}
                             </span>
                             <span className="evidence-snippet">
-                              {item.snippet || "No text snippet available"}
+                              {item.snippet ||
+                                uiText("No text snippet available")}
                             </span>
                             <span className="evidence-id mono">
                               {item.evidence_id}
@@ -964,7 +1024,8 @@ export default function Explorer({
                         {item.privilege_status &&
                           item.privilege_status !== "none" && (
                             <Badge
-                              value={`Privilege ${item.privilege_status}`}
+                              value={item.privilege_status}
+                              text={`${uiText("Privilege status")}: ${label(item.privilege_status)}`}
                               tone={
                                 item.privilege_status === "confirmed"
                                   ? "red"
@@ -982,7 +1043,11 @@ export default function Explorer({
           <Pagination
             text={
               result?.items.length
-                ? `Page ${history.length + 1} · ${number(result.items.length)} shown of ${number(result.total_hits)}`
+                ? uiText("Page {0} · {1} shown of {2}", {
+                    "0": history.length + 1,
+                    "1": number(result.items.length),
+                    "2": number(result.total_hits),
+                  })
                 : undefined
             }
             previous={
@@ -1029,7 +1094,7 @@ export default function Explorer({
                       `${number(count)} ${label(key).toLowerCase()}`,
                   )
                   .join(" · ") ||
-                  "See source inventory for full processing coverage."}
+                  uiText("See source inventory for full processing coverage.")}
               </span>
             </div>
           )}
@@ -1066,14 +1131,15 @@ export default function Explorer({
             <span className="empty-icon">
               <Icon name="file" size={25} />
             </span>
-            <h3>Read the record.</h3>
+            <h3>{uiText("Read the record.")}</h3>
             <p>
-              Open an evidence item to inspect its source, extracted text and
-              review history.
+              {uiText(
+                "Open an evidence item to inspect its source, extracted text and review history.",
+              )}
             </p>
             <div>
               <Icon name="shield" size={16} />
-              <span>Originals stay preserved.</span>
+              <span>{uiText("Originals stay preserved.")}</span>
             </div>
           </aside>
         )}
@@ -1185,7 +1251,7 @@ export function EvidenceInspector({
   const [tab, setTab] = useState("content"),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null),
-    [message, setMessage] = useState(""),
+    [message, setMessage] = useState<InterfaceMessage>(""),
     [verified, setVerified] = useState<{
       valid: boolean;
       expected_sha256: string;
@@ -1212,6 +1278,13 @@ export function EvidenceInspector({
           : detail.data,
     [detail.data, historical.data, version],
   );
+  const inspectorTabs: [string, MessageKey][] = [
+    ["content", "Content"],
+    ["metadata", "Source"],
+    ["review", "Review"],
+  ];
+  if (!version) inspectorTabs.push(["investigate", "Investigate"]);
+  if (data?.type === "email") inspectorTabs.push(["thread", "Thread"]);
   useEffect(() => {
     setTab("content");
     setError(null);
@@ -1297,12 +1370,15 @@ export function EvidenceInspector({
     note.trim() || (tagDraft.current.dirty && tags !== data?.tags.join(", ")),
   );
   return (
-    <aside className="evidence-inspector" aria-label="Evidence inspector">
+    <aside
+      className="evidence-inspector"
+      aria-label={uiText("Evidence inspector")}
+    >
       <div className="inspector-top">
-        <span className="eyebrow">EVIDENCE INSPECTOR</span>
+        <span className="eyebrow">{uiText("EVIDENCE INSPECTOR")}</span>
         <button
           className="icon-button"
-          aria-label="Close evidence inspector"
+          aria-label={uiText("Close evidence inspector")}
           onClick={close}
         >
           <Icon name="close" size={18} />
@@ -1311,7 +1387,7 @@ export function EvidenceInspector({
       {navigation && (
         <nav
           className={navigationStyles.navigation}
-          aria-label="Navigate visible evidence"
+          aria-label={uiText("Navigate visible evidence")}
         >
           <button
             className="button secondary compact"
@@ -1319,10 +1395,13 @@ export function EvidenceInspector({
             disabled={!navigation.previous || busy || unsaved}
             onClick={() => navigation.previous && open(navigation.previous)}
           >
-            <Icon name="back" size={14} /> Previous item
+            <Icon name="back" size={14} /> {" " + uiText("Previous item")}
           </button>
           <span>
-            Item {navigation.position} of {navigation.count} on this page
+            {uiText("Item {0} of {1} on this page", {
+              "0": navigation.position,
+              "1": navigation.count,
+            })}
           </span>
           <button
             className="button secondary compact"
@@ -1330,12 +1409,14 @@ export function EvidenceInspector({
             disabled={!navigation.next || busy || unsaved}
             onClick={() => navigation.next && open(navigation.next)}
           >
-            Next item <Icon name="arrow" size={14} />
+            {uiText("Next item") + " "}
+            <Icon name="arrow" size={14} />
           </button>
           {unsaved && (
             <small>
-              Save or clear your unsaved tags and note before moving to another
-              item.
+              {uiText(
+                "Save or clear your unsaved tags and note before moving to another item.",
+              )}
             </small>
           )}
         </nav>
@@ -1348,7 +1429,7 @@ export function EvidenceInspector({
         }}
       />
       {(detail.loading || historical.loading) && !data ? (
-        <Loading text="Opening evidence…" />
+        <Loading text={uiText("Opening evidence…")} />
       ) : (
         data && (
           <>
@@ -1357,24 +1438,30 @@ export function EvidenceInspector({
                 <Icon name="lock" size={17} />
                 <span>
                   {historical.data?.superseded
-                    ? `Superseded extraction v${version}; the current version is v${historical.data.current_version}.`
-                    : `Version-specific extraction v${version}.`}{" "}
-                  This view is read-only. Current review and production use the
-                  latest extraction.{" "}
+                    ? uiText(
+                        "Superseded extraction v{0}; the current version is v{1}.",
+                        { "0": version, "1": historical.data.current_version },
+                      )
+                    : uiText("Version-specific extraction v{0}.", {
+                        "0": version,
+                      })}{" "}
+                  {uiText(
+                    "This view is read-only. Current review and production use the latest extraction.",
+                  )}{" "}
                   <Link
                     className="text-link"
                     href={`/app/matters/${caseId}/evidence/${id}`}
                   >
-                    Open current evidence
+                    {uiText("Open current evidence")}
                   </Link>
                 </span>
               </div>
             )}
             <label className="inspector-version-select">
-              Extracted text version
+              {uiText("Extracted text version")}
               <select
                 value={version || "current"}
-                aria-label="Extracted text version"
+                aria-label={uiText("Extracted text version")}
                 onChange={(event) =>
                   versionRouter.push(
                     `/app/matters/${caseId}/evidence/${id}${event.target.value === "current" ? "" : `?version=${event.target.value}`}`,
@@ -1382,27 +1469,36 @@ export function EvidenceInspector({
                 }
               >
                 <option value="current">
-                  Current extraction
-                  {versions.data?.current_version
-                    ? ` · v${versions.data.current_version}`
-                    : ""}
+                  {uiText("Current extraction{0}", {
+                    "0": versions.data?.current_version
+                      ? ` ${uiText("· v{0}", { "0": versions.data.current_version })}`
+                      : "",
+                  })}
                 </option>
                 {version &&
                   !versions.data?.items.some(
                     (item) => String(item.version) === version,
                   ) && (
-                    <option value={version}>Cited extraction v{version}</option>
+                    <option value={version}>
+                      {uiText("Cited extraction v{0}", { "0": version })}
+                    </option>
                   )}
                 {versions.data?.items.map((item) => (
                   <option key={item.version} value={String(item.version)}>
-                    v{item.version} · {item.current ? "current" : "superseded"}
+                    {uiText("v{0} · {1}", {
+                      "0": item.version,
+                      "1": item.current
+                        ? uiText("current")
+                        : uiText("superseded"),
+                    })}
                   </option>
                 ))}
               </select>
               {versions.data?.before_version && (
                 <small>
-                  Showing the latest 50 versions. Older versions remain
-                  addressable by their exact version link.
+                  {uiText(
+                    "Showing the latest 50 versions. Older versions remain addressable by their exact version link.",
+                  )}
                 </small>
               )}
             </label>
@@ -1420,21 +1516,23 @@ export function EvidenceInspector({
                   href={`/api/v1/cases/${caseId}/evidence/${id}/original`}
                 >
                   <Icon name="export" size={15} />
-                  Original
+                  {uiText("Original")}
                 </a>
                 {canReview && (
                   <Link
                     className="button secondary compact"
                     href={`/app/matters/${caseId}/productions?evidence_id=${id}`}
                   >
-                    Redact
+                    {uiText("Redact")}
                   </Link>
                 )}
                 <button
                   className={`icon-button ${data.bookmarked ? "starred" : ""}`}
                   disabled={busy || !canReview}
                   aria-label={
-                    data.bookmarked ? "Remove bookmark" : "Bookmark evidence"
+                    data.bookmarked
+                      ? uiText("Remove bookmark")
+                      : uiText("Bookmark evidence")
                   }
                   onClick={() => void review({ bookmarked: !data.bookmarked })}
                 >
@@ -1458,7 +1556,7 @@ export function EvidenceInspector({
                   }}
                 >
                   <Icon name="shield" size={15} />
-                  Verify
+                  {uiText("Verify")}
                 </button>
               </div>
             </div>
@@ -1466,8 +1564,9 @@ export function EvidenceInspector({
               <div className="notice red" role="alert">
                 <Icon name="alert" size={17} />
                 <span>
-                  Original integrity verification failed. Download is blocked;
-                  investigate the preserved source.
+                  {uiText(
+                    "Original integrity verification failed. Download is blocked; investigate the preserved source.",
+                  )}
                 </span>
               </div>
             )}
@@ -1475,8 +1574,10 @@ export function EvidenceInspector({
               <div className="notice amber">
                 <Icon name="alert" size={17} />
                 <span>
-                  Extraction limitation: {label(data.parser_error)}. Review the
-                  original and import report for full coverage.
+                  {uiText(
+                    "Extraction limitation: {0}. Review the original and import report for full coverage.",
+                    { "0": label(data.parser_error) },
+                  )}
                 </span>
               </div>
             )}
@@ -1488,23 +1589,19 @@ export function EvidenceInspector({
                 <Icon name={verified.valid ? "check" : "alert"} size={16} />
                 <span>
                   {verified.valid
-                    ? "Original hash verified."
-                    : "Original hash mismatch. Source integrity requires investigation."}
+                    ? uiText("Original hash verified.")
+                    : uiText(
+                        "Original hash mismatch. Source integrity requires investigation.",
+                      )}
                 </span>
               </div>
             )}
             <div
               className="inspector-tabs"
               role="tablist"
-              aria-label="Evidence details"
+              aria-label={uiText("Evidence details")}
             >
-              {[
-                ["content", "Content"],
-                ["metadata", "Source"],
-                ["review", "Review"],
-                ...(!version ? [["investigate", "Investigate"]] : []),
-                ...(data.type === "email" ? [["thread", "Thread"]] : []),
-              ].map(([key, title]) => (
+              {inspectorTabs.map(([key, title]) => (
                 <button
                   key={key}
                   role="tab"
@@ -1521,12 +1618,7 @@ export function EvidenceInspector({
                     )
                       return;
                     event.preventDefault();
-                    const keys = [
-                      "content",
-                      "metadata",
-                      "review",
-                      ...(data.type === "email" ? ["thread"] : []),
-                    ];
+                    const keys = inspectorTabs.map(([key]) => key);
                     const position = keys.indexOf(key);
                     const target =
                       event.key === "Home"
@@ -1543,7 +1635,7 @@ export function EvidenceInspector({
                     document.getElementById(`tab-${target}`)?.focus();
                   }}
                 >
-                  {title}
+                  {uiText(title)}
                 </button>
               ))}
             </div>
@@ -1557,7 +1649,7 @@ export function EvidenceInspector({
               {message && (
                 <div className="notice green" role="status">
                   <Icon name="check" size={16} />
-                  {message}
+                  {uiText(message)}
                 </div>
               )}
               {tab === "content" ? (
@@ -1565,33 +1657,33 @@ export function EvidenceInspector({
                   {data.email && (
                     <dl className="email-envelope">
                       <div>
-                        <dt>From</dt>
+                        <dt>{uiText("From")}</dt>
                         <dd>{people(data.email.from)}</dd>
                       </div>
                       <div>
-                        <dt>To</dt>
+                        <dt>{uiText("To")}</dt>
                         <dd>{people(data.email.to)}</dd>
                       </div>
                       {people(data.email.cc) !== "" &&
                         people(data.email.cc) !== "—" && (
                           <div>
-                            <dt>CC</dt>
+                            <dt>{uiText("CC")}</dt>
                             <dd>{people(data.email.cc)}</dd>
                           </div>
                         )}
                       <div>
-                        <dt>Sent</dt>
+                        <dt>{uiText("Sent")}</dt>
                         <dd>{date(data.date_utc, true)}</dd>
                       </div>
                       {!["", "—"].includes(people(data.email.bcc)) && (
                         <div>
-                          <dt>BCC</dt>
+                          <dt>{uiText("BCC")}</dt>
                           <dd>{people(data.email.bcc)}</dd>
                         </div>
                       )}
                       {!["", "—"].includes(people(data.email.reply_to)) && (
                         <div>
-                          <dt>Reply-To</dt>
+                          <dt>{uiText("Reply-To")}</dt>
                           <dd>{people(data.email.reply_to)}</dd>
                         </div>
                       )}
@@ -1600,8 +1692,8 @@ export function EvidenceInspector({
                   <div className="text-viewer-heading">
                     <span>
                       {data.type === "pdf"
-                        ? "EXTRACTED DOCUMENT TEXT"
-                        : "EXTRACTED CONTENT"}
+                        ? uiText("EXTRACTED DOCUMENT TEXT")
+                        : uiText("EXTRACTED CONTENT")}
                     </span>
                     <Icon name="lock" size={13} />
                   </div>
@@ -1614,10 +1706,15 @@ export function EvidenceInspector({
                           id={`span-${span.span_id || span.id}`}
                         >
                           <span className="span-anchor">
-                            {span.page
-                              ? `Page ${span.page}`
-                              : `Chars ${span.char_start}–${span.char_end}`}{" "}
-                            · v{span.artifact_version}
+                            {uiText("{0} · v{1}", {
+                              "0": span.page
+                                ? uiText("Page {0}", { "0": span.page })
+                                : uiText("Chars {0}–{1}", {
+                                    "0": span.char_start,
+                                    "1": span.char_end,
+                                  }),
+                              "1": span.artifact_version,
+                            })}
                           </span>
                           <p>{span.text}</p>
                           <button
@@ -1636,7 +1733,7 @@ export function EvidenceInspector({
                             }}
                           >
                             <Icon name="copy" size={12} />
-                            Copy source reference
+                            {uiText("Copy source reference")}
                           </button>
                           <button
                             className="citation-copy"
@@ -1650,12 +1747,16 @@ export function EvidenceInspector({
                                 );
                               } catch {
                                 setMessage(
-                                  `Copy this version-specific source link: ${sourceUrl}`,
+                                  uiMessage(
+                                    "Copy this version-specific source link: {0}",
+                                    { "0": sourceUrl },
+                                  ),
                                 );
                               }
                             }}
                           >
-                            <Icon name="copy" size={12} /> Copy source link
+                            <Icon name="copy" size={12} />{" "}
+                            {" " + uiText("Copy source link")}
                           </button>
                           {canReview && (
                             <button
@@ -1666,7 +1767,7 @@ export function EvidenceInspector({
                               }}
                             >
                               <Icon name="review" size={12} />
-                              Note this location
+                              {uiText("Note this location")}
                             </button>
                           )}
                         </div>
@@ -1679,14 +1780,15 @@ export function EvidenceInspector({
                   ) : (
                     <div className="notice amber">
                       <Icon name="alert" size={18} />
-                      No extracted text is available. Review the original and
-                      processing report.
+                      {uiText(
+                        "No extracted text is available. Review the original and processing report.",
+                      )}
                     </div>
                   )}
                   {data.attachments?.length > 0 && (
                     <div className="attachment-list">
                       <h3>
-                        Attachment family{" "}
+                        {uiText("Attachment family")}{" "}
                         <span className="count-chip">
                           {data.attachments.length}
                         </span>
@@ -1717,7 +1819,7 @@ export function EvidenceInspector({
                       }
                     >
                       <Icon name="back" size={15} />
-                      Parent evidence
+                      {uiText("Parent evidence")}
                     </button>
                   )}
                   {data.email && (
@@ -1727,8 +1829,8 @@ export function EvidenceInspector({
                         onClick={() => setRaw((value) => !value)}
                       >
                         {raw
-                          ? "Hide original headers"
-                          : "Show original headers"}
+                          ? uiText("Hide original headers")
+                          : uiText("Show original headers")}
                         <Icon name="chevron" size={14} />
                       </button>
                       {raw && (
@@ -1743,15 +1845,15 @@ export function EvidenceInspector({
                 </>
               ) : tab === "metadata" ? (
                 <>
-                  <h3>Source provenance</h3>
+                  <h3>{uiText("Source provenance")}</h3>
                   <dl className="metadata-list">
                     <Meta
-                      title="Original filename"
+                      title={uiText("Original filename")}
                       value={data.original_name}
                     />
-                    <Meta title="Source" value={data.source?.label} />
+                    <Meta title={uiText("Source")} value={data.source?.label} />
                     <Meta
-                      title="Custodian"
+                      title={uiText("Custodian")}
                       value={
                         typeof data.source?.custodian === "string"
                           ? data.source.custodian
@@ -1764,36 +1866,47 @@ export function EvidenceInspector({
                             )?.display_name
                       }
                     />
-                    <Meta title="Evidence ID" value={data.evidence_id} />
                     <Meta
-                      title="Preserved size"
+                      title={uiText("Evidence ID")}
+                      value={data.evidence_id}
+                    />
+                    <Meta
+                      title={uiText("Preserved size")}
                       value={bytes(data.byte_size)}
                     />
                     <Meta
-                      title="Integrity state"
+                      title={uiText("Integrity state")}
                       value={data.integrity_status}
                     />
-                    <Meta title="Processing state" value={data.parser_state} />
-                    <Meta title="UTC timestamp" value={data.date_utc} />
                     <Meta
-                      title="Raw source time"
+                      title={uiText("Processing state")}
+                      value={data.parser_state}
+                    />
+                    <Meta
+                      title={uiText("UTC timestamp")}
+                      value={data.date_utc}
+                    />
+                    <Meta
+                      title={uiText("Raw source time")}
                       value={data.email?.sent_at_raw || data.date_raw}
                     />
                     <Meta
-                      title="Time zone provenance"
-                      value={data.timezone_source || "See original metadata"}
+                      title={uiText("Time zone provenance")}
+                      value={
+                        data.timezone_source || uiText("See original metadata")
+                      }
                     />
                   </dl>
                   {data.metadata && Object.keys(data.metadata).length > 0 && (
                     <>
-                      <h3>Extraction metadata</h3>
+                      <h3>{uiText("Extraction metadata")}</h3>
                       {Boolean(data.metadata.ocr_quality) && (
                         <div className="notice amber">
                           <Icon name="alert" size={16} />
                           <span>
-                            OCR text and confidence scores require human
-                            verification against the source. They do not
-                            establish evidentiary accuracy.
+                            {uiText(
+                              "OCR text and confidence scores require human verification against the source. They do not establish evidentiary accuracy.",
+                            )}
                           </span>
                         </div>
                       )}
@@ -1816,20 +1929,21 @@ export function EvidenceInspector({
                           ))}
                       </dl>
                       <details className="audit-metadata">
-                        <summary>All parser metadata</summary>
+                        <summary>{uiText("All parser metadata")}</summary>
                         <pre>{JSON.stringify(data.metadata, null, 2)}</pre>
                       </details>
                     </>
                   )}
-                  <h3>Original SHA-256</h3>
+                  <h3>{uiText("Original SHA-256")}</h3>
                   <code className="hash-block">{data.sha256}</code>
                   <p className="field-help">
-                    The hash identifies the exact original bytes, independently
-                    of extracted text.
+                    {uiText(
+                      "The hash identifies the exact original bytes, independently of extracted text.",
+                    )}
                   </p>
                   {data.derived_artifacts?.length ? (
                     <>
-                      <h3>Derived artifacts</h3>
+                      <h3>{uiText("Derived artifacts")}</h3>
                       {data.derived_artifacts.map((artifact) => (
                         <div className="artifact-card" key={artifact.id}>
                           <strong>{label(artifact.artifact_type)}</strong>
@@ -1841,20 +1955,25 @@ export function EvidenceInspector({
                   ) : null}
                   {data.spans?.length ? (
                     <>
-                      <h3>Source locations</h3>
+                      <h3>{uiText("Source locations")}</h3>
                       <div className="span-list">
                         {data.spans.map((span, i) => (
                           <div key={span.span_id || span.id || i}>
                             <strong>
                               {span.page
-                                ? `Page ${span.page}`
-                                : `Characters ${span.char_start}–${span.char_end}`}
+                                ? uiText("Page {0}", { "0": span.page })
+                                : uiText("Characters {0}–{1}", {
+                                    "0": span.char_start,
+                                    "1": span.char_end,
+                                  })}
                             </strong>
                             <small className="mono">
                               {span.span_id || span.id}
                             </small>
                             <small>
-                              Artifact version {span.artifact_version}
+                              {uiText("Artifact version {0}", {
+                                "0": span.artifact_version,
+                              })}
                             </small>
                           </div>
                         ))}
@@ -1874,10 +1993,10 @@ export function EvidenceInspector({
               ) : (
                 <>
                   <div className="review-current">
-                    <span className="eyebrow">HUMAN REVIEW</span>
+                    <span className="eyebrow">{uiText("HUMAN REVIEW")}</span>
                     <Badge value={data.review_status} />
                   </div>
-                  <h3>Responsiveness</h3>
+                  <h3>{uiText("Responsiveness")}</h3>
                   <div className="review-buttons">
                     {[
                       "responsive",
@@ -1895,13 +2014,14 @@ export function EvidenceInspector({
                       </button>
                     ))}
                   </div>
-                  <h3>Privilege review</h3>
+                  <h3>{uiText("Privilege review")}</h3>
                   <p className="field-help">
-                    Suspicion is a review flag. Confirmed privilege is a human
-                    decision and can block export.
+                    {uiText(
+                      "Suspicion is a review flag. Confirmed privilege is a human decision and can block export.",
+                    )}
                   </p>
                   <select
-                    aria-label="Privilege review status"
+                    aria-label={uiText("Privilege review status")}
                     value={data.privilege_status || "none"}
                     disabled={
                       busy ||
@@ -1915,20 +2035,22 @@ export function EvidenceInspector({
                       void review({ privilege_status: event.target.value })
                     }
                   >
-                    <option value="none">No privilege flag</option>
+                    <option value="none">{uiText("No privilege flag")}</option>
                     <option value="suspected">
-                      Suspected · requires review
+                      {uiText("Suspected · requires review")}
                     </option>
                     <option value="confirmed" disabled={!canPrivilege}>
-                      Confirmed by attorney
+                      {uiText("Confirmed by attorney")}
                     </option>
                     <option value="cleared" disabled={!canPrivilege}>
-                      Cleared by attorney
+                      {uiText("Cleared by attorney")}
                     </option>
                   </select>
-                  <h3>Assigned reviewer</h3>
+                  <h3>{uiText("Assigned reviewer")}</h3>
                   <label>
-                    <span className="sr-only">Evidence assigned reviewer</span>
+                    <span className="sr-only">
+                      {uiText("Evidence assigned reviewer")}
+                    </span>
                     <select
                       value={data.assigned_to || ""}
                       disabled={!canManage || busy}
@@ -1936,7 +2058,7 @@ export function EvidenceInspector({
                         void review({ assigned_to: event.target.value || null })
                       }
                     >
-                      <option value="">Unassigned</option>
+                      <option value="">{uiText("Unassigned")}</option>
                       {members.data?.items
                         .filter((member) => can(member.role, "review"))
                         .map((member) => (
@@ -1947,11 +2069,11 @@ export function EvidenceInspector({
                     </select>
                   </label>
                   <p className="field-help">
-                    Matter leads and review managers can change direct
-                    allocation. Reviewers claim fixed snapshots from the review
-                    queue.
+                    {uiText(
+                      "Matter leads and review managers can change direct allocation. Reviewers claim fixed snapshots from the review queue.",
+                    )}
                   </p>
-                  <h3>Human tags</h3>
+                  <h3>{uiText("Human tags")}</h3>
                   <form
                     onSubmit={(event) => {
                       event.preventDefault();
@@ -1965,7 +2087,7 @@ export function EvidenceInspector({
                   >
                     <label>
                       <span className="sr-only">
-                        Comma-separated evidence tags
+                        {uiText("Comma-separated evidence tags")}
                       </span>
                       <input
                         value={tags}
@@ -1976,23 +2098,23 @@ export function EvidenceInspector({
                           };
                           setTags(event.target.value);
                         }}
-                        placeholder="Payment approval, Key witness"
+                        placeholder={uiText("Payment approval, Key witness")}
                         disabled={!canReview}
                       />
                     </label>
                     <small className="field-help">
-                      Separate tags with a comma.
+                      {uiText("Separate tags with a comma.")}
                     </small>
                     <button
                       className="button secondary compact"
                       disabled={busy || !canReview}
                     >
-                      Save tags
+                      {uiText("Save tags")}
                     </button>
                   </form>
-                  <h3>Review note</h3>
+                  <h3>{uiText("Review note")}</h3>
                   <label>
-                    Source location
+                    {uiText("Source location")}
                     <select
                       value={noteSpan || ""}
                       onChange={(event) =>
@@ -2000,12 +2122,17 @@ export function EvidenceInspector({
                       }
                       disabled={!canReview}
                     >
-                      <option value="">General evidence note</option>
+                      <option value="">
+                        {uiText("General evidence note")}
+                      </option>
                       {data.spans.map((span) => (
                         <option key={span.id} value={span.span_id || span.id}>
                           {span.page
-                            ? `Page ${span.page}`
-                            : `Chars ${span.char_start}–${span.char_end}`}{" "}
+                            ? uiText("Page {0}", { "0": span.page })
+                            : uiText("Chars {0}–{1}", {
+                                "0": span.char_start,
+                                "1": span.char_end,
+                              })}{" "}
                           · {span.span_id || span.id}
                         </option>
                       ))}
@@ -2037,13 +2164,15 @@ export function EvidenceInspector({
                     }}
                   >
                     <label>
-                      <span className="sr-only">Evidence review note</span>
+                      <span className="sr-only">
+                        {uiText("Evidence review note")}
+                      </span>
                       <textarea
-                        aria-label="Evidence review note"
+                        aria-label={uiText("Evidence review note")}
                         rows={3}
                         value={note}
                         onChange={(event) => setNote(event.target.value)}
-                        placeholder="Add a note for your review team…"
+                        placeholder={uiText("Add a note for your review team…")}
                         required
                         disabled={busy || !canReview}
                       />
@@ -2052,7 +2181,7 @@ export function EvidenceInspector({
                       className="button secondary compact"
                       disabled={busy || !canReview || !note.trim()}
                     >
-                      Add note
+                      {uiText("Add note")}
                     </button>
                   </form>
                   {data.annotations?.length > 0 && (
@@ -2075,7 +2204,7 @@ export function EvidenceInspector({
                                 );
                               }}
                             >
-                              Open anchored location
+                              {uiText("Open anchored location")}
                             </button>
                           )}
                         </div>
@@ -2084,7 +2213,7 @@ export function EvidenceInspector({
                   )}
                   {data.review_history?.length > 0 && (
                     <>
-                      <h3>Review history</h3>
+                      <h3>{uiText("Review history")}</h3>
                       <div className="notes-list">
                         {data.review_history.map((item) => (
                           <div key={item.id}>
@@ -2094,7 +2223,7 @@ export function EvidenceInspector({
                                     (item.review_status ||
                                       item.changes?.review_status)!,
                                   )
-                                : "Review updated"}
+                                : uiText("Review updated")}
                             </strong>
                             {item.note && <p>{item.note}</p>}
                             <small>
@@ -2108,8 +2237,9 @@ export function EvidenceInspector({
                   {!canReview && (
                     <div className="notice subtle">
                       <Icon name="lock" size={16} />
-                      Your matter role allows reading this evidence. Review
-                      changes require additional permission.
+                      {uiText(
+                        "Your matter role allows reading this evidence. Review changes require additional permission.",
+                      )}
                     </div>
                   )}
                 </>
@@ -2132,7 +2262,7 @@ function Meta({
   return (
     <div>
       <dt>{title}</dt>
-      <dd>{value || "Not recorded"}</dd>
+      <dd>{value || uiText("Not recorded")}</dd>
     </div>
   );
 }
@@ -2178,7 +2308,7 @@ function ExplorerActionModal({
     const timer = setInterval(exportStatus.refresh, 1500);
     return () => clearInterval(timer);
   }, [download, exportStatus.refresh]);
-  const titles = {
+  const titles: Record<typeof kind, MessageKey> = {
     saved: "Save this search",
     set: "Create a review set",
     bulk: "Review selected evidence",
@@ -2242,17 +2372,19 @@ function ExplorerActionModal({
     }
   }
   return (
-    <Modal title={titles[kind]} close={close}>
+    <Modal title={uiText(titles[kind])} close={close}>
       <ErrorBox error={error} />
       {download ? (
         <>
           <div className="notice green" role="status">
             <Icon name="check" />
-            Export {label(download.state).toLowerCase()}.
+            {uiText("Export") + " "}
+            {label(download.state).toLowerCase()}.
           </div>
           <p className="muted">
-            The server checked your permissions, evidence integrity and export
-            holdbacks.
+            {uiText(
+              "The server checked your permissions, evidence integrity and export holdbacks.",
+            )}
           </p>
           {["completed", "ready"].includes(download.state.toLowerCase()) ? (
             <a
@@ -2260,14 +2392,14 @@ function ExplorerActionModal({
               href={`/api/v1/cases/${caseId}/exports/${download.id}/download`}
             >
               <Icon name="export" size={17} />
-              Download export
+              {uiText("Download export")}
             </a>
           ) : (
             <Link
               href={`/app/matters/${caseId}/reports`}
               className="button primary"
             >
-              View export status
+              {uiText("View export status")}
               <Icon name="arrow" size={16} />
             </Link>
           )}
@@ -2276,22 +2408,28 @@ function ExplorerActionModal({
         <form onSubmit={submit}>
           <p className="muted">
             {kind === "saved"
-              ? "Preserve this query, filters, sort and grouping so you can return to the same scope."
+              ? uiText(
+                  "Preserve this query, filters, sort and grouping so you can return to the same scope.",
+                )
               : selected.length
-                ? `${number(selected.length)} explicitly selected evidence items.`
-                : "All evidence matching the current query and filters, across every page."}
+                ? uiText("{0} explicitly selected evidence items.", {
+                    "0": number(selected.length),
+                  })
+                : uiText(
+                    "All evidence matching the current query and filters, across every page.",
+                  )}
           </p>
           {["saved", "set", "assign"].includes(kind) && (
             <label>
-              Name
+              {uiText("Name")}
               <input
                 name="name"
                 required
                 maxLength={200}
                 placeholder={
                   kind === "saved"
-                    ? "Finance correspondence · Q2"
-                    : "First-pass review"
+                    ? uiText("Finance correspondence · Q2")
+                    : uiText("First-pass review")
                 }
               />
             </label>
@@ -2300,9 +2438,11 @@ function ExplorerActionModal({
             <>
               <ErrorBox error={members.error} />
               <label>
-                Assigned reviewer
+                {uiText("Assigned reviewer")}
                 <select name="assignee_id" defaultValue="">
-                  <option value="">Unassigned · available to claim</option>
+                  <option value="">
+                    {uiText("Unassigned · available to claim")}
+                  </option>
                   {members.data?.items
                     .filter((member) => can(member.role, "review"))
                     .map((member) => (
@@ -2313,7 +2453,7 @@ function ExplorerActionModal({
                 </select>
               </label>
               <label>
-                Assignment reason
+                {uiText("Assignment reason")}
                 <textarea
                   name="reason"
                   required
@@ -2323,59 +2463,75 @@ function ExplorerActionModal({
                 />
               </label>
               <p className="field-help">
-                The selected items form a fixed snapshot. Items already reserved
-                by another open assignment are rejected.
+                {uiText(
+                  "The selected items form a fixed snapshot. Items already reserved by another open assignment are rejected.",
+                )}
               </p>
             </>
           )}
           {kind === "bulk" && (
             <>
               <label>
-                Review decision
+                {uiText("Review decision")}
                 <select name="review_status">
-                  <option value="needs_review">Needs review</option>
-                  <option value="responsive">Responsive</option>
-                  <option value="non_responsive">Non-responsive</option>
-                  <option value="unreviewed">Unreviewed</option>
+                  <option value="needs_review">{uiText("Needs review")}</option>
+                  <option value="responsive">{uiText("Responsive")}</option>
+                  <option value="non_responsive">
+                    {uiText("Non-responsive")}
+                  </option>
+                  <option value="unreviewed">{uiText("Unreviewed")}</option>
                 </select>
               </label>
               <label>
-                Tags <span className="optional">optional</span>
-                <input name="tags" placeholder="Comma-separated tags" />
+                {uiText("Tags") + " "}
+                <span className="optional">{uiText("optional")}</span>
+                <input
+                  name="tags"
+                  placeholder={uiText("Comma-separated tags")}
+                />
               </label>
             </>
           )}
           {kind === "export" && (
             <>
               <label>
-                Format
+                {uiText("Format")}
                 <select name="format">
-                  <option value="csv">CSV metadata + hash manifest</option>
-                  <option value="json">JSON metadata + hash manifest</option>
-                  <option value="zip">ZIP evidence package + manifest</option>
+                  <option value="csv">
+                    {uiText("CSV metadata + hash manifest")}
+                  </option>
+                  <option value="json">
+                    {uiText("JSON metadata + hash manifest")}
+                  </option>
+                  <option value="zip">
+                    {uiText("ZIP evidence package + manifest")}
+                  </option>
                 </select>
               </label>
               <label>
-                Purpose or reason
+                {uiText("Purpose or reason")}
                 <textarea
                   name="reason"
                   required
                   minLength={3}
                   rows={3}
-                  placeholder="Describe the purpose of this export"
+                  placeholder={uiText("Describe the purpose of this export")}
                 />
               </label>
               <label className="checkbox-label">
                 <input name="confirmed" type="checkbox" required />
                 <span>
-                  I reviewed the evidence scope and am authorized to export it.
+                  {uiText(
+                    "I reviewed the evidence scope and am authorized to export it.",
+                  )}
                 </span>
               </label>
               <div className="notice amber">
                 <Icon name="lock" size={17} />
                 <span>
-                  Server privilege, review and integrity checks can block this
-                  export. Preview exports are limited to 20,000 items.
+                  {uiText(
+                    "Server privilege, review and integrity checks can block this export. Preview exports are limited to 20,000 items.",
+                  )}
                 </span>
               </div>
             </>
@@ -2387,16 +2543,16 @@ function ExplorerActionModal({
               disabled={busy}
               onClick={close}
             >
-              Cancel
+              {uiText("Cancel")}
             </button>
             <button className="button primary" disabled={busy}>
               {busy
-                ? "Saving…"
+                ? uiText("Saving…")
                 : kind === "export"
-                  ? "Create export"
+                  ? uiText("Create export")
                   : kind === "bulk"
-                    ? "Save review decisions"
-                    : "Save"}
+                    ? uiText("Save review decisions")
+                    : uiText("Save")}
               <Icon name="arrow" size={16} />
             </button>
           </div>

@@ -75,6 +75,7 @@ def register(app, ingest, auth, email, evidence):
         add_resource(group, resource)
         if resource == "tasks":
             add_mutation(group, "update", resource, "PATCH")
+            add_worklist(group)
         if resource == "members":
             add_mutation(group, "remove", resource, "DELETE")
         if resource == "holds":
@@ -141,6 +142,51 @@ def register(app, ingest, auth, email, evidence):
     def compare(ctx: typer.Context, left_id: str, right_id: str, case: str | None = None):
         api = API(ctx.obj)
         display(api.request("POST", api.case_route(case, "/compare"), json={"left_id": identity(left_id), "right_id": identity(right_id)}), ctx.obj)
+
+
+def add_worklist(group):
+    @group.command("worklist", help="Find your assignments across all accessible active matters.")
+    def worklist(
+        ctx: typer.Context,
+        state: Annotated[str, typer.Option(help="all, open or in_progress")] = "all",
+        due: Annotated[str, typer.Option(help="all, overdue, upcoming or no_due")] = "all",
+        priority: Annotated[str, typer.Option(help="all, low, normal, high or urgent")] = "all",
+        sort: Annotated[str, typer.Option(help="due or priority")] = "due",
+        query: Annotated[str, typer.Option(help="Case-insensitive literal text in task titles (up to 200 characters).")] = "",
+    ):
+        if ctx.obj.case_id:
+            fail("Use task list with --case for one matter, or omit --case for your cross-matter worklist.", 2)
+        if ctx.obj.limit > 100:
+            fail("The worklist accepts --limit from 1 to 100.", 2)
+        choices = {
+            "state": {"all", "open", "in_progress"},
+            "due": {"all", "overdue", "upcoming", "no_due"},
+            "priority": {"all", "low", "normal", "high", "urgent"},
+            "sort": {"due", "priority"},
+        }
+        parameters = {"state": state, "due": due, "priority": priority, "sort": sort}
+        for name, value in parameters.items():
+            if value not in choices[name]:
+                fail(f"--{name} must be one of: {', '.join(sorted(choices[name]))}.", 2)
+        query = query.strip()
+        if len(query) > 200 or "\x00" in query:
+            fail("--query must contain at most 200 characters and no null characters.", 2)
+        parameters.update(limit=ctx.obj.limit, q=query)
+        if ctx.obj.cursor:
+            parameters["cursor"] = ctx.obj.cursor
+        page = API(ctx.obj).request("GET", "/worklist", params=parameters)
+        if ctx.obj.output == "table":
+            rows = [{"task": item["title"], "priority": item["priority"], "state": item["state"],
+                     "due": item["due_date"] or "—", "matter": item["matter"]["matter_number"], "id": item["id"]}
+                    for item in page["items"]]
+            if rows:
+                display({"items": rows}, ctx.obj)
+            else:
+                typer.echo("No matching assignments.")
+            bucket = {"all": "total", "overdue": "overdue", "upcoming": "upcoming", "no_due": "no_due"}[due]
+            typer.echo(f"Matching assignments: {page['summary'][bucket]}; next cursor: {page.get('next_cursor') or 'none'}")
+        else:
+            display(page, ctx.obj)
 
 
 def add_read(group, command, resource):

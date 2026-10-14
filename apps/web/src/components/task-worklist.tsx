@@ -1,20 +1,27 @@
 "use client";
+import { uiText, type MessageKey } from "@/lib/i18n";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useResource } from "@/lib/hooks";
-import { api, ApiError, date, number } from "@/lib/api";
+import { api, ApiError, date, uiLabel as label, number } from "@/lib/api";
 import { can } from "@/lib/permissions";
 import { Badge, Empty, ErrorBox, Icon, Loading } from "./ui";
 import { TaskDeadline } from "./task-deadline";
 import TaskDetails from "./task-details";
-import type { TaskDetail } from "./task-types";
+import {
+  taskPriorities,
+  taskPriorityTone,
+  type TaskDetail,
+  type TaskPriority,
+} from "./task-types";
 import styles from "./task-worklist.module.css";
 
 type Task = {
   id: string;
   title: string;
   state: "open" | "in_progress";
+  priority: TaskPriority;
   created_at: string;
   due_date: string | null;
   version: number;
@@ -29,15 +36,19 @@ type WorkPage = {
   server_today: string;
   time_zone: string;
   state: "all" | "open" | "in_progress";
+  q: string;
+  priority: "all" | TaskPriority;
+  sort: "due" | "priority";
   state_counts: { all: number; open: number; in_progress: number };
+  priority_counts: Record<"all" | TaskPriority, number>;
   summary: { total: number; overdue: number; upcoming: number; no_due: number };
 };
 type DueFilter = "all" | "overdue" | "upcoming" | "no_due";
 const filters: {
   value: DueFilter;
-  label: string;
+  label: MessageKey;
   count: keyof WorkPage["summary"];
-  detail: string;
+  detail: MessageKey;
 }[] = [
   {
     value: "all",
@@ -74,11 +85,18 @@ function Worklist({ userId }: { userId: string }) {
   const [history, setHistory] = useState<(string | null)[]>([]);
   const [dueFilter, setDueFilter] = useState<DueFilter>("all");
   const [stateFilter, setStateFilter] = useState<WorkPage["state"]>("all");
+  const [priorityFilter, setPriorityFilter] =
+    useState<WorkPage["priority"]>("all");
+  const [sort, setSort] = useState<WorkPage["sort"]>("due");
+  const [query, setQuery] = useState("");
+  const [queryDraft, setQueryDraft] = useState("");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [completing, setCompleting] = useState<string | null>(null);
   const [actionError, setActionError] = useState<unknown>(null);
+  const viewRevision = useRef(0);
+  const live = useRef(true);
   const resource = useResource<WorkPage>(
-    `/worklist?limit=20&due=${dueFilter}&state=${stateFilter}` +
+    `/worklist?limit=20&due=${dueFilter}&state=${stateFilter}&priority=${priorityFilter}&sort=${sort}&q=${encodeURIComponent(query)}` +
       (cursor ? "&cursor=" + encodeURIComponent(cursor) : ""),
   );
   const invalidPage =
@@ -89,7 +107,10 @@ function Worklist({ userId }: { userId: string }) {
   const page =
     !invalidPage &&
     resource.data?.user_id === userId &&
-    resource.data.state === stateFilter
+    resource.data.state === stateFilter &&
+    resource.data.priority === priorityFilter &&
+    resource.data.sort === sort &&
+    resource.data.q === query
       ? resource.data
       : null;
   const groups = useMemo(() => {
@@ -105,6 +126,12 @@ function Worklist({ userId }: { userId: string }) {
     return grouped;
   }, [page]);
   useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
+  useEffect(() => {
     const refreshVisible = () => {
       if (document.visibilityState === "visible") resource.refresh();
     };
@@ -116,7 +143,18 @@ function Worklist({ userId }: { userId: string }) {
     };
   }, [resource.refresh]);
 
+  function changeView() {
+    viewRevision.current += 1;
+    setActionError(null);
+  }
+  function resetPage() {
+    changeView();
+    setCursor(null);
+    setHistory([]);
+  }
+
   async function complete(task: Task) {
+    const submittedView = viewRevision.current;
     setCompleting(task.id);
     setActionError(null);
     try {
@@ -125,18 +163,21 @@ function Worklist({ userId }: { userId: string }) {
         body: JSON.stringify({ state: "done", expected_version: task.version }),
       });
     } catch (error) {
-      setActionError(error);
+      if (live.current && submittedView === viewRevision.current)
+        setActionError(error);
     } finally {
-      setCursor(null);
-      setHistory([]);
-      resource.refresh();
-      setCompleting(null);
+      if (live.current) {
+        if (submittedView === viewRevision.current) {
+          setCursor(null);
+          setHistory([]);
+        }
+        resource.refresh();
+        setCompleting(null);
+      }
     }
   }
   function taskChanged(_task: TaskDetail) {
-    setCursor(null);
-    setHistory([]);
-    setActionError(null);
+    resetPage();
     resource.refresh();
   }
   function closeTask() {
@@ -158,18 +199,27 @@ function Worklist({ userId }: { userId: string }) {
     >
       <div className={styles.heading}>
         <div>
-          <span className="eyebrow">ASSIGNED TO YOU</span>
+          <span className="eyebrow">{uiText("ASSIGNED TO YOU")}</span>
           <h2 id="my-work-heading" tabIndex={-1}>
-            My work
+            {uiText("My work")}
           </h2>
           <p>
-            Your open assignments, ordered by deadline, across active matters.
+            {uiText(
+              "Your open assignments across active matters, ordered by {0}.",
+              {
+                "0":
+                  sort === "priority"
+                    ? uiText("manual priority, then deadline")
+                    : uiText("deadline"),
+              },
+            )}
           </p>
         </div>
         <button
           className="button secondary compact"
           type="button"
           onClick={() => {
+            changeView();
             if (invalidPage) {
               setCursor(null);
               setHistory([]);
@@ -178,42 +228,128 @@ function Worklist({ userId }: { userId: string }) {
           }}
           disabled={resource.loading}
         >
-          Refresh my work
+          {uiText("Refresh my work")}
         </button>
       </div>
+      <form
+        className={styles.search}
+        role="search"
+        aria-label={uiText("Search your assigned tasks")}
+        onSubmit={(event) => {
+          event.preventDefault();
+          setQuery(queryDraft.trim());
+          resetPage();
+          resource.refresh();
+        }}
+      >
+        <label>
+          {uiText("Search task titles")}
+          <input
+            type="search"
+            aria-label={uiText("Search task titles")}
+            value={queryDraft}
+            onChange={(event) => setQueryDraft(event.target.value)}
+            maxLength={200}
+            placeholder={uiText("Find an assigned task by its title")}
+          />
+        </label>
+        <button type="submit" className="button secondary">
+          <Icon name="search" size={16} /> {" " + uiText("Search tasks")}
+        </button>
+        {(query || queryDraft) && (
+          <button
+            type="button"
+            className="button ghost"
+            onClick={() => {
+              setQuery("");
+              setQueryDraft("");
+              resetPage();
+            }}
+          >
+            {uiText("Clear task search")}
+          </button>
+        )}
+      </form>
       <div className={styles.statusBar}>
         <label>
-          Status
+          {uiText("Status")}
           <select
-            aria-label="Task status filter"
+            aria-label={uiText("Task status filter")}
             value={stateFilter}
             onChange={(event) => {
               setStateFilter(event.target.value as WorkPage["state"]);
-              setCursor(null);
-              setHistory([]);
-              setActionError(null);
+              resetPage();
             }}
           >
             <option value="all">
-              All open work{page ? ` (${number(page.state_counts.all)})` : ""}
+              {uiText("All open work{0}", {
+                "0": page ? ` (${number(page.state_counts.all)})` : "",
+              })}
             </option>
             <option value="open">
-              Open{page ? ` (${number(page.state_counts.open)})` : ""}
+              {uiText("Open{0}", {
+                "0": page ? ` (${number(page.state_counts.open)})` : "",
+              })}
             </option>
             <option value="in_progress">
-              In progress
-              {page ? ` (${number(page.state_counts.in_progress)})` : ""}
+              {uiText("In progress{0}", {
+                "0": page ? ` (${number(page.state_counts.in_progress)})` : "",
+              })}
             </option>
           </select>
         </label>
-        <p>
-          Status counts include all your active assignments. Deadline counts
-          reflect the selected status.
-        </p>
+        <label>
+          {uiText("Priority")}
+          <select
+            aria-label={uiText("Task priority filter")}
+            value={priorityFilter}
+            onChange={(event) => {
+              setPriorityFilter(event.target.value as WorkPage["priority"]);
+              resetPage();
+            }}
+          >
+            <option value="all">
+              {uiText("All priorities{0}", {
+                "0": page ? ` (${number(page.priority_counts.all)})` : "",
+              })}
+            </option>
+            {taskPriorities.map((priority) => (
+              <option key={priority} value={priority}>
+                {label(priority)}
+                {page ? ` (${number(page.priority_counts[priority])})` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {uiText("Sort by")}
+          <select
+            aria-label={uiText("Sort my work")}
+            value={sort}
+            onChange={(event) => {
+              setSort(event.target.value as WorkPage["sort"]);
+              resetPage();
+            }}
+          >
+            <option value="due">{uiText("Deadline first")}</option>
+            <option value="priority">{uiText("Priority first")}</option>
+          </select>
+        </label>
       </div>
+      <p className={styles.scope} role="status">
+        {query ? (
+          <>
+            {uiText("Matching titles containing “")}
+            {query}”.{" "}
+          </>
+        ) : null}
+        {uiText(
+          "Status counts cover matching active tasks; priority counts also reflect status. Deadline counts reflect title, status and priority. Priorities are manual and do not calculate court deadlines or apply court rules.",
+        )}
+      </p>
       <div
         className={styles.filters}
-        aria-label="Filter assigned tasks by deadline"
+        aria-label={uiText("Filter assigned tasks by deadline")}
       >
         {filters.map((filter) => (
           <button
@@ -221,20 +357,18 @@ function Worklist({ userId }: { userId: string }) {
             type="button"
             className={`${styles.filter} ${dueFilter === filter.value ? styles.selected : ""} ${filter.value === "overdue" ? styles.overdue : ""}`}
             aria-pressed={dueFilter === filter.value}
-            title={filter.detail}
+            title={uiText(filter.detail)}
             onClick={() => {
               setDueFilter(filter.value);
-              setCursor(null);
-              setHistory([]);
-              setActionError(null);
+              resetPage();
             }}
           >
             <span>
               {filter.value === "all" && stateFilter !== "all"
                 ? stateFilter === "open"
-                  ? "All open"
-                  : "All in progress"
-                : filter.label}
+                  ? uiText("All open")
+                  : uiText("All in progress")
+                : uiText(filter.label)}
             </span>
             <strong>{page ? number(page.summary[filter.count]) : "—"}</strong>
           </button>
@@ -242,14 +376,17 @@ function Worklist({ userId }: { userId: string }) {
       </div>
       {page && (
         <p className={styles.calendar}>
-          Calendar: {date(page.server_today)} ({page.time_zone}). Dates are
-          entered by your team.
+          {uiText("Calendar: {0} ({1}). Dates are entered by your team.", {
+            "0": date(page.server_today),
+            "1": page.time_zone,
+          })}
         </p>
       )}
       <ErrorBox error={actionError} />
       <ErrorBox
         error={resource.error}
         retry={() => {
+          changeView();
           if (invalidPage) {
             setCursor(null);
             setHistory([]);
@@ -258,7 +395,7 @@ function Worklist({ userId }: { userId: string }) {
         }}
       />
       {resource.loading && !page ? (
-        <Loading text="Loading your assigned work…" />
+        <Loading text={uiText("Loading your assigned work…")} />
       ) : (
         <>
           {groups.map(({ matter, tasks }) => (
@@ -281,7 +418,9 @@ function Worklist({ userId }: { userId: string }) {
                       <button
                         type="button"
                         id={`my-work-task-${task.id}`}
-                        aria-label={`Open task details: ${task.title}`}
+                        aria-label={uiText("Open task details: {0}", {
+                          "0": task.title,
+                        })}
                         onClick={() => setSelectedTask(task)}
                         className={styles.taskTitle}
                       >
@@ -289,6 +428,10 @@ function Worklist({ userId }: { userId: string }) {
                       </button>
                       <div className={styles.taskMeta}>
                         <Badge value={task.state} />
+                        <Badge
+                          value={`${task.priority} priority`}
+                          tone={taskPriorityTone(task.priority)}
+                        />
                         <TaskDeadline
                           value={task.due_date}
                           today={page!.server_today}
@@ -299,12 +442,16 @@ function Worklist({ userId }: { userId: string }) {
                       <button
                         type="button"
                         className={`button secondary compact ${styles.complete}`}
-                        aria-label={`Mark ${task.title} complete`}
+                        aria-label={uiText("Mark {0} complete", {
+                          "0": task.title,
+                        })}
                         disabled={Boolean(completing) || resource.loading}
                         onClick={() => void complete(task)}
                       >
                         <Icon name="check" size={15} />
-                        {completing === task.id ? "Saving…" : "Complete"}
+                        {completing === task.id
+                          ? uiText("Saving…")
+                          : uiText("Complete")}
                       </button>
                     )}
                   </li>
@@ -316,25 +463,39 @@ function Worklist({ userId }: { userId: string }) {
             <Empty
               icon="check"
               title={
-                cursor
-                  ? "No remaining tasks on this page"
-                  : dueFilter === "all"
-                    ? "No open tasks assigned to you"
-                    : `No ${dueFilter === "no_due" ? "undated" : dueFilter === "upcoming" ? "upcoming" : "overdue"} assignments`
+                query || priorityFilter !== "all" || stateFilter !== "all"
+                  ? uiText("No assignments match these filters")
+                  : cursor
+                    ? uiText("No remaining tasks on this page")
+                    : dueFilter === "all"
+                      ? uiText("No open tasks assigned to you")
+                      : uiText("No assignments match these filters")
               }
               text={
-                cursor
-                  ? "Shared work may have changed. Return to the first page to see the current list."
-                  : dueFilter === "all"
-                    ? "Tasks assigned to you in active matters will appear here. Change the status filter to see other active assignments. Completed and cancelled tasks remain in their matter's task history."
-                    : "Choose another status or deadline filter to see your other assignments."
+                query || priorityFilter !== "all" || stateFilter !== "all"
+                  ? uiText(
+                      "Try another title, priority or status, or clear the search to see your other assignments.",
+                    )
+                  : cursor
+                    ? uiText(
+                        "Shared work may have changed. Return to the first page to see the current list.",
+                      )
+                    : dueFilter === "all"
+                      ? uiText(
+                          "Tasks assigned to you in active matters will appear here. Change the status filter to see other active assignments. Completed and cancelled tasks remain in their matter's task history.",
+                        )
+                      : uiText(
+                          "Choose another status or deadline filter to see your other assignments.",
+                        )
               }
             />
           )}
           <div className={styles.footer}>
             <span>
               {page
-                ? `${page.items.length} task${page.items.length === 1 ? "" : "s"} on this page`
+                ? uiText("Tasks on this page: {0}", {
+                    "0": number(page.items.length),
+                  })
                 : ""}
             </span>
             <div className={styles.pageActions}>
@@ -343,39 +504,40 @@ function Worklist({ userId }: { userId: string }) {
                   type="button"
                   className="text-link"
                   onClick={() => {
-                    setCursor(null);
-                    setHistory([]);
+                    resetPage();
                   }}
                 >
-                  First page
+                  {uiText("First page")}
                 </button>
               )}
               <button
                 type="button"
                 className="button secondary compact"
-                aria-label="Previous page of my work"
+                aria-label={uiText("Previous page of my work")}
                 disabled={!history.length || resource.loading}
                 onClick={() => {
+                  changeView();
                   const previous = [...history];
                   setCursor(previous.pop() || null);
                   setHistory(previous);
                 }}
               >
-                Previous
+                {uiText("Previous")}
               </button>
               <button
                 type="button"
                 className="button secondary compact"
-                aria-label="Next page of my work"
+                aria-label={uiText("Next page of my work")}
                 disabled={!page?.next_cursor || resource.loading}
                 onClick={() => {
                   if (page?.next_cursor) {
+                    changeView();
                     setHistory([...history, cursor]);
                     setCursor(page.next_cursor);
                   }
                 }}
               >
-                Next
+                {uiText("Next")}
               </button>
             </div>
           </div>

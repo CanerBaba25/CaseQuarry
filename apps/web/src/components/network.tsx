@@ -1,4 +1,5 @@
 "use client";
+import { uiText } from "@/lib/i18n";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -44,9 +45,11 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
   return (
     <>
       <PageHeading
-        eyebrow="COLLECTED COMMUNICATIONS"
-        title="See the connections."
-        text="Directed sender-to-recipient relationships from email headers. Addresses are not automatically merged into human identities."
+        eyebrow={uiText("COLLECTED COMMUNICATIONS")}
+        title={uiText("See the connections.")}
+        text={uiText(
+          "Directed sender-to-recipient relationships from email headers. Addresses are not automatically merged into human identities.",
+        )}
       />
       <CommunicationScopeForm
         matter={matter}
@@ -62,8 +65,10 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
         <div className="panel">
           <Empty
             icon="network"
-            title="Connections appear with correspondence"
-            text="Import emails with sender and recipient headers to build a source-backed communication map."
+            title={uiText("Connections appear with correspondence")}
+            text={uiText(
+              "Import emails with sender and recipient headers to build a source-backed communication map.",
+            )}
           />
         </div>
       ) : (
@@ -71,24 +76,32 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
           <div className="notice subtle">
             <Icon name="people" size={18} />
             <span>
-              Counts include every preserved source occurrence. Unique originals
-              count byte-exact original messages separately.
-              {resource.data?.truncated
-                ? " This view is limited to the 500 highest-volume address pairs."
-                : ""}
+              {uiText(
+                "Counts include every preserved source occurrence. Unique originals count byte-exact original messages separately.{0}",
+                {
+                  "0": resource.data?.truncated
+                    ? ` ${uiText(
+                        "This view is limited to the 500 highest-volume address pairs.",
+                      )}`
+                    : "",
+                },
+              )}
             </span>
           </div>
           <section className="panel network-map-panel">
             <div className="section-heading">
               <div>
-                <h2>Communication map</h2>
+                <h2>{uiText("Communication map")}</h2>
                 <p className="muted">
-                  Up to 20 connected header addresses from the returned pairs.
-                  Open an address to inspect its exact message scope.
+                  {uiText(
+                    "Up to 20 connected header addresses from the returned pairs. Open an address to inspect its exact message scope.",
+                  )}
                 </p>
               </div>
               <span className="count-chip">
-                {number(resource.data?.nodes.length)} returned addresses
+                {uiText("{0} returned addresses", {
+                  "0": number(resource.data?.nodes.length),
+                })}
               </span>
             </div>
             <CommunicationMap
@@ -99,21 +112,23 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
           </section>
           <section className="section">
             <div className="section-heading">
-              <h2>Communication pairs</h2>
+              <h2>{uiText("Communication pairs")}</h2>
               <span className="muted">
-                {number(edges.length)} returned pairs
+                {uiText("{0} returned pairs", { "0": number(edges.length) })}
               </span>
             </div>
             <div className="panel table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Sender → Recipient</th>
-                    <th>Occurrences</th>
-                    <th>Unique originals</th>
-                    <th>Explicit threads</th>
+                    <th>{uiText("Sender → Recipient")}</th>
+                    <th>{uiText("Occurrences")}</th>
+                    <th>{uiText("Unique originals")}</th>
+                    <th>{uiText("Explicit threads")}</th>
                     <th>
-                      <span className="sr-only">Directed evidence scope</span>
+                      <span className="sr-only">
+                        {uiText("Directed evidence scope")}
+                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -167,7 +182,8 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
                             true,
                           )}
                         >
-                          Open pair <Icon name="arrow" size={14} />
+                          {uiText("Open pair") + " "}
+                          <Icon name="arrow" size={14} />
                         </Link>
                       </td>
                     </tr>
@@ -176,7 +192,11 @@ export default function NetworkPage({ matter }: { matter: Matter }) {
               </table>
             </div>
             <Pagination
-              text={`Pairs ${page * 50 + 1}–${Math.min((page + 1) * 50, edges.length)} of ${number(edges.length)} returned`}
+              text={uiText("Pairs {0}–{1} of {2} returned", {
+                "0": page * 50 + 1,
+                "1": Math.min((page + 1) * 50, edges.length),
+                "2": number(edges.length),
+              })}
               previous={page ? () => setPage((value) => value - 1) : undefined}
               next={
                 (page + 1) * 50 < edges.length
@@ -246,12 +266,12 @@ function CommunicationMap({
       aria-labelledby="network-title network-description"
     >
       <title id="network-title">
-        Collected sender-to-recipient communication map
+        {uiText("Collected sender-to-recipient communication map")}
       </title>
       <desc id="network-description">
-        A bounded visualization of up to 20 header addresses. The communication
-        pair table provides exact returned occurrence and unique original
-        counts.
+        {uiText(
+          "A bounded visualization of up to 20 header addresses. The communication pair table provides exact returned occurrence and unique original counts.",
+        )}
       </desc>
       <defs>
         <marker
@@ -300,8 +320,10 @@ function CommunicationMap({
           markerEnd="url(#arrowhead)"
         >
           <title>
-            {edge.count} preserved occurrences · {edge.unique_messages} unique
-            originals
+            {uiText("{0} preserved occurrences · {1} unique originals", {
+              "0": edge.count,
+              "1": edge.unique_messages,
+            })}
           </title>
         </line>
       ))}
@@ -313,7 +335,9 @@ function CommunicationMap({
             { ...scopeFilters(scope), person_id: node.id },
             true,
           )}
-          aria-label={`Open exact messages for ${node.email}`}
+          aria-label={uiText("Open exact messages for {0}", {
+            "0": node.email,
+          })}
         >
           <circle
             cx={node.x}
@@ -352,7 +376,7 @@ function CommunicationMap({
           >
             {node.email.slice(0, 38)}
           </text>
-          <title>{node.email} · header address</title>
+          <title>{uiText("{0} · header address", { "0": node.email })}</title>
         </a>
       ))}
     </svg>

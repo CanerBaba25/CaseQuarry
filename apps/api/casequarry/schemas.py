@@ -4,6 +4,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator
 
+from .languages import Language
+
 
 def _date_only(value):
     if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
@@ -29,6 +31,7 @@ class SetupInput(LoginInput):
     firm_name: str = Field(min_length=1, max_length=200)
     name: str = Field(min_length=1, max_length=200)
     password: str = Field(min_length=12, max_length=1024)
+    language: Language = "en"
 
 
 class UserInput(Input):
@@ -187,9 +190,20 @@ class IssueLinkInput(Input):
     note: str = Field(default="", max_length=10000)
 
 
+def _task_text(value):
+    if isinstance(value, str) and "\x00" in value:
+        raise ValueError("Task text cannot contain NUL characters.")
+    return value
+
+
+TaskText = Annotated[str, BeforeValidator(_task_text)]
+TaskPriority = Literal["low", "normal", "high", "urgent"]
+
+
 class TaskInput(Input):
-    title: str = Field(min_length=1, max_length=300)
-    description: str = Field(default="", max_length=10000)
+    title: TaskText = Field(min_length=1, max_length=300)
+    description: TaskText = Field(default="", max_length=10000)
+    priority: TaskPriority = "normal"
     assigned_to: str | None = None
     due_date: DateOnly | None = None
 

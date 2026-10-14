@@ -1,9 +1,10 @@
 "use client";
+import { uiText } from "@/lib/i18n";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { bytes, label, number, post } from "@/lib/api";
+import { bytes, uiLabel as label, number, post } from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import type { EvidenceDetail, Matter, User } from "@/lib/types";
@@ -110,16 +111,18 @@ export default function ProductionsPage({
   return (
     <>
       <PageHeading
-        eyebrow="REVIEWED DISCLOSURE"
-        title="Produce with a second look."
-        text="Verified derivative copies, fixed review snapshots and a stable Bates registry. Originals stay preserved and are never included in these production packs."
+        eyebrow={uiText("REVIEWED DISCLOSURE")}
+        title={uiText("Produce with a second look.")}
+        text={uiText(
+          "Verified derivative copies, fixed review snapshots and a stable Bates registry. Originals stay preserved and are never included in these production packs.",
+        )}
       >
         <button
           className="button secondary"
           disabled={!can(matter.role, "review")}
           onClick={() => setCreateRedaction(true)}
         >
-          Request redaction
+          {uiText("Request redaction")}
         </button>
         <button
           className="button primary"
@@ -127,33 +130,33 @@ export default function ProductionsPage({
           onClick={() => setCreateProduction(true)}
         >
           <Icon name="export" size={17} />
-          Propose production
+          {uiText("Propose production")}
         </button>
       </PageHeading>
       <div className="notice amber">
         <Icon name="shield" size={19} />
         <span>
-          A different current matter lead or attorney must approve each
-          redaction and production. Privilege, review and integrity checks are
-          repeated before delivery. Preservation holds remain disclosed; they do
-          not authorize disclosure.
+          {uiText(
+            "A different current matter lead or attorney must approve each redaction and production. Privilege, review and integrity checks are repeated before delivery. Preservation holds remain disclosed; they do not authorize disclosure.",
+          )}
         </span>
       </div>
       {can(matter.role, "review") ? (
         <section className="section">
           <div className="section-heading">
             <div>
-              <h2>Redaction review</h2>
+              <h2>{uiText("Redaction review")}</h2>
               <p className="muted">
-                Inspect the generated sanitized derivative before a separate
-                approval.
+                {uiText(
+                  "Inspect the generated sanitized derivative before a separate approval.",
+                )}
               </p>
             </div>
             <button
               className="button secondary compact"
               onClick={redactions.refresh}
             >
-              Refresh redactions
+              {uiText("Refresh redactions")}
             </button>
           </div>
           <ErrorBox error={redactions.error} retry={redactions.refresh} />
@@ -164,12 +167,14 @@ export default function ProductionsPage({
               <table>
                 <thead>
                   <tr>
-                    <th>Evidence</th>
-                    <th>Derivative</th>
-                    <th>State</th>
-                    <th>Preserved hash</th>
+                    <th>{uiText("Evidence")}</th>
+                    <th>{uiText("Derivative")}</th>
+                    <th>{uiText("State")}</th>
+                    <th>{uiText("Preserved hash")}</th>
                     <th>
-                      <span className="sr-only">Redaction action</span>
+                      <span className="sr-only">
+                        {uiText("Redaction action")}
+                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -192,14 +197,14 @@ export default function ProductionsPage({
                       <td className="mono">
                         {item.sha256
                           ? `${item.sha256.slice(0, 18)}…`
-                          : "Awaiting derivative"}
+                          : uiText("Awaiting derivative")}
                       </td>
                       <td>
                         <button
                           className="button secondary compact"
                           onClick={() => setRedactionId(item.id)}
                         >
-                          Inspect redaction
+                          {uiText("Inspect redaction")}
                         </button>
                       </td>
                     </tr>
@@ -209,8 +214,10 @@ export default function ProductionsPage({
               {!redactions.data?.items.length && (
                 <Empty
                   icon="review"
-                  title="No redaction requests"
-                  text="Select exact text offsets or PDF page regions. Sanitized derivatives are generated and checked separately from immutable originals."
+                  title={uiText("No redaction requests")}
+                  text={uiText(
+                    "Select exact text offsets or PDF page regions. Sanitized derivatives are generated and checked separately from immutable originals.",
+                  )}
                 />
               )}
             </div>
@@ -238,24 +245,25 @@ export default function ProductionsPage({
       ) : (
         <div className="notice subtle">
           <Icon name="lock" size={17} />
-          Your matter role does not allow redaction review.
+          {uiText("Your matter role does not allow redaction review.")}
         </div>
       )}
       {can(matter.role, "export") && (
         <section className="section">
           <div className="section-heading">
             <div>
-              <h2>Production packs</h2>
+              <h2>{uiText("Production packs")}</h2>
               <p className="muted">
-                At most 200 reviewed items per pack. Flattened PDF copies or
-                verified UTF-8 text, manifest and CSV/DAT/OPT load files.
+                {uiText(
+                  "At most 200 reviewed items per pack. Flattened PDF copies or verified UTF-8 text, manifest and CSV/DAT/OPT load files.",
+                )}
               </p>
             </div>
             <button
               className="button secondary compact"
               onClick={productions.refresh}
             >
-              Refresh productions
+              {uiText("Refresh productions")}
             </button>
           </div>
           <ErrorBox error={productions.error} retry={productions.refresh} />
@@ -266,12 +274,14 @@ export default function ProductionsPage({
               <table>
                 <thead>
                   <tr>
-                    <th>Pack</th>
-                    <th>Scope</th>
-                    <th>State</th>
-                    <th>Bates prefix</th>
+                    <th>{uiText("Pack")}</th>
+                    <th>{uiText("Scope")}</th>
+                    <th>{uiText("State")}</th>
+                    <th>{uiText("Bates prefix")}</th>
                     <th>
-                      <span className="sr-only">Production action</span>
+                      <span className="sr-only">
+                        {uiText("Production action")}
+                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -282,7 +292,11 @@ export default function ProductionsPage({
                         <strong>{item.reason}</strong>
                         <small className="block mono">{item.id}</small>
                       </td>
-                      <td>{number(item.evidence_ids.length)} items</td>
+                      <td>
+                        {uiText("{0} items", {
+                          "0": number(item.evidence_ids.length),
+                        })}
+                      </td>
                       <td>
                         <Badge value={item.state} />
                       </td>
@@ -292,7 +306,7 @@ export default function ProductionsPage({
                           className="button secondary compact"
                           onClick={() => setProductionId(item.id)}
                         >
-                          Inspect pack
+                          {uiText("Inspect pack")}
                         </button>
                       </td>
                     </tr>
@@ -302,8 +316,10 @@ export default function ProductionsPage({
               {!productions.data?.items.length && (
                 <Empty
                   icon="export"
-                  title="No proposed productions"
-                  text="Propose a reviewed evidence snapshot and approved redactions. The pack is generated only after separate attorney or matter-lead approval."
+                  title={uiText("No proposed productions")}
+                  text={uiText(
+                    "Propose a reviewed evidence snapshot and approved redactions. The pack is generated only after separate attorney or matter-lead approval.",
+                  )}
                 />
               )}
             </div>
@@ -407,10 +423,10 @@ function RedactionRequest({
     text = content.data?.text || "",
     characters = Array.from(text);
   return (
-    <Modal title="Request a sanitized redaction" close={close} wide>
+    <Modal title={uiText("Request a sanitized redaction")} close={close} wide>
       <div className="evidence-lookup">
         <label>
-          Evidence ID
+          {uiText("Evidence ID")}
           <input
             value={draftId}
             onChange={(event) => setDraftId(event.target.value)}
@@ -427,7 +443,7 @@ function RedactionRequest({
             setError(null);
           }}
         >
-          Load evidence
+          {uiText("Load evidence")}
         </button>
       </div>
       <ErrorBox error={item.error || content.error || error} />
@@ -464,10 +480,11 @@ function RedactionRequest({
         >
           <h3>{item.data.title}</h3>
           <p className="field-help">
-            Original SHA-256: <code>{item.data.sha256}</code>
+            {uiText("Original SHA-256:") + " "}
+            <code>{item.data.sha256}</code>
           </p>
           <label>
-            Derivative type
+            {uiText("Derivative type")}
             <select
               value={kind}
               onChange={(event) => {
@@ -476,16 +493,16 @@ function RedactionRequest({
                 setRegions([]);
               }}
             >
-              <option value="text">UTF-8 extracted text</option>
+              <option value="text">{uiText("UTF-8 extracted text")}</option>
               <option value="pdf" disabled={item.data.type !== "pdf"}>
-                Flattened PDF pages
+                {uiText("Flattened PDF pages")}
               </option>
             </select>
           </label>
           {kind === "text" ? (
             <>
               <label>
-                Immutable extracted text · version{" "}
+                {uiText("Immutable extracted text · version")}{" "}
                 {content.data?.artifact_version || "—"}
                 <textarea
                   className="redaction-source-text"
@@ -518,14 +535,17 @@ function RedactionRequest({
                   setError(null);
                 }}
               >
-                Add selected text range
+                {uiText("Add selected text range")}
               </button>
               <div className="redaction-selections">
                 {ranges.map((range, index) => (
                   <div key={index}>
                     <span>
                       <strong>
-                        Characters {range.start}–{range.end}
+                        {uiText("Characters {0}–{1}", {
+                          "0": range.start,
+                          "1": range.end,
+                        })}
                       </strong>
                       <small className="block">
                         {characters
@@ -537,7 +557,9 @@ function RedactionRequest({
                     <button
                       type="button"
                       className="icon-button"
-                      aria-label={`Remove text range ${index + 1}`}
+                      aria-label={uiText("Remove text range {0}", {
+                        "0": index + 1,
+                      })}
                       onClick={() =>
                         setRanges(ranges.filter((_, i) => i !== index))
                       }
@@ -548,9 +570,9 @@ function RedactionRequest({
                 ))}
               </div>
               <p className="field-help">
-                Ranges use zero-based Unicode character offsets; the end is
-                exclusive. The server binds them to the verified extracted-text
-                version.
+                {uiText(
+                  "Ranges use zero-based Unicode character offsets; the end is exclusive. The server binds them to the verified extracted-text version.",
+                )}
               </p>
             </>
           ) : (
@@ -565,17 +587,16 @@ function RedactionRequest({
               <div className="notice subtle">
                 <Icon name="file" size={17} />
                 <span>
-                  Use normalized page coordinates with the top-left as origin.
-                  For example x=0.1, y=0.2, width=0.3 and height=0.1. Inspect
-                  the sanitized draft and the original before approval. PDF
-                  processing is limited to 50 pages and 50 MB.
+                  {uiText(
+                    "Use normalized page coordinates with the top-left as origin. For example x=0.1, y=0.2, width=0.3 and height=0.1. Inspect the sanitized draft and the original before approval. PDF processing is limited to 50 pages and 50 MB.",
+                  )}
                 </span>
               </div>
               <a
                 className="text-link"
                 href={`/api/v1/cases/${caseId}/evidence/${id}/original`}
               >
-                Download original for coordinate review
+                {uiText("Download original for coordinate review")}
               </a>
               <div className="redaction-regions">
                 {regions.map((region, index) => (
@@ -586,7 +607,10 @@ function RedactionRequest({
                           {label(field)}
                           <input
                             type="number"
-                            aria-label={`Region ${index + 1} ${field}`}
+                            aria-label={uiText("Region {0} {1}", {
+                              "0": index + 1,
+                              "1": label(field),
+                            })}
                             value={region[field]}
                             min={
                               field === "page"
@@ -617,7 +641,9 @@ function RedactionRequest({
                     <button
                       type="button"
                       className="icon-button"
-                      aria-label={`Remove PDF region ${index + 1}`}
+                      aria-label={uiText("Remove PDF region {0}", {
+                        "0": index + 1,
+                      })}
                       onClick={() =>
                         setRegions(regions.filter((_, i) => i !== index))
                       }
@@ -638,12 +664,12 @@ function RedactionRequest({
                   ])
                 }
               >
-                Add PDF region
+                {uiText("Add PDF region")}
               </button>
             </>
           )}
           <label>
-            Redaction reason
+            {uiText("Redaction reason")}
             <textarea
               name="reason"
               required
@@ -654,7 +680,7 @@ function RedactionRequest({
           </label>
           <div className="form-actions">
             <button type="button" className="button secondary" onClick={close}>
-              Cancel
+              {uiText("Cancel")}
             </button>
             <button
               className="button primary"
@@ -665,7 +691,7 @@ function RedactionRequest({
                   : !regions.length)
               }
             >
-              {busy ? "Requesting…" : "Generate redacted draft"}
+              {busy ? uiText("Requesting…") : uiText("Generate redacted draft")}
             </button>
           </div>
         </form>
@@ -709,7 +735,7 @@ function ProductionRequest({
     [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null);
   return (
-    <Modal title="Propose a derived production pack" close={close}>
+    <Modal title={uiText("Propose a derived production pack")} close={close}>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -759,21 +785,21 @@ function ProductionRequest({
       >
         <ErrorBox error={error || sets.error || redactions.error} />
         <label>
-          Production scope
+          {uiText("Production scope")}
           <select
             value={scope}
             onChange={(event) => setScope(event.target.value)}
           >
-            <option value="ids">Explicit evidence IDs</option>
-            <option value="set">Fixed review-set snapshot</option>
+            <option value="ids">{uiText("Explicit evidence IDs")}</option>
+            <option value="set">{uiText("Fixed review-set snapshot")}</option>
           </select>
         </label>
         {scope === "set" ? (
           <label>
-            Review set
+            {uiText("Review set")}
             <select name="review_set_id" required defaultValue="">
               <option value="" disabled>
-                Choose a review set
+                {uiText("Choose a review set")}
               </option>
               {sets.data?.items.map((set) => (
                 <option
@@ -781,25 +807,28 @@ function ProductionRequest({
                   value={set.id}
                   disabled={!set.count || set.count > 200}
                 >
-                  {set.name} · {number(set.count)} items
-                  {set.count > 200 ? " · exceeds limit" : ""}
+                  {uiText("{0} · {1} items{2}", {
+                    "0": set.name,
+                    "1": number(set.count),
+                    "2": set.count > 200 ? ` ${uiText("· exceeds limit")}` : "",
+                  })}
                 </option>
               ))}
             </select>
           </label>
         ) : (
           <label>
-            Evidence IDs
+            {uiText("Evidence IDs")}
             <textarea
               name="evidence_ids"
               required
               rows={4}
-              placeholder="One ID per line, or comma separated"
+              placeholder={uiText("One ID per line, or comma separated")}
             />
           </label>
         )}
         <fieldset className="production-redactions">
-          <legend>Approved redactions to apply</legend>
+          <legend>{uiText("Approved redactions to apply")}</legend>
           {availableRedactions
             .filter((item) => item.state === "approved")
             .map((item) => (
@@ -815,12 +844,13 @@ function ProductionRequest({
             ))}
           {!availableRedactions.some((item) => item.state === "approved") && (
             <p className="muted">
-              No approved redactions loaded. Unredacted derivatives may contain
-              sensitive information.
+              {uiText(
+                "No approved redactions loaded. Unredacted derivatives may contain sensitive information.",
+              )}
             </p>
           )}
           {redactions.loading && (
-            <Loading text="Loading approved redaction choices…" />
+            <Loading text={uiText("Loading approved redaction choices…")} />
           )}
           {redactions.data?.next_cursor && (
             <button
@@ -829,12 +859,12 @@ function ProductionRequest({
               disabled={redactions.loading}
               onClick={() => setRedactionCursor(redactions.data!.next_cursor)}
             >
-              Load older redaction records
+              {uiText("Load older redaction records")}
             </button>
           )}
         </fieldset>
         <label>
-          Bates prefix
+          {uiText("Bates prefix")}
           <input
             name="bates_prefix"
             defaultValue="CQ"
@@ -844,7 +874,7 @@ function ProductionRequest({
           />
         </label>
         <label>
-          Disclosure reason
+          {uiText("Disclosure reason")}
           <textarea
             name="reason"
             required
@@ -856,26 +886,27 @@ function ProductionRequest({
         <label className="checkbox-label">
           <input type="checkbox" name="confirmed" required />
           <span>
-            I confirm the selected evidence scope, applied redactions and
-            requested disclosure. A different matter lead or attorney must
-            approve.
+            {uiText(
+              "I confirm the selected evidence scope, applied redactions and requested disclosure. A different matter lead or attorney must approve.",
+            )}
           </span>
         </label>
         <div className="notice amber">
           <Icon name="lock" size={17} />
           <span>
-            Completed human review and privilege none or cleared are required.
-            Packs contain verified text or flattened PDF derivatives,
-            CSV/DAT/OPT load files and a hash manifest; they exclude original
-            native bytes.
+            {uiText(
+              "Completed human review and privilege none or cleared are required. Packs contain verified text or flattened PDF derivatives, CSV/DAT/OPT load files and a hash manifest; they exclude original native bytes.",
+            )}
           </span>
         </div>
         <div className="form-actions">
           <button type="button" className="button secondary" onClick={close}>
-            Cancel
+            {uiText("Cancel")}
           </button>
           <button className="button primary" disabled={busy}>
-            {busy ? "Proposing…" : "Propose for separate approval"}
+            {busy
+              ? uiText("Proposing…")
+              : uiText("Propose for separate approval")}
           </button>
         </div>
       </form>
@@ -921,7 +952,7 @@ function Confirmation({
       >
         <ErrorBox error={error} />
         <label>
-          Review reason
+          {uiText("Review reason")}
           <textarea
             name="reason"
             required
@@ -934,17 +965,18 @@ function Confirmation({
           <label className="checkbox-label">
             <input type="checkbox" name="confirmed" required />
             <span>
-              I separately reviewed this disclosure and confirm approval. The
-              server will recheck evidence, human review and permissions.
+              {uiText(
+                "I separately reviewed this disclosure and confirm approval. The server will recheck evidence, human review and permissions.",
+              )}
             </span>
           </label>
         )}
         <div className="form-actions">
           <button type="button" className="button secondary" onClick={close}>
-            Back
+            {uiText("Back")}
           </button>
           <button className="button primary" disabled={busy}>
-            {busy ? "Saving…" : title}
+            {busy ? uiText("Saving…") : title}
           </button>
         </div>
       </form>
@@ -980,7 +1012,7 @@ function RedactionReview({
     changed();
   };
   return (
-    <Modal title="Inspect redacted derivative" close={close} wide>
+    <Modal title={uiText("Inspect redacted derivative")} close={close} wide>
       <ErrorBox error={detail.error} retry={detail.refresh} />
       {detail.loading && !row ? (
         <Loading />
@@ -997,7 +1029,8 @@ function RedactionReview({
                 className="text-link"
                 href={`/app/matters/${caseId}/evidence/${row.evidence_id}`}
               >
-                Inspect source <Icon name="arrow" size={14} />
+                {uiText("Inspect source") + " "}
+                <Icon name="arrow" size={14} />
               </Link>
             </div>
             {row.error && (
@@ -1010,16 +1043,18 @@ function RedactionReview({
             )}
             {row.sha256 && (
               <>
-                <h3>Sanitized derivative SHA-256</h3>
+                <h3>{uiText("Sanitized derivative SHA-256")}</h3>
                 <code className="hash-block">{row.sha256}</code>
                 <p className="field-help">
-                  {bytes(row.byte_size)} · verified derivative, original
-                  preserved separately.
+                  {uiText(
+                    "{0} · verified derivative, original preserved separately.",
+                    { "0": bytes(row.byte_size) },
+                  )}
                 </p>
               </>
             )}
             <details className="audit-metadata">
-              <summary>Selection and verification results</summary>
+              <summary>{uiText("Selection and verification results")}</summary>
               <pre>
                 {JSON.stringify(
                   { selection: row.selection, verification: row.verification },
@@ -1031,23 +1066,23 @@ function RedactionReview({
             {row.state === "ready_for_review" && (
               <>
                 <p className="field-help">
-                  Review both the sanitized derivative and original. A different
-                  matter lead or attorney must approve; the requester cannot
-                  approve their own redaction.
+                  {uiText(
+                    "Review both the sanitized derivative and original. A different matter lead or attorney must approve; the requester cannot approve their own redaction.",
+                  )}
                 </p>
                 <div className="form-actions">
                   <button
                     className="button secondary"
                     onClick={() => setAction("reject")}
                   >
-                    Reject draft
+                    {uiText("Reject draft")}
                   </button>
                   <button
                     className="button primary"
                     disabled={!canApprove || row.requested_by === user.id}
                     onClick={() => setAction("approve")}
                   >
-                    Approve redaction
+                    {uiText("Approve redaction")}
                   </button>
                 </div>
               </>
@@ -1056,8 +1091,8 @@ function RedactionReview({
               <Confirmation
                 title={
                   action === "approve"
-                    ? "Approve redaction"
-                    : "Reject redaction"
+                    ? uiText("Approve redaction")
+                    : uiText("Reject redaction")
                 }
                 path={`/cases/${caseId}/redactions/${id}/${action}`}
                 approve={action === "approve"}
@@ -1115,17 +1150,17 @@ function SanitizedPreview({ caseId, row }: { caseId: string; row: Redaction }) {
   }, [caseId, row.id, row.kind]);
   return (
     <section className="sanitized-preview">
-      <h3>Sanitized derivative preview</h3>
+      <h3>{uiText("Sanitized derivative preview")}</h3>
       <ErrorBox error={error} />
       {source === null && !error ? (
-        <Loading text="Verifying and opening sanitized preview…" />
+        <Loading text={uiText("Verifying and opening sanitized preview…")} />
       ) : (
         source !== null &&
         (row.kind === "text" ? (
           <pre className="redaction-text-preview">{source}</pre>
         ) : (
           <iframe
-            title="Sanitized flattened PDF derivative"
+            title={uiText("Sanitized flattened PDF derivative")}
             src={source}
             sandbox="allow-same-origin"
             className="redaction-pdf-preview"
@@ -1136,7 +1171,7 @@ function SanitizedPreview({ caseId, row }: { caseId: string; row: Redaction }) {
         className="text-link"
         href={`/api/v1/cases/${caseId}/redactions/${row.id}/preview`}
       >
-        Download verified sanitized derivative
+        {uiText("Download verified sanitized derivative")}
       </a>
     </section>
   );
@@ -1166,7 +1201,7 @@ function ProductionReview({
     return () => clearInterval(timer);
   }, [row, detail.refresh]);
   return (
-    <Modal title="Inspect derived production pack" close={close} wide>
+    <Modal title={uiText("Inspect derived production pack")} close={close} wide>
       <ErrorBox error={detail.error} retry={detail.refresh} />
       {detail.loading && !row ? (
         <Loading />
@@ -1178,9 +1213,12 @@ function ProductionReview({
                 <Badge value={row.state} />
                 <h3>{row.reason}</h3>
                 <p className="field-help">
-                  Bates prefix <code>{row.bates_prefix}</code> ·{" "}
-                  {number(row.evidence_ids.length)} explicit snapshot items ·{" "}
-                  {Object.keys(row.redactions).length} approved redactions
+                  {uiText("Bates prefix") + " "}
+                  <code>{row.bates_prefix}</code> ·{" "}
+                  {number(row.evidence_ids.length)}{" "}
+                  {" " + uiText("explicit snapshot items ·")}{" "}
+                  {Object.keys(row.redactions).length}{" "}
+                  {" " + uiText("approved redactions")}
                 </p>
               </div>
               {row.state === "completed" && (
@@ -1189,24 +1227,25 @@ function ProductionReview({
                   href={`/api/v1/cases/${caseId}/productions/${id}/download`}
                 >
                   <Icon name="export" size={17} />
-                  Download verified pack
+                  {uiText("Download verified pack")}
                 </a>
               )}
             </div>
             <div className="notice subtle">
               <Icon name="file" size={17} />
               <span>
-                Delivery contains derivatives only. CSV/DAT metadata and the
-                tested OPT profile accompany the manifest. Original native files
-                remain excluded; active preservation holds are disclosed in the
-                scope.
+                {uiText(
+                  "Delivery contains derivatives only. CSV/DAT metadata and the tested OPT profile accompany the manifest. Original native files remain excluded; active preservation holds are disclosed in the scope.",
+                )}
               </span>
             </div>
             <details className="audit-metadata" open>
-              <summary>Scope, processing and hold disclosure</summary>
+              <summary>
+                {uiText("Scope, processing and hold disclosure")}
+              </summary>
               <pre>{JSON.stringify(row.counts, null, 2)}</pre>
             </details>
-            <h3>Evidence snapshot</h3>
+            <h3>{uiText("Evidence snapshot")}</h3>
             <div className="production-evidence-scope">
               {row.evidence_ids.map((evidence) => (
                 <Link
@@ -1217,8 +1256,9 @@ function ProductionReview({
                   {evidence}
                   {row.redactions[evidence] && (
                     <small>
-                      {" "}
-                      · approved redaction {row.redactions[evidence]}
+                      {uiText("· approved redaction {0}", {
+                        "0": row.redactions[evidence],
+                      })}
                     </small>
                   )}
                 </Link>
@@ -1229,11 +1269,11 @@ function ProductionReview({
                 <table>
                   <thead>
                     <tr>
-                      <th>Evidence</th>
-                      <th>Bates beginning</th>
-                      <th>Bates ending</th>
-                      <th>Pages</th>
-                      <th>Produced SHA-256</th>
+                      <th>{uiText("Evidence")}</th>
+                      <th>{uiText("Bates beginning")}</th>
+                      <th>{uiText("Bates ending")}</th>
+                      <th>{uiText("Pages")}</th>
+                      <th>{uiText("Produced SHA-256")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1254,33 +1294,35 @@ function ProductionReview({
             ) : null}
             {row.sha256 && (
               <>
-                <h3>Production package SHA-256</h3>
+                <h3>{uiText("Production package SHA-256")}</h3>
                 <code className="hash-block">{row.sha256}</code>
                 <p className="field-help">
-                  {bytes(row.byte_size)} · hashes and current approval
-                  permissions are revalidated at download.
+                  {uiText(
+                    "{0} · hashes and current approval permissions are revalidated at download.",
+                    { "0": bytes(row.byte_size) },
+                  )}
                 </p>
               </>
             )}
             {row.state === "proposed" && (
               <div className="form-actions">
                 <p className="field-help">
-                  A different current matter lead or attorney must confirm this
-                  snapshot. Inspect its evidence and approved redactions before
-                  acting.
+                  {uiText(
+                    "A different current matter lead or attorney must confirm this snapshot. Inspect its evidence and approved redactions before acting.",
+                  )}
                 </p>
                 <button
                   className="button primary"
                   disabled={!canApprove || row.requested_by === user.id}
                   onClick={() => setApprove(true)}
                 >
-                  Approve production
+                  {uiText("Approve production")}
                 </button>
               </div>
             )}
             {approve && (
               <Confirmation
-                title="Approve production"
+                title={uiText("Approve production")}
                 path={`/cases/${caseId}/productions/${id}/approve`}
                 approve
                 close={() => setApprove(false)}

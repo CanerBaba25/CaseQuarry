@@ -20,7 +20,8 @@ body {
   margin: 0;
 }
 button,
-input {
+input,
+select {
   font: inherit;
 }
 button {
@@ -32,6 +33,7 @@ button:disabled {
 }
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 summary:focus-visible {
   outline: 3px solid #55a6a1;
   outline-offset: 4px;
@@ -139,7 +141,7 @@ p {
   font-size: 11px;
   margin: 16px 0;
 }
-.principles span {
+.principles li > span:first-child {
   color: #6c8894;
   font-family: monospace;
   font-size: 10px;
@@ -171,7 +173,7 @@ p {
   font-size: 10px;
   font-weight: 600;
 }
-.status-pill > span {
+.status-pill > .status-dot {
   width: 6px;
   height: 6px;
   background: #3f8279;
@@ -188,6 +190,30 @@ h2 {
   line-height: 1.8;
   font-size: 12px;
   margin-bottom: 28px;
+}
+.language-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+.language-control select {
+  min-width: 130px;
+  max-width: 100%;
+  padding: 7px 10px;
+  color: inherit;
+  background: #fff;
+  border: 1px solid #d9e1e7;
+  border-radius: 7px;
+}
+.language-help {
+  color: #596d81;
+  font-size: 10px;
+  line-height: 1.6;
+  margin-bottom: 22px;
 }
 .field-label {
   display: block;

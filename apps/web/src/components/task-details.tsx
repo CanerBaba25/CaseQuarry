@@ -1,19 +1,34 @@
 "use client";
+import { uiText, type InterfaceMessage, type MessageKey } from "@/lib/i18n";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { api, ApiError, date, getDisplayTimeZone, label } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  date,
+  getDisplayTimeZone,
+  uiLabel as label,
+} from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import { can } from "@/lib/permissions";
 import type { Member } from "@/lib/types";
 import { Badge, ErrorBox, Loading, Modal } from "./ui";
 import { TaskDeadline } from "./task-deadline";
-import type { TaskDetail, TaskMatter, TaskState } from "./task-types";
+import {
+  taskPriorities,
+  taskPriorityTone,
+  type TaskDetail,
+  type TaskMatter,
+  type TaskPriority,
+  type TaskState,
+} from "./task-types";
 import styles from "./task-details.module.css";
 
 type Draft = {
   title: string;
   description: string;
   state: TaskState;
+  priority: TaskPriority;
   assigned_to: string;
   due_date: string;
 };
@@ -21,14 +36,16 @@ const fields: (keyof Draft)[] = [
   "title",
   "description",
   "state",
+  "priority",
   "assigned_to",
   "due_date",
 ];
-const fieldNames: Record<keyof Draft, string> = {
+const fieldNames: Record<keyof Draft, MessageKey> = {
   title: "Title",
   description: "Description",
   state: "Status",
-  assigned_to: "Assignee",
+  priority: "Priority",
+  assigned_to: "Task assignee",
   due_date: "Due date",
 };
 function toDraft(task: TaskDetail): Draft {
@@ -36,6 +53,7 @@ function toDraft(task: TaskDetail): Draft {
     title: task.title,
     description: task.description,
     state: task.state,
+    priority: task.priority,
     assigned_to: task.assigned_to || "",
     due_date: task.due_date || "",
   };
@@ -62,7 +80,7 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<InterfaceMessage>("");
   const [conflict, setConflict] = useState(false);
   const live = useRef(true);
   const id = useId();
@@ -202,21 +220,22 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
     if (field === "assigned_to")
       return value
         ? members.data?.items.find((member) => member.user_id === value)
-            ?.name || "Unavailable assignee"
-        : "Unassigned";
-    if (field === "state") return label(value);
-    if (field === "due_date") return value ? date(value) : "No due date";
-    return value || "Empty";
+            ?.name || uiText("Unavailable assignee")
+        : uiText("Unassigned");
+    if (field === "state" || field === "priority") return label(value);
+    if (field === "due_date")
+      return value ? date(value) : uiText("No due date");
+    return value || "—";
   }
 
   return (
-    <Modal title="Task details" close={close} wide>
+    <Modal title={uiText("Task details")} close={close} wide>
       <ErrorBox error={detail.error} retry={detail.refresh} />
       <ErrorBox error={access.error} retry={access.refresh} />
       <ErrorBox error={error} />
       {!readable ? (
         detail.loading || access.loading ? (
-          <Loading text="Loading task details…" />
+          <Loading text={uiText("Loading task details…")} />
         ) : null
       ) : (
         record && (
@@ -228,6 +247,10 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
               </div>
               <div className={styles.badges}>
                 <Badge value={record.state} />
+                <Badge
+                  value={`${record.priority} priority`}
+                  tone={taskPriorityTone(record.priority)}
+                />
                 <TaskDeadline
                   value={record.due_date}
                   today={record.server_today || ""}
@@ -237,15 +260,15 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
             </div>
             <dl className={styles.metadata}>
               <div>
-                <dt>Created</dt>
+                <dt>{uiText("Created")}</dt>
                 <dd>{date(record.created_at, true)}</dd>
               </div>
               <div>
-                <dt>Last updated</dt>
+                <dt>{uiText("Last updated")}</dt>
                 <dd>{date(record.updated_at, true)}</dd>
               </div>
               <div>
-                <dt>Version</dt>
+                <dt>{uiText("Version")}</dt>
                 <dd>{record.version}</dd>
               </div>
             </dl>
@@ -253,12 +276,17 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
               <>
                 <h3>{record.title}</h3>
                 <p className={styles.description}>
-                  {record.description || "No task description provided."}
+                  {record.description ||
+                    uiText("No task description provided.")}
                 </p>
                 <p className="notice subtle">
                   {access.data?.archived_at
-                    ? "This matter is archived. Task details remain available for reading."
-                    : "Your matter role allows reading this task. Editing requires review permission."}
+                    ? uiText(
+                        "This matter is archived. Task details remain available for reading.",
+                      )
+                    : uiText(
+                        "Your matter role allows reading this task. Editing requires review permission.",
+                      )}
                 </p>
               </>
             ) : (
@@ -266,7 +294,7 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
               base && (
                 <form onSubmit={save}>
                   <label>
-                    Task title
+                    {uiText("Task title")}
                     <input
                       value={draft.title}
                       onChange={(event) => edit("title", event.target.value)}
@@ -276,10 +304,10 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
                     />
                   </label>
                   <label htmlFor={`${id}-description`}>
-                    Task description
+                    {uiText("Task description")}
                     <textarea
                       id={`${id}-description`}
-                      aria-label="Task description"
+                      aria-label={uiText("Task description")}
                       value={draft.description}
                       onChange={(event) =>
                         edit("description", event.target.value)
@@ -287,30 +315,51 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
                       rows={4}
                       maxLength={10000}
                       disabled={busy}
-                      placeholder="Describe the next step, context or expected outcome"
+                      placeholder={uiText(
+                        "Describe the next step, context or expected outcome",
+                      )}
                     />
                   </label>
                   <div className={styles.fields}>
                     <label>
-                      Task status
+                      {uiText("Task priority")}
                       <select
-                        aria-label="Task status"
+                        aria-label={uiText("Task priority")}
+                        value={draft.priority}
+                        onChange={(event) =>
+                          edit("priority", event.target.value as TaskPriority)
+                        }
+                        disabled={busy}
+                      >
+                        {taskPriorities.map((priority) => (
+                          <option key={priority} value={priority}>
+                            {label(priority)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      {uiText("Task status")}
+                      <select
+                        aria-label={uiText("Task status")}
                         value={draft.state}
                         onChange={(event) =>
                           edit("state", event.target.value as TaskState)
                         }
                         disabled={busy}
                       >
-                        <option value="open">Open</option>
-                        <option value="in_progress">In progress</option>
-                        <option value="done">Done</option>
-                        <option value="cancelled">Cancelled</option>
+                        <option value="open">{uiText("Open (status)")}</option>
+                        <option value="in_progress">
+                          {uiText("In progress")}
+                        </option>
+                        <option value="done">{uiText("Done")}</option>
+                        <option value="cancelled">{uiText("Cancelled")}</option>
                       </select>
                     </label>
                     <label>
-                      Task assignee
+                      {uiText("Task assignee")}
                       <select
-                        aria-label="Task assignee"
+                        aria-label={uiText("Task assignee")}
                         value={draft.assigned_to}
                         onChange={(event) =>
                           edit("assigned_to", event.target.value)
@@ -319,13 +368,13 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
                           busy || members.loading || Boolean(members.error)
                         }
                       >
-                        <option value="">Unassigned</option>
+                        <option value="">{uiText("Unassigned")}</option>
                         {draft.assigned_to &&
                           !members.data?.items.some(
                             (member) => member.user_id === draft.assigned_to,
                           ) && (
                             <option value={draft.assigned_to} disabled>
-                              Unavailable assignee
+                              {uiText("Unavailable assignee")}
                             </option>
                           )}
                         {members.data?.items.map((member) => (
@@ -335,15 +384,17 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
                             disabled={member.active === false}
                           >
                             {member.name}
-                            {member.active === false ? " (inactive)" : ""}
+                            {member.active === false
+                              ? uiText("(inactive)")
+                              : ""}
                           </option>
                         ))}
                       </select>
                     </label>
                     <label>
-                      Task due date
+                      {uiText("Task due date")}
                       <input
-                        aria-label="Task due date"
+                        aria-label={uiText("Task due date")}
                         aria-describedby={`${id}-date-help`}
                         type="date"
                         value={draft.due_date}
@@ -354,11 +405,17 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
                         }
                       />
                       <small id={`${id}-date-help`} className={styles.help}>
-                        Optional calendar date entered by your team. Clear it to
-                        remove the deadline.
+                        {uiText(
+                          "Optional calendar date entered by your team. Clear it to remove the deadline.",
+                        )}
                       </small>
                     </label>
                   </div>
+                  <p className={styles.help}>
+                    {uiText(
+                      "Priorities are set by your team. They do not calculate court deadlines or apply court rules.",
+                    )}
+                  </p>
                   <ErrorBox error={members.error} retry={members.refresh} />
                   {(outdated || conflict) && (
                     <section
@@ -366,25 +423,26 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
                       aria-labelledby={`${id}-conflict-title`}
                     >
                       <h3 id={`${id}-conflict-title`}>
-                        This task changed while you were editing.
+                        {uiText("This task changed while you were editing.")}
                       </h3>
                       <p>
-                        Your draft is preserved. Review the current values
-                        before saving again.
+                        {uiText(
+                          "Your draft is preserved. Review the current values before saving again.",
+                        )}
                       </p>
                       {record.version !== base.version ? (
                         <>
                           <dl className={styles.comparison}>
                             {comparisonFields.map((field) => (
                               <div key={field}>
-                                <dt>{fieldNames[field]}</dt>
+                                <dt>{uiText(fieldNames[field])}</dt>
                                 <dd>
                                   <span>
-                                    <small>Your draft</small>
+                                    <small>{uiText("Your draft")}</small>
                                     {showValue(field, draft[field])}
                                   </span>
                                   <span>
-                                    <small>Current task</small>
+                                    <small>{uiText("Current task")}</small>
                                     {showValue(field, toDraft(record)[field])}
                                   </span>
                                 </dd>
@@ -398,7 +456,7 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
                               onClick={() => adoptLatest(false)}
                               disabled={busy}
                             >
-                              Use latest task values
+                              {uiText("Use latest task values")}
                             </button>
                             <button
                               type="button"
@@ -406,7 +464,7 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
                               onClick={() => adoptLatest(true)}
                               disabled={busy}
                             >
-                              Keep my changes with current version
+                              {uiText("Keep my changes with current version")}
                             </button>
                           </div>
                         </>
@@ -417,18 +475,20 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
                           onClick={detail.refresh}
                           disabled={detail.loading}
                         >
-                          Load current task
+                          {uiText("Load current task")}
                         </button>
                       )}
                     </section>
                   )}
                   <p className={styles.help}>
-                    Task completion is separate from evidence review. Timestamps
-                    are displayed in {getDisplayTimeZone()}.
+                    {uiText(
+                      "Task completion is separate from evidence review. Timestamps are displayed in {0}.",
+                      { "0": getDisplayTimeZone() },
+                    )}
                   </p>
                   {message && (
                     <p role="status" className={styles.message}>
-                      {message}
+                      {uiText(message)}
                     </p>
                   )}
                   <div className={styles.actions}>
@@ -437,7 +497,7 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
                       className="button secondary"
                       onClick={close}
                     >
-                      Close
+                      {uiText("Close")}
                     </button>
                     <button
                       type="submit"
@@ -450,7 +510,7 @@ function TaskSession({ matter, taskId, close, changed }: Props) {
                         conflict
                       }
                     >
-                      {busy ? "Saving task…" : "Save task"}
+                      {busy ? uiText("Saving task…") : uiText("Save task")}
                     </button>
                   </div>
                 </form>

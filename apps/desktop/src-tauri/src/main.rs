@@ -2,10 +2,10 @@
 
 mod connection;
 mod diagnostics;
+mod localization;
 mod secure_store;
 
 use connection::{Connection, probe_server, trusted_settings_context};
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 fn trusted_settings(window: &WebviewWindow) -> Result<(), String> {
@@ -112,6 +112,22 @@ fn forget_connection(window: WebviewWindow, app: tauri::AppHandle) -> Result<(),
     secure_store::forget(&diagnostics::settings_directory(&app)?)
 }
 
+#[tauri::command]
+fn set_language(
+    window: WebviewWindow,
+    app: tauri::AppHandle,
+    language: String,
+    labels: localization::MenuLabels,
+) -> Result<(), String> {
+    trusted_settings(&window)?;
+    localization::validate(&language, &labels)?;
+    let menu = localization::menu(&app, &labels)
+        .map_err(|_| "Cannot update the native menu language.".to_string())?;
+    app.set_menu(menu)
+        .map_err(|_| "Cannot update the native menu language.".to_string())?;
+    Ok(())
+}
+
 fn main() {
     let diagnostic = diagnostics::RuntimeDiagnostic::from_arguments()
         .expect("CaseQuarry runtime diagnostic configuration is invalid");
@@ -129,7 +145,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_connection,
             connect_server,
-            forget_connection
+            forget_connection,
+            set_language
         ])
         .setup(move |app| {
             if diagnostic_enabled {
@@ -139,35 +156,7 @@ fn main() {
                     handle.exit(124);
                 });
             }
-            let settings = MenuItem::with_id(
-                app,
-                "settings",
-                "Firm connection…",
-                true,
-                Some("CmdOrCtrl+Shift+C"),
-            )?;
-            let leave = MenuItem::with_id(app, "leave", "Close workspace", true, None::<&str>)?;
-            let quit = PredefinedMenuItem::quit(app, Some("Exit CaseQuarry"))?;
-            let menu = Menu::with_items(
-                app,
-                &[
-                    &Submenu::with_items(app, "Connection", true, &[&settings, &leave, &quit])?,
-                    &Submenu::with_items(
-                        app,
-                        "Edit",
-                        true,
-                        &[
-                            &PredefinedMenuItem::undo(app, None)?,
-                            &PredefinedMenuItem::redo(app, None)?,
-                            &PredefinedMenuItem::separator(app)?,
-                            &PredefinedMenuItem::cut(app, None)?,
-                            &PredefinedMenuItem::copy(app, None)?,
-                            &PredefinedMenuItem::paste(app, None)?,
-                            &PredefinedMenuItem::select_all(app, None)?,
-                        ],
-                    )?,
-                ],
-            )?;
+            let menu = localization::menu(app.handle(), &localization::MenuLabels::default())?;
             app.set_menu(menu)?;
             if let Some(window) = app.get_webview_window("connection") {
                 let handle = app.handle().clone();

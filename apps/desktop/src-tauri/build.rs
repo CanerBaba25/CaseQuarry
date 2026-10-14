@@ -4,6 +4,7 @@ fn main() {
             "get_connection",
             "connect_server",
             "forget_connection",
+            "set_language",
         ]),
     ))
     .expect("desktop application manifest could not be built");

@@ -1,7 +1,15 @@
 "use client";
+import { uiMessage, uiText, type InterfaceMessage } from "@/lib/i18n";
 
 import { useEffect, useRef, useState } from "react";
-import { csrfToken, date, getDisplayTimeZone, number, post } from "@/lib/api";
+import {
+  csrfToken,
+  date,
+  getDisplayTimeZone,
+  uiLabel as label,
+  number,
+  post,
+} from "@/lib/api";
 import { useResource } from "@/lib/hooks";
 import type { User } from "@/lib/types";
 import { Badge, ErrorBox, Icon, Loading, Modal } from "./ui";
@@ -43,13 +51,15 @@ export default function AccountSecurity({
   const [revoke, setRevoke] = useState<{ id: string; current: boolean } | null>(
       null,
     ),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useState<InterfaceMessage>("");
   return (
     <>
       <PageHeading
-        eyebrow="YOUR ACCOUNT"
-        title="Protect the way in."
-        text="An authenticator adds a second step to signing in to your private workspace."
+        eyebrow={uiText("YOUR ACCOUNT")}
+        title={uiText("Protect the way in.")}
+        text={uiText(
+          "An authenticator adds a second step to signing in to your private workspace.",
+        )}
       />
       {preferences}
       <div className="account-security-grid">
@@ -61,20 +71,20 @@ export default function AccountSecurity({
           <p>{user.email}</p>
           <dl className="metadata-list">
             <div>
-              <dt>Firm role</dt>
-              <dd>{user.role.replace(/_/g, " ")}</dd>
+              <dt>{uiText("Firm role")}</dt>
+              <dd>{label(user.role)}</dd>
             </div>
             <div>
-              <dt>Matter access</dt>
-              <dd>Granted separately per matter</dd>
+              <dt>{uiText("Matter access")}</dt>
+              <dd>{uiText("Granted separately per matter")}</dd>
             </div>
             <div>
-              <dt>Timezone</dt>
-              <dd>{user.time_zone || "UTC"}</dd>
+              <dt>{uiText("Timezone")}</dt>
+              <dd>{user.time_zone || uiText("UTC")}</dd>
             </div>
             <div>
-              <dt>Sign-in</dt>
-              <dd>Local account</dd>
+              <dt>{uiText("Sign-in")}</dt>
+              <dd>{uiText("Local account")}</dd>
             </div>
           </dl>
         </section>
@@ -82,8 +92,12 @@ export default function AccountSecurity({
           <div className="panel-heading">
             <Icon name="shield" size={25} />
             <div>
-              <h2>Authenticator protection</h2>
-              <p>Time-based one-time codes from your authenticator app.</p>
+              <h2>{uiText("Authenticator protection")}</h2>
+              <p>
+                {uiText(
+                  "Time-based one-time codes from your authenticator app.",
+                )}
+              </p>
             </div>
           </div>
           <ErrorBox error={status.error} retry={status.refresh} />
@@ -98,13 +112,17 @@ export default function AccountSecurity({
                 />
                 <h3>
                   {status.data.enabled
-                    ? "Your account requires an authenticator code."
-                    : "Add another layer to your sign-in."}
+                    ? uiText("Your account requires an authenticator code.")
+                    : uiText("Add another layer to your sign-in.")}
                 </h3>
                 <p>
                   {status.data.enabled
-                    ? "Your password and a current six-digit code are required at sign-in. Enabling or disabling protection revokes your other active sessions."
-                    : "Use an authenticator app that supports TOTP. The setup key is shown only when you explicitly start enrollment."}
+                    ? uiText(
+                        "Your password and a current six-digit code are required at sign-in. Enabling or disabling protection revokes your other active sessions.",
+                      )
+                    : uiText(
+                        "Use an authenticator app that supports TOTP. The setup key is shown only when you explicitly start enrollment.",
+                      )}
                 </p>
                 <button
                   className={`button ${status.data.enabled ? "secondary" : "primary"}`}
@@ -117,8 +135,8 @@ export default function AccountSecurity({
                     size={17}
                   />
                   {status.data.enabled
-                    ? "Disable authenticator"
-                    : "Set up authenticator"}
+                    ? uiText("Disable authenticator")
+                    : uiText("Set up authenticator")}
                 </button>
               </>
             )
@@ -128,10 +146,11 @@ export default function AccountSecurity({
       <section className="panel security-password">
         <div className="section-heading">
           <div>
-            <h2>Password</h2>
+            <h2>{uiText("Password")}</h2>
             <p className="muted">
-              Changing your password revokes your other sessions and preserves
-              this one.
+              {uiText(
+                "Changing your password revokes your other sessions and preserves this one.",
+              )}
             </p>
           </div>
           <button
@@ -139,30 +158,32 @@ export default function AccountSecurity({
             onClick={() => setPasswordModal(true)}
             disabled={!status.data || status.loading}
           >
-            Change password
+            {uiText("Change password")}
           </button>
         </div>
       </section>
       {message && (
         <div className="notice green" role="status">
           <Icon name="check" size={17} />
-          {message}
+          {uiText(message)}
         </div>
       )}
       <section className="panel sessions-panel">
         <div className="section-heading">
           <div>
-            <h2>Active sign-ins</h2>
+            <h2>{uiText("Active sign-ins")}</h2>
             <p className="muted">
-              Up to 100 active sessions for your account. Times are shown in{" "}
-              {getDisplayTimeZone(user.time_zone || "UTC")}.
+              {uiText(
+                "Up to 100 active sessions for your account. Times are shown in {0}.",
+                { "0": getDisplayTimeZone(user.time_zone || "UTC") },
+              )}
             </p>
           </div>
           <button
             className="button secondary compact"
             onClick={sessions.refresh}
           >
-            Refresh sessions
+            {uiText("Refresh sessions")}
           </button>
         </div>
         <ErrorBox error={sessions.error} retry={sessions.refresh} />
@@ -173,15 +194,19 @@ export default function AccountSecurity({
             <table>
               <thead>
                 <tr>
-                  <th>Session</th>
+                  <th>{uiText("Session")}</th>
                   <th>
-                    Signed in · {getDisplayTimeZone(user.time_zone || "UTC")}
+                    {uiText("Signed in · {0}", {
+                      "0": getDisplayTimeZone(user.time_zone || "UTC"),
+                    })}
                   </th>
                   <th>
-                    Expires · {getDisplayTimeZone(user.time_zone || "UTC")}
+                    {uiText("Expires · {0}", {
+                      "0": getDisplayTimeZone(user.time_zone || "UTC"),
+                    })}
                   </th>
                   <th>
-                    <span className="sr-only">Session action</span>
+                    <span className="sr-only">{uiText("Session action")}</span>
                   </th>
                 </tr>
               </thead>
@@ -204,7 +229,9 @@ export default function AccountSecurity({
                         className="button ghost compact danger-link"
                         onClick={() => setRevoke(session)}
                       >
-                        {session.current ? "Sign out here" : "Revoke session"}
+                        {session.current
+                          ? uiText("Sign out here")
+                          : uiText("Revoke session")}
                       </button>
                     </td>
                   </tr>
@@ -222,7 +249,9 @@ export default function AccountSecurity({
           done={(count) => {
             setPasswordModal(false);
             setMessage(
-              `Password changed. ${number(count)} other sessions revoked.`,
+              uiMessage("Password changed. {0} other sessions revoked.", {
+                "0": number(count),
+              }),
             );
             sessions.refresh();
           }}
@@ -273,7 +302,7 @@ function PasswordModal({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<unknown>(null);
   return (
-    <Modal title="Change your password" close={close}>
+    <Modal title={uiText("Change your password")} close={close}>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
@@ -307,7 +336,7 @@ function PasswordModal({
       >
         <ErrorBox error={error} />
         <label>
-          Current password
+          {uiText("Current password")}
           <input
             name="current_password"
             type="password"
@@ -317,7 +346,7 @@ function PasswordModal({
           />
         </label>
         <label>
-          New password
+          {uiText("New password")}
           <input
             name="new_password"
             type="password"
@@ -328,7 +357,7 @@ function PasswordModal({
           />
         </label>
         <label>
-          Confirm new password
+          {uiText("Confirm new password")}
           <input
             name="confirmation"
             type="password"
@@ -340,7 +369,7 @@ function PasswordModal({
         </label>
         {mfaEnabled && (
           <label>
-            Current authenticator code
+            {uiText("Current authenticator code")}
             <input
               name="totp_code"
               required
@@ -354,15 +383,17 @@ function PasswordModal({
         <div className="notice amber">
           <Icon name="lock" size={17} />
           <span>
-            Your other active sessions will be signed out after this change.
+            {uiText(
+              "Your other active sessions will be signed out after this change.",
+            )}
           </span>
         </div>
         <div className="form-actions">
           <button type="button" className="button secondary" onClick={close}>
-            Cancel
+            {uiText("Cancel")}
           </button>
           <button className="button primary" disabled={busy}>
-            {busy ? "Changing…" : "Change password"}
+            {busy ? uiText("Changing…") : uiText("Change password")}
           </button>
         </div>
       </form>
@@ -386,7 +417,11 @@ function RevokeSession({
     [error, setError] = useState<unknown>(null);
   return (
     <Modal
-      title={current ? "Sign out this session" : "Revoke the selected session"}
+      title={
+        current
+          ? uiText("Sign out this session")
+          : uiText("Revoke the selected session")
+      }
       close={close}
     >
       <form
@@ -413,20 +448,26 @@ function RevokeSession({
       >
         <p className="muted">
           {current
-            ? "This browser will return to the sign-in page."
-            : "The selected session will no longer have access. The account can sign in again with its credentials."}
+            ? uiText("This browser will return to the sign-in page.")
+            : uiText(
+                "The selected session will no longer have access. The account can sign in again with its credentials.",
+              )}
         </p>
         <ErrorBox error={error} />
         <label>
-          Reason
+          {uiText("Reason")}
           <input name="reason" required minLength={3} maxLength={2000} />
         </label>
         <div className="form-actions">
           <button type="button" className="button secondary" onClick={close}>
-            Cancel
+            {uiText("Cancel")}
           </button>
           <button className="button primary" disabled={busy}>
-            {busy ? "Revoking…" : current ? "Sign out" : "Revoke session"}
+            {busy
+              ? uiText("Revoking…")
+              : current
+                ? uiText("Sign out")
+                : uiText("Revoke session")}
           </button>
         </div>
       </form>
@@ -484,8 +525,8 @@ function AuthenticatorModal({
     <Modal
       title={
         kind === "disable"
-          ? "Disable authenticator protection"
-          : "Set up your authenticator"
+          ? uiText("Disable authenticator protection")
+          : uiText("Set up your authenticator")
       }
       close={close}
     >
@@ -494,12 +535,13 @@ function AuthenticatorModal({
         {enrollment ? (
           <>
             <p className="muted">
-              Add a TOTP account in your authenticator using this setup key.
-              Enter its current code to finish within{" "}
-              {Math.floor(enrollment.expires_in / 60)} minutes.
+              {uiText(
+                "Add a TOTP account in your authenticator using this setup key. Enter its current code to finish within {0} minutes.",
+                { "0": Math.floor(enrollment.expires_in / 60) },
+              )}
             </p>
             <div className="authenticator-secret">
-              <span className="eyebrow">PRIVATE SETUP KEY</span>
+              <span className="eyebrow">{uiText("PRIVATE SETUP KEY")}</span>
               <code>{enrollment.secret}</code>
               <button
                 type="button"
@@ -514,11 +556,11 @@ function AuthenticatorModal({
                 }}
               >
                 <Icon name="copy" size={14} />
-                {copied ? "Copied setup key" : "Copy setup key"}
+                {copied ? uiText("Copied setup key") : uiText("Copy setup key")}
               </button>
             </div>
             <label>
-              Current authenticator code
+              {uiText("Current authenticator code")}
               <input
                 name="code"
                 required
@@ -526,14 +568,15 @@ function AuthenticatorModal({
                 maxLength={6}
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                placeholder="6 digits"
+                placeholder={uiText("6 digits")}
               />
             </label>
             <div className="notice subtle">
               <Icon name="lock" size={17} />
               <span>
-                Keep this key private. It is not saved in browser storage. Other
-                active sessions are revoked when protection is enabled.
+                {uiText(
+                  "Keep this key private. It is not saved in browser storage. Other active sessions are revoked when protection is enabled.",
+                )}
               </span>
             </div>
           </>
@@ -541,11 +584,15 @@ function AuthenticatorModal({
           <>
             <p className="muted">
               {kind === "disable"
-                ? "Confirm with your password and current authenticator code. Your other active sessions will be revoked."
-                : "Confirm your password to begin. Your authenticator setup key will then be shown for this enrollment."}
+                ? uiText(
+                    "Confirm with your password and current authenticator code. Your other active sessions will be revoked.",
+                  )
+                : uiText(
+                    "Confirm your password to begin. Your authenticator setup key will then be shown for this enrollment.",
+                  )}
             </p>
             <label>
-              Current password
+              {uiText("Current password")}
               <input
                 name="password"
                 type="password"
@@ -555,7 +602,7 @@ function AuthenticatorModal({
             </label>
             {kind === "disable" && (
               <label>
-                Current authenticator code
+                {uiText("Current authenticator code")}
                 <input
                   name="code"
                   required
@@ -575,16 +622,16 @@ function AuthenticatorModal({
             onClick={close}
             disabled={busy}
           >
-            Cancel
+            {uiText("Cancel")}
           </button>
           <button className="button primary" disabled={busy}>
             {busy
-              ? "Checking…"
+              ? uiText("Checking…")
               : kind === "disable"
-                ? "Disable protection"
+                ? uiText("Disable protection")
                 : enrollment
-                  ? "Enable authenticator"
-                  : "Begin enrollment"}
+                  ? uiText("Enable authenticator")
+                  : uiText("Begin enrollment")}
             <Icon name="arrow" size={16} />
           </button>
         </div>

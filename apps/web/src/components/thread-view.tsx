@@ -1,4 +1,5 @@
 "use client";
+import { uiText } from "@/lib/i18n";
 
 import { useState } from "react";
 import { date, number } from "@/lib/api";
@@ -30,19 +31,25 @@ export default function ThreadView({
     <>
       <ErrorBox error={resource.error} retry={resource.refresh} />
       {resource.loading ? (
-        <Loading text="Opening collected conversation…" />
+        <Loading text={uiText("Opening collected conversation…")} />
       ) : (
         resource.data && (
           <>
             <div className="thread-scope">
-              <span className="eyebrow">EXPLICIT HEADER LINKS</span>
+              <span className="eyebrow">{uiText("EXPLICIT HEADER LINKS")}</span>
               <strong>
-                {number(resource.data.total_hits)} collected{" "}
-                {resource.data.total_hits === 1 ? "message" : "messages"}
+                {uiText("{0} collected {1}", {
+                  "0": number(resource.data.total_hits),
+                  "1":
+                    resource.data.total_hits === 1
+                      ? uiText("message")
+                      : uiText("messages"),
+                })}
               </strong>
               <p>
-                Only explicit message identifiers connect these records.
-                Collection completeness has not been assessed.
+                {uiText(
+                  "Only explicit message identifiers connect these records. Collection completeness has not been assessed.",
+                )}
               </p>
             </div>
             <div className="thread-messages">
